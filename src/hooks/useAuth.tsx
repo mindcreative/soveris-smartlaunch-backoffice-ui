@@ -1,87 +1,82 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, ReactNode } from 'react'
+import { useAuthStore } from '../stores/authStore'
 
-interface User {
-  id: string
-  email: string
-  displayName: string
-  role: 'Admin' | 'Editor' | 'Viewer'
-  clientId: string
-}
-
-interface AuthContextType {
-  user: User | null
-  isAuthenticated: boolean
-  isLoading: boolean
-  login: (email: string, password: string) => Promise<void>
-  logout: () => void
-  hasPermission: (permission: string) => boolean
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
-
-// Permission matrix for roles
+// Role-based permission map
 const ROLE_PERMISSIONS: Record<string, string[]> = {
-  Admin: ['*'],
-  Editor: [
-    'submissions:view',
-    'submissions:delete',
-    'submissions:export',
-    'analytics:view',
-    'content:view',
-    'content:update',
-    'ai:view',
-    'ai:create'
+  admin: [
+    'users:view', 'users:create', 'users:edit', 'users:delete',
+    'content:view', 'content:create', 'content:edit', 'content:delete',
+    'submissions:view', 'submissions:approve', 'submissions:reject',
+    'analytics:view', 'audit:view',
+    'ai:view', 'ai:use',
+    'settings:view', 'settings:edit',
+    'themes:view', 'themes:edit',
   ],
-  Viewer: [
+  editor: [
+    'content:view', 'content:create', 'content:edit', 'content:delete',
+    'submissions:view', 'submissions:approve', 'submissions:reject',
+    'analytics:view',
+    'ai:view', 'ai:use',
+  ],
+  viewer: [
+    'content:view',
     'submissions:view',
     'analytics:view',
-    'content:view',
-    'audit:view'
-  ]
+    'audit:view',
+    'ai:view',
+    'settings:view',
+    'themes:view',
+  ],
 }
+
+// AuthContext for backward compatibility with App.tsx AuthProvider
+const AuthContext = createContext<ReturnType<typeof useAuth> | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const auth = useAuth()
+  return <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>
+}
 
-  const hasPermission = useCallback((permission: string) => {
-    if (!user) return false
-    const permissions = ROLE_PERMISSIONS[user.role] || []
-    return permissions.includes('*') || permissions.includes(permission)
-  }, [user])
-
-  const login = useCallback(async (_email: string, _password: string) => {
-    setIsLoading(true)
-    try {
-      // TODO: Implement actual login logic
-      const mockUser: User = {
-        id: '1',
-        email: 'admin@soveris.com',
-        displayName: 'Admin User',
-        role: 'Admin',
-        clientId: 'default-client-id'
-      }
-      setUser(mockUser)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  const logout = useCallback(() => {
-    setUser(null)
-  }, [])
-
-  return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, hasPermission }}>
-      {children}
-    </AuthContext.Provider>
-  )
+export function useAuthContext() {
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuthContext must be used within AuthProvider')
+  return ctx
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
+  const accessToken = useAuthStore((s) => s.accessToken)
+  const refreshTokenValue = useAuthStore((s) => s.refreshTokenValue)
+  const user = useAuthStore((s) => s.user)
+  const isLoading = useAuthStore((s) => s.isLoading)
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  const login = useAuthStore((s) => s.login)
+  const logout = useAuthStore((s) => s.logout)
+  const refreshTokenAction = useAuthStore((s) => s.doRefreshToken)
+
+  const hasPermission = (permission: string): boolean => {
+    if (!user?.role) return false
+    const allowed = ROLE_PERMISSIONS[user.role]
+    if (!allowed) return false
+    return allowed.includes(permission)
   }
-  return context
+
+  const hasAnyPermission = (permissions: string[]): boolean => {
+    if (!user?.role) return false
+    const allowed = ROLE_PERMISSIONS[user.role]
+    if (!allowed) return false
+    return permissions.some((p) => allowed.includes(p))
+  }
+
+  return {
+    accessToken,
+    refreshTokenValue,
+    refreshToken: refreshTokenAction,
+    user,
+    isLoading,
+    isAuthenticated,
+    login,
+    logout,
+    hasPermission,
+    hasAnyPermission,
+  }
 }

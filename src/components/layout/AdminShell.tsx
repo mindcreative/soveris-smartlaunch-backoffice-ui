@@ -1,21 +1,30 @@
-import { Outlet } from 'react-router-dom'
+import { useEffect } from 'react'
+import { useNavigate, Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { useAuth } from '../../hooks/useAuth'
+import { LoadingSpinner } from '../shared/LoadingSpinner'
 
 export function AdminShell() {
-  const { isAuthenticated } = useAuth()
+  const navigate = useNavigate()
+  const { isAuthenticated, isLoading } = useAuth()
 
-  if (!isAuthenticated) {
-    // Redirect to login - TODO: Implement proper route protection
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      navigate('/login', { replace: true })
+    }
+  }, [isAuthenticated, isLoading, navigate])
+
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Soveris Back-Office</h1>
-          <p className="text-gray-500 mb-4">Redirecting to login...</p>
-        </div>
+        <LoadingSpinner size="lg" />
       </div>
     )
+  }
+
+  if (!isAuthenticated) {
+    return null
   }
 
   return (

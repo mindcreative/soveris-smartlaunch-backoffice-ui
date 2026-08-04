@@ -73,11 +73,12 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* Client info at bottom */}
+        {/* User info at bottom */}
         {user && (
           <div className="border-t border-gray-200 p-4">
-            <p className="text-xs text-gray-500">Client</p>
-            <p className="text-sm font-medium text-gray-900 truncate">{user.clientId}</p>
+            <p className="text-xs text-gray-500">Logged in as</p>
+            <p className="text-sm font-medium text-gray-900 truncate">{user.displayName || user.email || 'User'}</p>
+            <p className="text-xs text-gray-400 capitalize">{user.role}</p>
           </div>
         )}
       </div>

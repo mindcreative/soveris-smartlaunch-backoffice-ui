@@ -1,14 +1,126 @@
 import type { FC } from 'react'
+import { useMemo } from 'react'
+import { useOverviewMetrics, useProductBreakdown } from '@/hooks/useQueryHooks'
+import { StatCard } from '@/components/shared/StatCard'
+import { DataTable } from '@/components/shared/DataTable'
+import { ErrorDisplay } from '@/components/shared/ErrorDisplay'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 
-const AuditLogsPage: FC = () => {
+const AnalyticsPage: FC = () => {
+  const { data: overview, isLoading: overviewLoading, error: overviewError } = useOverviewMetrics()
+  const { data: productBreakdown, isLoading: productsLoading } = useProductBreakdown()
+
+  const isLoading = overviewLoading || productsLoading
+  const error = overviewError
+
+  const statsCards = useMemo(() => {
+    if (!overview) return []
+
+    const totalSubmissions = overview.totalSubmissions ?? 0
+    const verifiedCount = overview.totalVerified ?? 0
+    const verificationRate = overview.verificationRate ?? 0
+    const conversionRate = overview.conversionRate ?? 0
+
+    return [
+      {
+        title: 'Total Submissions',
+        value: totalSubmissions,
+      },
+      {
+        title: 'Verification Rate',
+        value: `${verificationRate}%`,
+      },
+      {
+        title: 'Conversion Rate',
+        value: `${conversionRate}%`,
+      },
+      {
+        title: 'Verified',
+        value: verifiedCount,
+      },
+    ]
+  }, [overview])
+
+  const topProductsColumns = useMemo(
+    () => [
+      { key: 'productName', label: 'Product' },
+      {
+        key: 'submissions',
+        label: 'Submissions',
+        render: (value: unknown) => <strong>{String(value)}</strong>,
+      },
+      {
+        key: 'verified',
+        label: 'Verified',
+        render: (value: unknown) => <span className="text-green-600 font-medium">{String(value)}</span>,
+      },
+      {
+        key: 'conversionRate',
+        label: 'Conv. Rate',
+        render: (value: unknown) => `${(Number(value) * 100).toFixed(1)}%`,
+      },
+    ],
+    []
+  )
+
+  const topProductsData = useMemo(() => {
+    if (!productBreakdown) return []
+    return productBreakdown.map((p) => ({
+      productName: p.productName,
+      submissions: p.submissions,
+      verified: p.verified,
+      conversionRate: p.conversionRate,
+    }))
+  }, [productBreakdown])
+
+  if (error) {
+    return (
+      <ErrorDisplay
+        message={error.message || 'Failed to load analytics data'}
+        onRetry={() => window.location.reload()}
+      />
+    )
+  }
+
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold text-slate-900 mb-6">Audit Logs</h1>
-      <div className="bg-white rounded-lg shadow p-6">
-        <p className="text-slate-500">Audit log viewer coming soon</p>
-      </div>
+    <div className="space-y-6">
+      <h1 className="text-xl font-semibold text-gray-900">Analytics</h1>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <LoadingSpinner size="lg" />
+        </div>
+      ) : (
+        <>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {statsCards.map((card) => (
+              <StatCard
+                key={card.title}
+                title={card.title}
+                value={card.value}
+              />
+            ))}
+          </div>
+
+          {/* Top Products Table */}
+          <div>
+            <h2 className="text-base font-semibold text-gray-900 mb-3">Product Breakdown</h2>
+            {!topProductsData.length ? (
+              <EmptyState
+                icon="chart-bar"
+                title="No product data available"
+                description="Product analytics will appear once submissions start coming in."
+              />
+            ) : (
+              <DataTable columns={topProductsColumns} data={topProductsData} />
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }
 
-export default AuditLogsPage
+export default AnalyticsPage
