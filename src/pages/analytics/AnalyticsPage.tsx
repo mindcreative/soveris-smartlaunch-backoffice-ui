@@ -1,6 +1,6 @@
 import type { FC } from 'react'
 import { useMemo } from 'react'
-import { useOverviewMetrics, useProductBreakdown } from '@/hooks/useQueryHooks'
+import { useOverviewMetrics } from '@/hooks/useQueryHooks'
 import { StatCard } from '@/components/shared/StatCard'
 import { DataTable } from '@/components/shared/DataTable'
 import { ErrorDisplay } from '@/components/shared/ErrorDisplay'
@@ -9,9 +9,8 @@ import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 
 const AnalyticsPage: FC = () => {
   const { data: overview, isLoading: overviewLoading, error: overviewError } = useOverviewMetrics()
-  const { data: productBreakdown, isLoading: productsLoading } = useProductBreakdown()
 
-  const isLoading = overviewLoading || productsLoading
+  const isLoading = overviewLoading
   const error = overviewError
 
   const statsCards = useMemo(() => {
@@ -64,15 +63,10 @@ const AnalyticsPage: FC = () => {
     []
   )
 
-  const topProductsData = useMemo(() => {
-    if (!productBreakdown) return []
-    return productBreakdown.map((p) => ({
-      productName: p.productName,
-      submissions: p.submissions,
-      verified: p.verified,
-      conversionRate: p.conversionRate,
-    }))
-  }, [productBreakdown])
+  // NOTE: ProductBreakdown is a single object from API (requires productId).
+  // The /analytics/products endpoint was renamed to /analytics/products/{productId}.
+  // Placeholder: show empty state until a product selector is added.
+  const topProductsData: Array<{ productName: string; submissions: number; verified: number; conversionRate: number }> = []
 
   if (error) {
     return (

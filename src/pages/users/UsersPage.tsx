@@ -1,6 +1,6 @@
 import type { FC } from 'react'
 import { useState, useMemo } from 'react'
-import { useUsers, useCreateUser, useDeleteUser } from '@/hooks/useQueryHooks'
+import { useUsers, useCreateUser, useDeactivateUser } from '@/hooks/useQueryHooks'
 import { DataTable } from '@/components/shared/DataTable'
 import { Pagination } from '@/components/shared/Pagination'
 import { Badge } from '@/components/shared/Badge'
@@ -32,7 +32,7 @@ const UsersPage: FC = () => {
 
   const { data: users, isLoading, error } = useUsers({ page, pageSize })
   const createUserMutation = useCreateUser()
-  const deleteUserMutation = useDeleteUser()
+  const deactivateUserMutation = useDeactivateUser()
 
   const tableData = useMemo(() => {
     const result = users as { data?: BackOfficeUser[] } | undefined
@@ -102,9 +102,9 @@ const UsersPage: FC = () => {
     }
   }
 
-  const handleDeleteUser = async () => {
+  const handleDeactivateUser = async () => {
     if (showDeleteConfirm) {
-      await deleteUserMutation.mutateAsync(showDeleteConfirm)
+      await deactivateUserMutation.mutateAsync(showDeleteConfirm)
       setShowDeleteConfirm(null)
     }
   }
@@ -223,11 +223,11 @@ const UsersPage: FC = () => {
         </div>
       </Modal>
 
-      {/* Delete Confirmation Modal */}
+      {/* Deactivate Confirmation Modal */}
       <Modal
         isOpen={!!showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(null)}
-        title="Delete User"
+        title="Deactivate User"
         footer={
           <>
             <button
@@ -237,17 +237,17 @@ const UsersPage: FC = () => {
               Cancel
             </button>
             <button
-              onClick={handleDeleteUser}
-              disabled={!showDeleteConfirm || deleteUserMutation.isPending}
+              onClick={handleDeactivateUser}
+              disabled={!showDeleteConfirm || deactivateUserMutation.isPending}
               className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50"
             >
-              {deleteUserMutation.isPending ? 'Deleting...' : 'Delete User'}
+               {deactivateUserMutation.isPending ? 'Deactivating...' : 'Deactivate User'}
             </button>
           </>
         }
       >
         <p className="text-sm text-gray-600">
-          Are you sure you want to delete this user? This action cannot be undone.
+          Are you sure you want to deactivate this user? They will no longer be able to log in.
         </p>
       </Modal>
     </div>

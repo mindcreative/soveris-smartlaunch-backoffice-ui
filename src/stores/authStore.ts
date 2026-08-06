@@ -151,25 +151,22 @@ export const useAuthStore = create<AuthStore>()(
         },
 
         logout: async () => {
-          try {
-            await authApi.logout()
-          } catch {
-            // Ignore logout errors — clear state regardless
-          } finally {
-            set({
-              user: null,
-              accessToken: null,
-              refreshTokenValue: null,
-              isAuthenticated: false,
-              isLoading: false,
-            })
+          // NOTE: API /auth/logout and /auth/revoke are not called from the UI side.
+          // Simply clear local state.
+          set({
+            user: null,
+            accessToken: null,
+            refreshTokenValue: null,
+            isAuthenticated: false,
+            isLoading: false,
+          })
 
-            try {
-              localStorage.removeItem('backoffice_access_token')
-              localStorage.removeItem('backoffice_refresh_token')
-            } catch {
-              // noop
-            }
+          try {
+            localStorage.removeItem('backoffice_access_token')
+            localStorage.removeItem('backoffice_refresh_token')
+          }
+          catch {
+            // noop
           }
         },
 
@@ -218,14 +215,23 @@ export const useAuthStore = create<AuthStore>()(
           const state = get()
           if (!state.accessToken) return
 
-          set({ isLoading: true })
+          // NOTE: /auth/me is not implemented in the API.
+          // Trust the persisted JWT payload (user + expiration) and attempt refresh if needed.
+          set({ isLoading: false })
           try {
-            const user = await authApi.getCurrentUser()
-            set({
-              user,
-              isAuthenticated: true,
-              isLoading: false,
-            })
+            // If we have a persisted user with accessToken, consider authenticated
+            if (state.user && state.accessToken) {
+              set({ isAuthenticated: true })
+            } else if (state.refreshTokenValue) {
+              await get().doRefreshToken()
+            } else {
+              set({
+                user: null,
+                accessToken: null,
+                refreshTokenValue: null,
+                isAuthenticated: false,
+              })
+            }
           } catch {
             // Token is stale — attempt refresh
             const currentState = get()

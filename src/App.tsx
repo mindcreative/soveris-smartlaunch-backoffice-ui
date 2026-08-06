@@ -10,7 +10,10 @@ import Submissions from './pages/submissions/SubmissionsPage'
 import Analytics from './pages/analytics/AnalyticsPage'
 import Content from './pages/content/ContentPage'
 import Users from './pages/users/UsersPage'
+import { AuditLogPage } from './pages/audit'
 import Forbidden from './pages/error/ForbiddenPage'
+import { useAuthGuard } from './hooks/useAuthGuard'
+import type { UserRole } from './types/auth'
 
 // Create QueryClient instance
 const queryClient = new QueryClient({
@@ -22,6 +25,21 @@ const queryClient = new QueryClient({
     },
   },
 })
+
+// Protected route wrapper with role-based access
+function ProtectedRoute({
+  children,
+  requiredRole,
+}: {
+  children: React.ReactNode
+  requiredRole?: UserRole
+}) {
+  const { hasAccess } = useAuthGuard({ requiredRole })
+  if (!hasAccess()) {
+    return <Navigate to="/forbidden" replace />
+  }
+  return <>{children}</>
+}
 
 function App() {
   return (
@@ -54,12 +72,15 @@ function App() {
                   <p className="text-gray-500">AI tools integration coming soon.</p>
                 </div>
               } />
-              <Route path="/audit" element={
-                <div className="space-y-4">
-                  <h1 className="text-xl font-semibold text-gray-900">Audit Logs</h1>
-                  <p className="text-gray-500">Audit log viewer coming soon.</p>
-                </div>
-              } />
+              {/* Audit Logs - Admin only */}
+              <Route
+                path="/audit"
+                element={
+                  <ProtectedRoute requiredRole="Admin">
+                    <AuditLogPage />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Default redirect to dashboard */}
               <Route path="/" element={<Navigate to="/dashboard" replace />} />

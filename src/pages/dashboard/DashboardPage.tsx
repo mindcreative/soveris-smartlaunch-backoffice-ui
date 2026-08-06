@@ -1,7 +1,7 @@
 import type { FC } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { useOverviewMetrics, useAuditLogs, useHealthCheck } from '@/hooks/useQueryHooks'
+import { useOverviewMetrics, useHealthCheck } from '@/hooks/useQueryHooks'
 import { StatCard } from '@/components/shared/StatCard'
 import { ErrorDisplay } from '@/components/shared/ErrorDisplay'
 import { Badge } from '@/components/shared/Badge'
@@ -14,7 +14,6 @@ const DashboardPage: FC = () => {
   const queryClient = useQueryClient()
 
   const { data: metrics, isLoading: metricsLoading, error: metricsError } = useOverviewMetrics()
-  const { data: activity, isLoading: activityLoading, error: activityError } = useAuditLogs({ page: 1, pageSize: 10 })
   const { data: health, isLoading: healthLoading, error: healthError } = useHealthCheck()
 
   const handleRefresh = () => {
@@ -33,7 +32,7 @@ const DashboardPage: FC = () => {
         </div>
         <button
           onClick={handleRefresh}
-          disabled={metricsLoading || activityLoading || healthLoading}
+          disabled={metricsLoading || healthLoading}
           className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
         >
           <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -87,93 +86,46 @@ const DashboardPage: FC = () => {
         />
       )}
 
-      {/* Activity & Health */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Activity */}
-        <div className="bg-white rounded-lg border border-gray-200">
-          <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-900">Recent Activity</h2>
-            <button
-              onClick={() => navigate('/audit')}
-              className="text-xs text-blue-600 hover:text-blue-700"
-            >
-              View all
-            </button>
-          </div>
-          {activityLoading ? (
-            <div className="p-4 space-y-3">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="animate-pulse flex items-center gap-3">
-                  <div className="w-2 h-2 bg-gray-200 rounded-full"></div>
-                  <div className="h-3 bg-gray-200 rounded flex-1"></div>
-                </div>
-              ))}
-            </div>
-          ) : activityError ? (
-            <ErrorDisplay message={activityError.message} onRetry={handleRefresh} />
-          ) : activity?.data?.length ? (
-            <ul className="divide-y divide-gray-100">
-              {activity.data.slice(0, 5).map((item: { action?: string; description?: string; userName?: string; createdAt: string }, idx: number) => (
-                <li key={idx} className="px-4 py-3 hover:bg-gray-50">
-                  <div className="flex items-start gap-3">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full mt-1.5 shrink-0" />
-                    <div>
-                      <p className="text-sm text-gray-800">{item.action || item.description || 'Activity event'}</p>
-                      <p className="text-xs text-gray-500">
-                        {item.userName && `${item.userName} — `}
-                        {new Date(item.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="p-6 text-center text-sm text-gray-500">No recent activity</div>
-          )}
+      {/* System Health */}
+      <div className="bg-white rounded-lg border border-gray-200">
+        <div className="px-4 py-3 border-b border-gray-200">
+          <h2 className="text-sm font-semibold text-gray-900">System Health</h2>
         </div>
-
-        {/* System Health */}
-        <div className="bg-white rounded-lg border border-gray-200">
-          <div className="px-4 py-3 border-b border-gray-200">
-            <h2 className="text-sm font-semibold text-gray-900">System Health</h2>
+        {healthLoading ? (
+          <div className="p-4 space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="animate-pulse flex items-center justify-between">
+                <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+                <div className="h-5 bg-gray-200 rounded w-1/6"></div>
+              </div>
+            ))}
           </div>
-          {healthLoading ? (
-            <div className="p-4 space-y-3">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="animate-pulse flex items-center justify-between">
-                  <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-                  <div className="h-5 bg-gray-200 rounded w-1/6"></div>
-                </div>
-              ))}
+        ) : healthError ? (
+          <ErrorDisplay message={healthError.message} onRetry={handleRefresh} />
+        ) : health ? (
+          <div className="divide-y divide-gray-100">
+            <div className="px-4 py-3 flex items-center justify-between">
+              <span className="text-sm text-gray-700">API</span>
+              <Badge variant={health.status === 'healthy' ? 'success' : 'error'}>
+                {health.status}
+              </Badge>
             </div>
-          ) : healthError ? (
-            <ErrorDisplay message={healthError.message} onRetry={handleRefresh} />
-          ) : health ? (
-            <div className="divide-y divide-gray-100">
-              <div className="px-4 py-3 flex items-center justify-between">
-                <span className="text-sm text-gray-700">API</span>
-                <Badge variant={health.status === 'healthy' ? 'success' : 'error'}>
-                  {health.status}
-                </Badge>
-              </div>
-              <div className="px-4 py-3 flex items-center justify-between">
-                <span className="text-sm text-gray-700">Database</span>
-                <Badge variant={health.database === 'ok' ? 'success' : 'error'}>
-                  {health.database}
-                </Badge>
-              </div>
-              <div className="px-4 py-3 flex items-center justify-between">
-                <span className="text-sm text-gray-700">Redis</span>
-                <Badge variant={health.redis === 'ok' ? 'success' : 'error'}>
-                  {health.redis}
-                </Badge>
-              </div>
+            <div className="px-4 py-3 flex items-center justify-between">
+              <span className="text-sm text-gray-700">Database</span>
+              <Badge variant={health.database === 'ok' ? 'success' : 'error'}>
+                {health.database}
+              </Badge>
             </div>
-          ) : (
-            <div className="p-6 text-center text-sm text-gray-500">Health data unavailable</div>
-          )}
-        </div>
+            <div className="px-4 py-3 flex items-center justify-between">
+              <span className="text-sm text-gray-700">Redis</span>
+              <Badge variant={health.redis === 'ok' ? 'success' : 'error'}>
+                {health.redis}
+              </Badge>
+            </div>
+          </div>
+        ) : (
+          <div className="p-6 text-center text-sm text-gray-500">Health data unavailable</div>
+        )}
       </div>
     </div>
   )

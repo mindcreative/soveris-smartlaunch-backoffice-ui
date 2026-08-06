@@ -1,14 +1,13 @@
 import type { FC } from 'react'
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useSubmissions, useRejectSubmission } from '@/hooks/useQueryHooks'
+import { useSubmissions } from '@/hooks/useQueryHooks'
 import { DataTable } from '@/components/shared/DataTable'
 import { Pagination } from '@/components/shared/Pagination'
 import { Badge } from '@/components/shared/Badge'
 import { ErrorDisplay } from '@/components/shared/ErrorDisplay'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
-import { Modal } from '@/components/shared/Modal'
 import type { Submission, SubmissionStatus as SubmissionStatusType } from '@/types'
 
 const statusColors: Record<SubmissionStatusType, 'success' | 'warning' | 'error' | 'info' | 'neutral'> = {
@@ -22,22 +21,8 @@ const SubmissionsPage: FC = () => {
   const [page, setPage] = useState(1)
   const [pageSize] = useState(20)
   const [statusFilter, setStatusFilter] = useState<SubmissionStatusType | ''>('')
-  const [selectedSubmission, setSelectedSubmission] = useState<string | null>(null)
-  const [rejectReason, setRejectReason] = useState('')
-  const [showRejectModal, setShowRejectModal] = useState(false)
 
   const { data: submissions, isLoading, error } = useSubmissions({ page, pageSize, status: statusFilter || undefined })
-
-  const rejectMutation = useRejectSubmission()
-
-  const handleRejectSubmit = async () => {
-    if (selectedSubmission && rejectReason.trim()) {
-      await rejectMutation.mutateAsync({ id: selectedSubmission, reason: rejectReason })
-      setShowRejectModal(false)
-      setSelectedSubmission(null)
-      setRejectReason('')
-    }
-  }
 
   const columns = useMemo(
     () => [
@@ -134,43 +119,8 @@ const SubmissionsPage: FC = () => {
         </>
       )}
 
-      {/* Reject Modal */}
-      <Modal
-        isOpen={showRejectModal}
-        onClose={() => { setShowRejectModal(false); setSelectedSubmission(null); setRejectReason('') }}
-        title="Reject Submission"
-        footer={
-          <>
-            <button
-              onClick={() => { setShowRejectModal(false); setSelectedSubmission(null); setRejectReason('') }}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleRejectSubmit}
-              disabled={!rejectReason.trim() || rejectMutation.isPending}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50"
-            >
-              {rejectMutation.isPending ? 'Rejecting...' : 'Confirm Rejection'}
-            </button>
-          </>
-        }
-      >
-        <div className="mt-2">
-          <label htmlFor="reject-reason" className="block text-sm font-medium text-gray-700 mb-1">
-            Reason for rejection
-          </label>
-          <textarea
-            id="reject-reason"
-            rows={4}
-            value={rejectReason}
-            onChange={(e) => setRejectReason(e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
-            placeholder="Provide a detailed reason..."
-          />
-        </div>
-      </Modal>
+      {/* NOTE: Reject/Update status endpoints do not exist in the API.
+          Status changes must be done via direct API calls or admin tools. */}
     </div>
   )
 }

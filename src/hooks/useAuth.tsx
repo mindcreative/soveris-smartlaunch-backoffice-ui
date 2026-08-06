@@ -55,14 +55,18 @@ export function useAuth() {
 
   const hasPermission = (permission: string): boolean => {
     if (!user?.role) return false
-    const allowed = ROLE_PERMISSIONS[user.role]
+    // Normalize role to lowercase for lookup (DB stores "Admin", map uses "admin")
+    const normalizedRole = user.role.toLowerCase()
+    const allowed = ROLE_PERMISSIONS[normalizedRole]
     if (!allowed) return false
     return allowed.includes(permission)
   }
 
   const hasAnyPermission = (permissions: string[]): boolean => {
     if (!user?.role) return false
-    const allowed = ROLE_PERMISSIONS[user.role]
+    // Normalize role to lowercase for lookup (DB stores "Admin", map uses "admin")
+    const normalizedRole = user.role.toLowerCase()
+    const allowed = ROLE_PERMISSIONS[normalizedRole]
     if (!allowed) return false
     return permissions.some((p) => allowed.includes(p))
   }

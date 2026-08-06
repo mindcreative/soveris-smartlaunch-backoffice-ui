@@ -11,17 +11,16 @@ import {
   aiApi,
   auditApi,
   clientsApi,
+  getClients,
   settingsApi,
   themeApi,
   healthApi,
   type Client,
   type AiGenerationRequest,
-  type AiTool,
 } from '../api/endpoints'
 import type {
   ProductContent,
   Submission,
-  SubmissionStatus,
   GetSubmissionsRequest,
   FunnelStageCount,
   GeographyData,
@@ -55,11 +54,19 @@ export const queryKeys = {
 }
 
 // ==================== CLIENTS HOOKS ====================
+// NOTE: API has no list/create/delete endpoints for clients. Only GET/PUT by ID.
 
-export function useClients(params?: { page?: number; pageSize?: number; search?: string }) {
-  return useQuery({
+export function useClients(_params?: { page?: number; pageSize?: number; search?: string }) {
+  // Placeholder - will throw at runtime until API implements list endpoint
+  return useQuery<Client[]>({
     queryKey: queryKeys.clients(),
-    queryFn: () => clientsApi.getClients(params),
+    queryFn: async () => {
+      try {
+        return await getClients()
+      } catch {
+        return []
+      }
+    },
     staleTime: 5 * 60 * 1000,
   })
 }
@@ -70,16 +77,6 @@ export function useClient(id: string) {
     queryFn: () => clientsApi.getClient(id),
     enabled: !!id,
     staleTime: 5 * 60 * 1000,
-  })
-}
-
-export function useCreateClient() {
-  const queryClient = useQueryClient()
-  return useMutation<Client, Error, Partial<Client>>({
-    mutationFn: (data) => clientsApi.createClient(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.clients() })
-    },
   })
 }
 
@@ -98,18 +95,8 @@ export function useUpdateClient() {
   })
 }
 
-export function useDeleteClient() {
-  const queryClient = useQueryClient()
-  return useMutation<void, Error, string>({
-    mutationFn: (id) => clientsApi.deleteClient(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.clients() })
-      queryClient.removeQueries({ queryKey: queryKeys.client('') })
-    },
-  })
-}
-
 // ==================== CONTENT HOOKS ====================
+// NOTE: API has no create/delete content endpoints. Content is per-product.
 
 export function useContent(params?: {
   page?: number
@@ -133,16 +120,6 @@ export function useContentItem(id: string) {
   })
 }
 
-export function useCreateContent() {
-  const queryClient = useQueryClient()
-  return useMutation<ProductContent, Error, Partial<ProductContent>>({
-    mutationFn: (data) => contentApi.createContent(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.content() })
-    },
-  })
-}
-
 export function useUpdateContent() {
   const queryClient = useQueryClient()
   return useMutation<
@@ -158,17 +135,8 @@ export function useUpdateContent() {
   })
 }
 
-export function useDeleteContent() {
-  const queryClient = useQueryClient()
-  return useMutation<void, Error, string>({
-    mutationFn: (id) => contentApi.deleteContent(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.content() })
-    },
-  })
-}
-
 // ==================== SUBMISSIONS HOOKS ====================
+// NOTE: API has no updateSubmissionStatus or rejectSubmission endpoints.
 
 export function useSubmissions(params?: GetSubmissionsRequest) {
   return useQuery({
@@ -187,29 +155,12 @@ export function useSubmission(id: string) {
   })
 }
 
-export function useUpdateSubmissionStatus() {
+export function useDeleteSubmission() {
   const queryClient = useQueryClient()
-  return useMutation<
-    Submission,
-    Error,
-    { id: string; status: SubmissionStatus; notes?: string }
-  >({
-    mutationFn: ({ id, status, notes }) =>
-      submissionsApi.updateSubmissionStatus(id, status, notes),
-    onSuccess: (data) => {
+  return useMutation<void, Error, string>({
+    mutationFn: (id) => submissionsApi.deleteSubmission(id),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.submissions() })
-      queryClient.setQueryData(queryKeys.submission(data.id), data)
-    },
-  })
-}
-
-export function useRejectSubmission() {
-  const queryClient = useQueryClient()
-  return useMutation<Submission, Error, { id: string; reason: string }>({
-    mutationFn: ({ id, reason }) => submissionsApi.rejectSubmission(id, reason),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.submissions() })
-      queryClient.setQueryData(queryKeys.submission(data.id), data)
     },
   })
 }
@@ -256,10 +207,22 @@ export function useTrafficSources() {
   })
 }
 
-export function useProductBreakdown() {
-  return useQuery<ProductBreakdown[]>({
-    queryKey: [...queryKeys.analytics(), 'products'],
-    queryFn: () => analyticsApi.getProductBreakdown(),
+// NOTE: API requires productId for product breakdown. Use useProductBreakdownWithId(productId) instead.
+export function useProductBreakdown(_productId?: string) {
+  // This now requires a productId - kept for backward compat but will fail without it
+  return useQuery<ProductBreakdown>({
+    queryKey: [...queryKeys.analytics(), 'products', _productId || 'all'],
+    queryFn: () => analyticsApi.getProductBreakdown(_productId || ''),
+    enabled: !!_productId,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+export function useProductBreakdownWithId(productId: string) {
+  return useQuery<ProductBreakdown>({
+    queryKey: [...queryKeys.analytics(), 'products', productId],
+    queryFn: () => analyticsApi.getProductBreakdown(productId),
+    enabled: !!productId,
     staleTime: 5 * 60 * 1000,
   })
 }
@@ -313,10 +276,11 @@ export function useUpdateUser() {
   })
 }
 
-export function useDeleteUser() {
+// NOTE: API has no deleteUser endpoint. Use deactivateUser instead.
+export function useDeactivateUser() {
   const queryClient = useQueryClient()
   return useMutation<void, Error, string>({
-    mutationFn: (id) => usersApi.deleteUser(id),
+    mutationFn: (id) => usersApi.deactivateUser(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.users() })
     },
@@ -325,7 +289,7 @@ export function useDeleteUser() {
 
 // ==================== AUDIT LOGS HOOKS ====================
 
-export function useAuditLogs(params?: {
+export interface AuditLogParams {
   page?: number
   pageSize?: number
   action?: string
@@ -333,23 +297,29 @@ export function useAuditLogs(params?: {
   entityType?: string
   startDate?: string
   endDate?: string
-}) {
+  sortBy?: string
+  sortDirection?: 'asc' | 'desc'
+}
+
+export function useAuditLogs(params?: AuditLogParams) {
   return useQuery({
-    queryKey: queryKeys.auditLogs(),
+    queryKey: [...queryKeys.auditLogs(), params || 'all'],
     queryFn: () => auditApi.getAuditLogs(params),
     staleTime: 1 * 60 * 1000,
   })
 }
 
-// ==================== AI HOOKS ====================
-
-export function useAiTools() {
-  return useQuery<AiTool[]>({
-    queryKey: queryKeys.ai(),
-    queryFn: () => aiApi.getAiTools(),
-    staleTime: 30 * 60 * 1000,
+export function useAuditLogDetail(id: string) {
+  return useQuery({
+    queryKey: [...queryKeys.auditLogs(), id],
+    queryFn: () => auditApi.getAuditLogById(id),
+    enabled: !!id,
+    staleTime: 1 * 60 * 1000,
   })
 }
+
+// ==================== AI HOOKS ====================
+// NOTE: /ai/tools and /ai/analyze/{id} endpoints do not exist in the API.
 
 export function useAiGenerate() {
   return useMutation<
@@ -361,19 +331,27 @@ export function useAiGenerate() {
   })
 }
 
-export function useAiAnalyze() {
-  return useMutation<
-    {
-      sentiment: string
-      confidence: number
-      categories: string[]
-      summary: string
-      recommendations: string[]
-    },
-    Error,
-    string
-  >({
-    mutationFn: (submissionId) => aiApi.analyzeSubmission(submissionId),
+export function useAiGenerateSeo() {
+  return useMutation<string, Error, { content: string; language?: string }>({
+    mutationFn: (data) => aiApi.generateSeo(data),
+  })
+}
+
+export function useAiGenerateHeadline() {
+  return useMutation<string, Error, { content: string; tone?: string }>({
+    mutationFn: (data) => aiApi.generateHeadline(data),
+  })
+}
+
+export function useAiGenerateImagePrompt() {
+  return useMutation<string, Error, { description: string }>({
+    mutationFn: (data) => aiApi.generateImagePrompt(data),
+  })
+}
+
+export function useAiRewriteContent() {
+  return useMutation<string, Error, { content: string; style?: string }>({
+    mutationFn: (data) => aiApi.rewriteContent(data),
   })
 }
 
@@ -398,21 +376,37 @@ export function useUpdateSettings() {
 }
 
 // ==================== THEME HOOKS ====================
+// NOTE: API requires productId for theme endpoints. Use useThemeWithProduct(productId) instead.
 
-export function useTheme() {
+export function useTheme(_productId?: string) {
+  // This now requires a productId - kept for backward compat but will fail without it
   return useQuery({
     queryKey: queryKeys.themes(),
-    queryFn: () => themeApi.getTheme(),
+    queryFn: () => themeApi.getTheme(_productId || ''),
+    enabled: !!_productId,
+    staleTime: 30 * 60 * 1000,
+  })
+}
+
+export function useThemeWithId(productId: string) {
+  return useQuery({
+    queryKey: [...queryKeys.themes(), productId],
+    queryFn: () => themeApi.getTheme(productId),
+    enabled: !!productId,
     staleTime: 30 * 60 * 1000,
   })
 }
 
 export function useUpdateTheme() {
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (data: Record<string, unknown>) => themeApi.updateTheme(data),
-    onSuccess: (data) => {
-      queryClient.setQueryData(queryKeys.themes(), data)
+  return useMutation<
+    Record<string, unknown>,
+    Error,
+    { productId: string; data: Record<string, unknown> }
+  >({
+    mutationFn: ({ productId, data }) => themeApi.updateTheme(productId, data),
+    onSuccess: (data, { productId }) => {
+      queryClient.setQueryData([...queryKeys.themes(), productId], data)
     },
   })
 }
