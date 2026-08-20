@@ -12,6 +12,10 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Vite embeds public configuration into the static bundle at build time.
+ARG VITE_API_BASE_URL=https://backoffice-api.soveris.com/api/backoffice
+ARG VITE_APP_ENV=production
+
 # Build the application
 RUN npm run build
 
