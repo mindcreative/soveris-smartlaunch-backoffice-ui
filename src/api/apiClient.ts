@@ -49,6 +49,19 @@ export function resolveApiOrigin(
 
 const API_ORIGIN = resolveApiOrigin(API_BASE_URL)
 
+export interface AuthRefreshLifecycleDetail {
+  waitUntil: (promise: Promise<void>) => void
+}
+
+export async function notifySuccessfulAuthRefresh(): Promise<void> {
+  if (typeof window === 'undefined') return
+  const pending: Promise<void>[] = []
+  window.dispatchEvent(new CustomEvent<AuthRefreshLifecycleDetail>('auth:refreshed', {
+    detail: { waitUntil: (promise) => pending.push(promise) },
+  }))
+  await Promise.all(pending)
+}
+
 function isApiError(error: unknown): error is ApiError {
   return Boolean(
     error &&
@@ -262,6 +275,7 @@ export class ApiClient {
       const { accessToken, refreshToken: newRefreshToken } = response.data
 
       this.setTokens(accessToken, newRefreshToken || refreshToken)
+      await notifySuccessfulAuthRefresh()
 
       return accessToken
     })()

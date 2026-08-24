@@ -100,4 +100,17 @@ describe('auth lifecycle', () => {
     expect(localStorage.getItem('backoffice_access_token')).toBeNull()
     expect(localStorage.getItem('backoffice_refresh_token')).toBeNull()
   })
+
+  it('clears private Billing data before accepting a successful store refresh', async () => {
+    queryClient.setQueryData(billingAccountKeys.account(CLIENT_ID), { ownedBalance: '10.0000' })
+    useAuthStore.setState({ refreshTokenValue: 'refresh', isInitialized: true, isLoading: false })
+    vi.spyOn(authApi, 'refreshToken').mockResolvedValue({
+      accessToken: 'new-token', refreshToken: 'new-refresh', expiresIn: 3600,
+    })
+
+    await useAuthStore.getState().doRefreshToken()
+
+    expect(queryClient.getQueryData(billingAccountKeys.account(CLIENT_ID))).toBeUndefined()
+    expect(useAuthStore.getState().accessToken).toBe('new-token')
+  })
 })

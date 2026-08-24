@@ -23,6 +23,7 @@ export interface AuthActions {
   doRefreshToken: () => Promise<void>
   initialize: () => Promise<void>
   clearSession: () => Promise<void>
+  handleSuccessfulRefresh: () => Promise<void>
   hasRole: (requiredRole: UserRole) => boolean
   hasAnyRole: (roles: UserRole[]) => boolean
   hasPermission: (permission: string) => boolean
@@ -137,6 +138,10 @@ export const useAuthStore = create<AuthStore>()(
           await get().logout()
         },
 
+        handleSuccessfulRefresh: async () => {
+          await clearPrivateBillingQueries(queryClient)
+        },
+
         doRefreshToken: async () => {
           const state = get()
           if (!state.refreshTokenValue) {
@@ -155,6 +160,8 @@ export const useAuthStore = create<AuthStore>()(
           set({ isLoading: true })
           try {
             const result = await authApi.refreshToken({ refreshToken: state.refreshTokenValue })
+
+            await clearPrivateBillingQueries(queryClient)
 
             set({
               accessToken: result.accessToken,

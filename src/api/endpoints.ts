@@ -21,7 +21,13 @@ import type {
   UpdateUserRequest,
 } from '../types'
 
-export { billingApi, getBillingAccountSnapshot, parseBillingAccountSnapshot } from './billingApi'
+export {
+  billingApi,
+  getBillingAccountSnapshot,
+  getBillingLedgerPage,
+  parseBillingAccountSnapshot,
+  parseBillingLedgerPage,
+} from './billingApi'
 
 // ==================== AUTH ENDPOINTS ====================
 

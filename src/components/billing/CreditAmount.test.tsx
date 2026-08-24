@@ -15,4 +15,10 @@ describe('CreditAmount', () => {
     render(<CreditAmount value="0.0000" />)
     expect(screen.getByText('0.0000')).toBeInTheDocument()
   })
+
+  it('supports a compact explicit sign without changing the exact decimal', () => {
+    render(<CreditAmount value="99999999999999.9999" signed compact />)
+    expect(screen.getByText('+99,999,999,999,999.9999')).toBeInTheDocument()
+    expect(screen.getByText('abstract credits')).toBeInTheDocument()
+  })
 })

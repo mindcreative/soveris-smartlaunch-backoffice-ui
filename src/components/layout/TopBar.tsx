@@ -12,7 +12,7 @@ export function TopBar({ onOpenMobileNavigation, menuButtonRef }: TopBarProps) {
   return (
     <header className="sticky top-0 z-40 border-b border-gray-200 bg-white">
       <div className="flex h-16 min-w-0 items-center justify-between gap-2 px-3 sm:px-6">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
           <button
             ref={menuButtonRef}
             type="button"
@@ -27,7 +27,7 @@ export function TopBar({ onOpenMobileNavigation, menuButtonRef }: TopBarProps) {
           </span>
         </div>
 
-        <div className="flex min-w-0 items-center gap-2 sm:gap-4">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
           {user && (
             <div className="hidden min-w-0 items-center gap-3 sm:flex">
               <div className="min-w-0 text-right">

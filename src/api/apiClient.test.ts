@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { apiClient, resolveApiOrigin, type ApiError } from './apiClient'
+import { apiClient, notifySuccessfulAuthRefresh, resolveApiOrigin, type ApiError } from './apiClient'
 
 describe('resolveApiOrigin', () => {
   it('derives the API origin from absolute and relative backoffice bases', () => {
@@ -67,5 +67,21 @@ describe('ApiClient error normalization', () => {
       message: 'Generic server error',
       status: 500,
     })
+  })
+})
+
+describe('successful refresh lifecycle', () => {
+  it('waits for registered private-state cleanup before continuing', async () => {
+    let cleaned = false
+    const listener = (event: Event) => {
+      const refreshEvent = event as CustomEvent<{ waitUntil: (promise: Promise<void>) => void }>
+      refreshEvent.detail.waitUntil(Promise.resolve().then(() => { cleaned = true }))
+    }
+    window.addEventListener('auth:refreshed', listener)
+
+    await notifySuccessfulAuthRefresh()
+
+    expect(cleaned).toBe(true)
+    window.removeEventListener('auth:refreshed', listener)
   })
 })

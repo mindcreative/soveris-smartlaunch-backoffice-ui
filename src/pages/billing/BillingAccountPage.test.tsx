@@ -142,14 +142,21 @@ describe('Billing account routes and states', () => {
     expect(screen.queryByText('99,999,999,999,999.9999')).not.toBeInTheDocument()
   })
 
-  it('exposes the ledger boundary without calling a ledger or snapshot endpoint', async () => {
+  it('exposes the canonical ledger boundary without calling the account endpoint', async () => {
     const request = vi.spyOn(billingApi, 'getAccountSnapshot')
-    window.history.replaceState({}, '', `/billing/clients/${CLIENT_ID}/ledger`)
+    const ledgerRequest = vi.spyOn(billingApi, 'getLedgerPage').mockResolvedValue({
+      items: [],
+      asOf: '2026-08-24T07:00:00+00:00',
+      nextCursor: null,
+    })
+    window.history.replaceState({}, '', `/billing/clients/${CLIENT_ID.toUpperCase()}/ledger`)
 
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'Ledger history' })).toBeInTheDocument()
-    expect(screen.getByText(/not available in this story/i)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Ledger history' })).toHaveFocus()
+    expect(window.location.pathname).toBe(`/billing/clients/${CLIENT_ID}/ledger`)
+    expect(await screen.findByRole('heading', { name: 'No ledger operations' })).toBeInTheDocument()
+    expect(ledgerRequest).toHaveBeenCalledWith(CLIENT_ID, { filters: {} }, expect.any(AbortSignal))
     expect(request).not.toHaveBeenCalled()
   })
 })

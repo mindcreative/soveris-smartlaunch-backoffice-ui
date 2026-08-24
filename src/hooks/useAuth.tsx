@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, ReactNode } from 'react'
 import { useAuthStore } from '../stores/authStore'
 import { hasAnyRolePermission, hasRolePermission } from '../auth/permissions'
+import type { AuthRefreshLifecycleDetail } from '../api/apiClient'
 
 // AuthContext for backward compatibility with App.tsx AuthProvider
 const AuthContext = createContext<ReturnType<typeof useAuth> | null>(null)
@@ -10,6 +11,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void useAuthStore.getState().initialize()
+  }, [])
+
+  useEffect(() => {
+    const handleAuthRefreshed = (event: Event) => {
+      const detail = (event as CustomEvent<AuthRefreshLifecycleDetail>).detail
+      detail.waitUntil(useAuthStore.getState().handleSuccessfulRefresh())
+    }
+    window.addEventListener('auth:refreshed', handleAuthRefreshed)
+    return () => window.removeEventListener('auth:refreshed', handleAuthRefreshed)
   }, [])
 
   useEffect(() => {
