@@ -2,6 +2,9 @@ import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
 import type { AuthUser, UserRole } from '../types/auth'
 import { authApi } from '../api/endpoints'
+import { hasRolePermission } from '../auth/permissions'
+import { clearPrivateBillingQueries } from '../queries/billingQueries'
+import { queryClient } from '../queryClient'
 
 interface AuthState {
   accessToken: string | null
@@ -9,6 +12,7 @@ interface AuthState {
   user: AuthUser | null
   isLoading: boolean
   isAuthenticated: boolean
+  isInitialized: boolean
 }
 
 export interface AuthActions {
@@ -18,6 +22,7 @@ export interface AuthActions {
   logout: () => Promise<void>
   doRefreshToken: () => Promise<void>
   initialize: () => Promise<void>
+  clearSession: () => Promise<void>
   hasRole: (requiredRole: UserRole) => boolean
   hasAnyRole: (roles: UserRole[]) => boolean
   hasPermission: (permission: string) => boolean
@@ -27,52 +32,6 @@ type AuthStore = AuthState & AuthActions
 
 const roleHierarchy: Record<UserRole, number> = { Viewer: 0, Editor: 1, Admin: 2 }
 
-// Permission matrix per role
-const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
-  Admin: [
-    'dashboard:view',
-    'submissions:view',
-    'submissions:edit',
-    'submissions:delete',
-    'content:view',
-    'content:create',
-    'content:edit',
-    'content:delete',
-    'users:view',
-    'users:create',
-    'users:edit',
-    'users:delete',
-    'clients:view',
-    'clients:create',
-    'clients:edit',
-    'clients:delete',
-    'analytics:view',
-    'ai:use',
-    'audit:view',
-    'settings:view',
-    'settings:edit',
-    'theme:view',
-    'theme:edit',
-  ],
-  Editor: [
-    'dashboard:view',
-    'submissions:view',
-    'submissions:edit',
-    'content:view',
-    'content:create',
-    'content:edit',
-    'analytics:view',
-    'ai:use',
-  ],
-  Viewer: [
-    'dashboard:view',
-    'submissions:view',
-    'content:view',
-    'analytics:view',
-    'audit:view',
-  ],
-}
-
 export const useAuthStore = create<AuthStore>()(
   devtools(
     persist(
@@ -80,15 +39,16 @@ export const useAuthStore = create<AuthStore>()(
         accessToken: null,
         refreshTokenValue: null,
         user: null,
-        isLoading: false,
+        isLoading: true,
         isAuthenticated: false,
+        isInitialized: false,
 
         setTokens: (accessToken: string, refreshTokenValue: string) => {
-          set({ accessToken, refreshTokenValue, isAuthenticated: !!accessToken })
+          set({ accessToken, refreshTokenValue, isAuthenticated: !!accessToken, isInitialized: true })
         },
 
         setUser: (user: AuthUser) => {
-          set({ user, isAuthenticated: true })
+          set({ user, isAuthenticated: true, isInitialized: true })
         },
 
         hasRole: (requiredRole: UserRole) => {
@@ -106,8 +66,7 @@ export const useAuthStore = create<AuthStore>()(
         hasPermission: (permission: string) => {
           const state = get()
           if (!state.user) return false
-          const permissions = ROLE_PERMISSIONS[state.user.role]
-          return permissions.includes(permission)
+          return hasRolePermission(state.user.role, permission)
         },
 
         login: async (email: string, password: string) => {
@@ -131,6 +90,7 @@ export const useAuthStore = create<AuthStore>()(
               refreshTokenValue: result.refreshToken,
               isAuthenticated: true,
               isLoading: false,
+              isInitialized: true,
             })
 
             // Also persist in localStorage for interceptor
@@ -145,7 +105,7 @@ export const useAuthStore = create<AuthStore>()(
               error && typeof error === 'object' && 'message' in error
                 ? (error as { message: string }).message
                 : 'Login failed'
-            set({ isLoading: false, isAuthenticated: false })
+            set({ isLoading: false, isAuthenticated: false, isInitialized: true })
             throw new Error(message)
           }
         },
@@ -159,7 +119,10 @@ export const useAuthStore = create<AuthStore>()(
             refreshTokenValue: null,
             isAuthenticated: false,
             isLoading: false,
+            isInitialized: true,
           })
+
+          await clearPrivateBillingQueries(queryClient)
 
           try {
             localStorage.removeItem('backoffice_access_token')
@@ -170,10 +133,22 @@ export const useAuthStore = create<AuthStore>()(
           }
         },
 
+        clearSession: async () => {
+          await get().logout()
+        },
+
         doRefreshToken: async () => {
           const state = get()
           if (!state.refreshTokenValue) {
-            set({ isAuthenticated: false, user: null, accessToken: null, refreshTokenValue: null })
+            set({
+              isAuthenticated: false,
+              user: null,
+              accessToken: null,
+              refreshTokenValue: null,
+              isLoading: false,
+              isInitialized: true,
+            })
+            await clearPrivateBillingQueries(queryClient)
             return
           }
 
@@ -185,6 +160,8 @@ export const useAuthStore = create<AuthStore>()(
               accessToken: result.accessToken,
               refreshTokenValue: result.refreshToken,
               isLoading: false,
+              isAuthenticated: true,
+              isInitialized: true,
             })
 
             try {
@@ -200,7 +177,10 @@ export const useAuthStore = create<AuthStore>()(
               refreshTokenValue: null,
               isAuthenticated: false,
               isLoading: false,
+              isInitialized: true,
             })
+
+            await clearPrivateBillingQueries(queryClient)
 
             try {
               localStorage.removeItem('backoffice_access_token')
@@ -213,7 +193,11 @@ export const useAuthStore = create<AuthStore>()(
 
         initialize: async () => {
           const state = get()
-          if (!state.accessToken) return
+          if (state.isInitialized) return
+          if (!state.accessToken) {
+            set({ isLoading: false, isAuthenticated: false, isInitialized: true })
+            return
+          }
 
           // NOTE: /auth/me is not implemented in the API.
           // Trust the persisted JWT payload (user + expiration) and attempt refresh if needed.
@@ -221,7 +205,7 @@ export const useAuthStore = create<AuthStore>()(
           try {
             // If we have a persisted user with accessToken, consider authenticated
             if (state.user && state.accessToken) {
-              set({ isAuthenticated: true })
+              set({ isAuthenticated: true, isLoading: false, isInitialized: true })
             } else if (state.refreshTokenValue) {
               await get().doRefreshToken()
             } else {
@@ -230,6 +214,8 @@ export const useAuthStore = create<AuthStore>()(
                 accessToken: null,
                 refreshTokenValue: null,
                 isAuthenticated: false,
+                isLoading: false,
+                isInitialized: true,
               })
             }
           } catch {
@@ -244,6 +230,7 @@ export const useAuthStore = create<AuthStore>()(
                 refreshTokenValue: null,
                 isAuthenticated: false,
                 isLoading: false,
+                isInitialized: true,
               })
             }
           }

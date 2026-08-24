@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { AuthProvider } from './hooks/useAuth'
@@ -14,17 +14,9 @@ import { AuditLogPage } from './pages/audit'
 import Forbidden from './pages/error/ForbiddenPage'
 import { useAuthGuard } from './hooks/useAuthGuard'
 import type { UserRole } from './types/auth'
-
-// Create QueryClient instance
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-      staleTime: 5 * 60 * 1000, // 5 minutes
-    },
-  },
-})
+import { queryClient } from './queryClient'
+import { BillingAccountPage, BillingIndexPage } from './pages/billing/BillingAccountPage'
+import { BillingLedgerBoundaryPage } from './pages/billing/BillingLedgerBoundaryPage'
 
 // Protected route wrapper with role-based access
 function ProtectedRoute({
@@ -58,6 +50,9 @@ function App() {
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/content" element={<Content />} />
               <Route path="/users" element={<Users />} />
+              <Route path="/billing" element={<BillingIndexPage />} />
+              <Route path="/billing/clients/:clientId/account" element={<BillingAccountPage />} />
+              <Route path="/billing/clients/:clientId/ledger" element={<BillingLedgerBoundaryPage />} />
 
               {/* Placeholder routes for future pages */}
               <Route path="/themes" element={

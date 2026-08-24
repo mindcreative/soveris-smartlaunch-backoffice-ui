@@ -33,6 +33,13 @@ import type {
   OverviewMetrics,
 } from '../types'
 
+export {
+  billingAccountKeys,
+  cancelAndRemoveBillingAccount,
+  clearPrivateBillingQueries,
+  useBillingAccount,
+} from '../queries/billingQueries'
+
 // ==================== QUERY KEY FACTORIES ====================
 
 export const queryKeys = {

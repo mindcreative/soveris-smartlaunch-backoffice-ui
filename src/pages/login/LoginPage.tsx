@@ -1,10 +1,34 @@
 import type { FC } from 'react'
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+
+function validatedReturnPath(state: unknown): string {
+  if (
+    !state ||
+    typeof state !== 'object' ||
+    !('from' in state) ||
+    typeof state.from !== 'string' ||
+    !state.from.startsWith('/') ||
+    state.from.startsWith('//') ||
+    state.from.includes('\\')
+  ) {
+    return '/dashboard'
+  }
+
+  try {
+    const candidate = new URL(state.from, window.location.origin)
+    return candidate.origin === window.location.origin
+      ? `${candidate.pathname}${candidate.search}${candidate.hash}`
+      : '/dashboard'
+  } catch {
+    return '/dashboard'
+  }
+}
 
 const LoginPage: FC = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const { login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -18,7 +42,7 @@ const LoginPage: FC = () => {
 
     try {
       await login(email, password)
-      navigate('/dashboard', { replace: true })
+      navigate(validatedReturnPath(location.state), { replace: true })
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'message' in err) {
         setError((err as { message: string }).message || 'Login failed. Please check your credentials.')

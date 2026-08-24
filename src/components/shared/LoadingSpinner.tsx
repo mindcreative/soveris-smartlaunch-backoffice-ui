@@ -12,12 +12,12 @@ export function LoadingSpinner({ size = 'md', fullScreen = false, message = 'Loa
   }
 
   const spinner = (
-    <div className={`border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin ${sizeClasses[size]}`}></div>
+    <div aria-hidden="true" className={`border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin ${sizeClasses[size]}`}></div>
   )
 
   if (fullScreen) {
     return (
-      <div className="fixed inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center z-50">
+      <div role="status" aria-live="polite" aria-label={message} className="fixed inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center z-50">
         <div className="flex flex-col items-center gap-4">
           {spinner}
           {message && <p className="text-gray-600 text-sm font-medium">{message}</p>}
@@ -27,7 +27,7 @@ export function LoadingSpinner({ size = 'md', fullScreen = false, message = 'Loa
   }
 
   return (
-    <div className="flex flex-col items-center justify-center gap-3 p-4">
+    <div role="status" aria-live="polite" aria-label={message} className="flex min-h-32 flex-col items-center justify-center gap-3 p-4">
       {spinner}
       {message && <p className="text-gray-500 text-xs">{message}</p>}
     </div>

@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-package-lock.json
 
 # Build output
 dist/
@@ -32,6 +31,8 @@ lerna-debug.log*
 # Test coverage
 coverage/
 *.lcov
+playwright-report/
+test-results/
 
 # TypeScript
 *.tsbuildinfo

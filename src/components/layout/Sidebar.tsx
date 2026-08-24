@@ -1,7 +1,8 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import { canonicalizeGuid } from '../../lib/guid'
 
-const navigation = [
+const baseNavigation = [
   { name: 'Dashboard', href: '/dashboard', icon: 'home' },
   { name: 'Submissions', href: '/submissions', icon: 'inbox' },
   { name: 'Analytics', href: '/analytics', icon: 'chart' },
@@ -21,14 +22,32 @@ const iconMap: Record<string, string> = {
   sparkle: '✨',
   users: '👥',
   shield: '🛡️',
+  billing: '◎',
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  mobile?: boolean
+  onClose?: () => void
+  onNavigate?: () => void
+}
+
+export function Sidebar({ mobile = false, onClose, onNavigate }: SidebarProps) {
   const location = useLocation()
   const { hasPermission, user } = useAuth()
+  const defaultClientId = canonicalizeGuid(user?.clientId)
+  const navigation = defaultClientId && hasPermission('billing:view')
+    ? [
+        ...baseNavigation.slice(0, 1),
+        {
+          name: 'Billing',
+          href: `/billing/clients/${defaultClientId}/account`,
+          icon: 'billing',
+        },
+        ...baseNavigation.slice(1),
+      ]
+    : baseNavigation
 
-  // Filter navigation based on permissions
-  const filteredNav = navigation.filter(item => {
+  const filteredNav = navigation.filter((item) => {
     switch (item.name) {
       case 'Users':
         return hasPermission('users:view')
@@ -42,46 +61,66 @@ export function Sidebar() {
   })
 
   return (
-    <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col">
-      <div className="flex flex-col border-r border-gray-200 bg-white flex-grow">
-        {/* Logo */}
-        <div className="flex h-16 items-center px-6 border-b border-gray-200">
-          <h1 className="text-lg font-semibold text-gray-900">Soveris</h1>
-          <span className="ml-2 text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-            Back-Office
-          </span>
+    <aside
+      aria-label={mobile ? 'Mobile navigation' : 'Primary navigation'}
+      className={mobile
+        ? 'fixed inset-y-0 left-0 z-50 flex w-[min(20rem,calc(100vw-3rem))] flex-col bg-white shadow-xl lg:hidden'
+        : 'hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col'}
+    >
+      <div className="flex flex-grow flex-col border-r border-gray-200 bg-white">
+        <div className="flex h-16 items-center justify-between border-b border-gray-200 px-4 sm:px-6">
+          <div className="flex min-w-0 items-center">
+            <span className="text-lg font-semibold text-gray-900">Soveris</span>
+            <span className="ml-2 rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+              Back-Office
+            </span>
+          </div>
+          {mobile && (
+            <button
+              type="button"
+              autoFocus
+              onClick={onClose}
+              aria-label="Close navigation"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-2xl text-gray-700 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          )}
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
+        <nav aria-label="Back-Office" className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
           {filteredNav.map((item) => {
-            const isActive = location.pathname.startsWith(item.href)
+            const activePrefix = item.name === 'Billing' ? '/billing' : item.href
+            const isActive = location.pathname.startsWith(activePrefix)
             return (
               <Link
                 key={item.name}
                 to={item.href}
-                className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                onClick={onNavigate}
+                aria-current={isActive ? 'page' : undefined}
+                className={`flex min-h-11 items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                   isActive
                     ? 'bg-indigo-50 text-indigo-700'
                     : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                 }`}
               >
-                <span className="mr-3 text-lg">{iconMap[item.icon]}</span>
+                <span aria-hidden="true" className="mr-3 text-lg">{iconMap[item.icon]}</span>
                 {item.name}
               </Link>
             )
           })}
         </nav>
 
-        {/* User info at bottom */}
         {user && (
           <div className="border-t border-gray-200 p-4">
             <p className="text-xs text-gray-500">Logged in as</p>
-            <p className="text-sm font-medium text-gray-900 truncate">{user.displayName || user.email || 'User'}</p>
-            <p className="text-xs text-gray-400 capitalize">{user.role}</p>
+            <p className="truncate text-sm font-medium text-gray-900">
+              {user.displayName || user.email || 'User'}
+            </p>
+            <p className="text-xs capitalize text-gray-500">{user.role}</p>
           </div>
         )}
       </div>
-    </div>
+    </aside>
   )
 }

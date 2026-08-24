@@ -13,12 +13,13 @@ export interface ApiError {
 }
 
 export interface ApiErrorResponse {
-  error?: {
+  error?: string | {
     code?: string
     message: string
   }
   message?: string
   statusCode?: number
+  success?: boolean
 }
 
 // Response wrapper
@@ -31,7 +32,45 @@ export interface ApiResponse<T = unknown> {
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/backoffice'
 
-class ApiClient {
+export function resolveApiOrigin(
+  baseUrl: string,
+  currentOrigin = typeof window === 'undefined' ? 'http://localhost' : window.location.origin
+): string {
+  try {
+    const parsed = new URL(baseUrl, currentOrigin)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error('Unsupported protocol')
+    }
+    return parsed.origin
+  } catch {
+    throw new Error('Invalid API base URL')
+  }
+}
+
+const API_ORIGIN = resolveApiOrigin(API_BASE_URL)
+
+function isApiError(error: unknown): error is ApiError {
+  return Boolean(
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    typeof (error as { code?: unknown }).code === 'string' &&
+    'message' in error &&
+    typeof (error as { message?: unknown }).message === 'string'
+  )
+}
+
+function decodeErrorBody(data: unknown): unknown {
+  if (typeof data !== 'string') return data
+
+  try {
+    return JSON.parse(data) as unknown
+  } catch {
+    return data
+  }
+}
+
+export class ApiClient {
   private client: AxiosInstance
   private refreshPromise: Promise<string> | null = null
 
@@ -98,26 +137,57 @@ class ApiClient {
     return !nonRetryPaths.some((path) => config.url?.includes(path))
   }
 
-  private normalizeError(error: unknown): ApiError {
-    if (error && typeof error === 'object' && 'response' in error) {
-      const axiosError = error as { response?: AxiosResponse<ApiErrorResponse> }
-      const responseData = axiosError.response?.data
-      const status = axiosError.response?.status
+  public normalizeError(error: unknown): ApiError {
+    if (isApiError(error)) {
+      return error
+    }
 
-      if (responseData?.error?.message) {
+    if (error && typeof error === 'object' && 'response' in error) {
+      const axiosError = error as { response?: AxiosResponse<unknown> }
+      const responseData = decodeErrorBody(axiosError.response?.data)
+      const status = axiosError.response?.status
+      const fallbackCode = status ? `HTTP_${status}` : 'API_ERROR'
+
+      if (responseData && typeof responseData === 'object') {
+        const envelope = responseData as ApiErrorResponse
+
+        if (typeof envelope.error === 'string') {
+          return {
+            code: fallbackCode,
+            message: envelope.error,
+            status,
+          }
+        }
+
+        if (envelope.error?.message) {
+          return {
+            code: envelope.error.code || fallbackCode,
+            message: envelope.error.message,
+            status,
+          }
+        }
+
+        if (envelope.message) {
+          return {
+            code: envelope.statusCode ? `HTTP_${envelope.statusCode}` : fallbackCode,
+            message: envelope.message,
+            status,
+          }
+        }
+      }
+
+      if (typeof responseData === 'string' && responseData.trim()) {
         return {
-          code: responseData.error.code || 'API_ERROR',
-          message: responseData.error.message,
+          code: fallbackCode,
+          message: responseData,
           status,
         }
       }
 
-      if (responseData?.message) {
-        return {
-          code: responseData.statusCode ? `HTTP_${responseData.statusCode}` : 'API_ERROR',
-          message: responseData.message,
-          status,
-        }
+      return {
+        code: fallbackCode,
+        message: status ? `Request failed with status ${status}` : 'API request failed',
+        status,
       }
     }
 
@@ -182,7 +252,7 @@ class ApiClient {
     this.refreshPromise = (async () => {
       const refreshToken = this.getRefreshToken()
       if (!refreshToken) {
-        throw { code: 'NO_REFRESH_TOKEN', message: 'No refresh token available' }
+        throw { code: 'NO_REFRESH_TOKEN', message: 'No refresh token available' } satisfies ApiError
       }
 
       const response = await this.client.post('/auth/refresh', {
@@ -196,9 +266,11 @@ class ApiClient {
       return accessToken
     })()
 
-    const result = this.refreshPromise
-    this.refreshPromise = null
-    return result
+    try {
+      return await this.refreshPromise
+    } finally {
+      this.refreshPromise = null
+    }
   }
 
   // Request helpers
@@ -217,6 +289,10 @@ class ApiClient {
 
   get<T>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     return this.request<T>({ ...config, method: 'GET', url })
+  }
+
+  getApiRoot<T>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+    return this.request<T>({ ...config, baseURL: API_ORIGIN, method: 'GET', url })
   }
 
   post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {

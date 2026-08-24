@@ -21,6 +21,8 @@ import type {
   UpdateUserRequest,
 } from '../types'
 
+export { billingApi, getBillingAccountSnapshot, parseBillingAccountSnapshot } from './billingApi'
+
 // ==================== AUTH ENDPOINTS ====================
 
 export async function login(credentials: LoginCredentials): Promise<AuthResponse & { user: AuthUser }> {

@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react'
+
 interface EmptyStateProps {
   icon?: React.ReactNode
   title: string
@@ -15,8 +17,14 @@ export function EmptyState({
   onAction,
   className = '',
 }: EmptyStateProps) {
+  const headingRef = useRef<HTMLHeadingElement>(null)
+
+  useEffect(() => {
+    headingRef.current?.focus()
+  }, [])
+
   return (
-    <div className={`flex flex-col items-center justify-center p-12 text-center ${className}`}>
+    <div role="status" className={`flex flex-col items-center justify-center p-8 sm:p-12 text-center ${className}`}>
       <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
         {icon || (
           <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -24,12 +32,12 @@ export function EmptyState({
           </svg>
         )}
       </div>
-      <p className="text-gray-900 font-semibold text-lg mb-1">{title}</p>
+      <h2 ref={headingRef} tabIndex={-1} className="text-gray-900 font-semibold text-lg mb-1 outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">{title}</h2>
       {description && <p className="text-gray-500 max-w-sm mb-4">{description}</p>}
       {actionLabel && onAction && (
         <button
           onClick={onAction}
-          className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+          className="min-h-11 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
         >
           {actionLabel}
         </button>
