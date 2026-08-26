@@ -1,13 +1,13 @@
 import type { FC } from 'react'
 import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useSubmissions } from '@/hooks/useQueryHooks'
+import { useSubmissions, useSubmission } from '@/hooks/useQueryHooks'
 import { DataTable } from '@/components/shared/DataTable'
 import { Pagination } from '@/components/shared/Pagination'
 import { Badge } from '@/components/shared/Badge'
 import { ErrorDisplay } from '@/components/shared/ErrorDisplay'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
+import { SubmissionDetailPanel } from '@/components/submissions/SubmissionDetailPanel'
 import type { Submission, SubmissionStatus as SubmissionStatusType } from '@/types'
 
 const statusColors: Record<SubmissionStatusType, 'success' | 'warning' | 'error' | 'info' | 'neutral'> = {
@@ -17,12 +17,15 @@ const statusColors: Record<SubmissionStatusType, 'success' | 'warning' | 'error'
 }
 
 const SubmissionsPage: FC = () => {
-  const navigate = useNavigate()
   const [page, setPage] = useState(1)
   const [pageSize] = useState(20)
   const [statusFilter, setStatusFilter] = useState<SubmissionStatusType | ''>('')
+  const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null)
 
   const { data: submissions, isLoading, error } = useSubmissions({ page, pageSize, status: statusFilter || undefined })
+  const { data: selectedSubmission, isLoading: submissionLoading, error: submissionError } = useSubmission(
+    selectedSubmissionId || '',
+  )
 
   const columns = useMemo(
     () => [
@@ -32,10 +35,10 @@ const SubmissionsPage: FC = () => {
         sortable: true,
         render: (value: unknown, row: Record<string, unknown>) => (
           <button
-            onClick={() => navigate(`/submissions/${String(row.id)}`)}
+            onClick={() => setSelectedSubmissionId(String(row.id))}
             className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
           >
-            {String(value).slice(0, 8)}...
+            {String(value).slice(0, 12)}...
           </button>
         ),
       },
@@ -43,11 +46,24 @@ const SubmissionsPage: FC = () => {
         key: 'status',
         label: 'Status',
         sortable: true,
-        render: (value: unknown) => (
-          <Badge variant={statusColors[(value as SubmissionStatusType) || 'pending']}>
-            {String(value)}
-          </Badge>
-        ),
+        render: (value: unknown) => {
+          const typedValue = value as SubmissionStatusType | undefined
+          const isBackendField = value != null && (value as unknown as Record<string, unknown>).isVerified !== undefined
+          if (isBackendField) {
+            const isVerified = (value as unknown as Record<string, unknown>).isVerified as boolean | undefined
+            const resolvedStatus = isVerified === true ? 'verified' : 'pending'
+            return (
+              <Badge variant={statusColors[resolvedStatus]}>
+                {isVerified ? 'Verified' : 'Pending'}
+              </Badge>
+            )
+          }
+          return (
+            <Badge variant={statusColors[typedValue || 'pending']}>
+              {String(typedValue || 'pending')}
+            </Badge>
+          )
+        },
       },
       {
         key: 'submittedAt',
@@ -63,7 +79,7 @@ const SubmissionsPage: FC = () => {
           (row.productName as string) || (row.productId as string) || '-',
       },
     ],
-    [navigate]
+    [],
   )
 
   const tableData = useMemo(() => {
@@ -73,6 +89,8 @@ const SubmissionsPage: FC = () => {
       ...item,
     }) as Record<string, unknown>)
   }, [submissions])
+
+  const handleClosePanel = () => setSelectedSubmissionId(null)
 
   if (error) {
     return <ErrorDisplay message={error.message || 'Failed to load submissions'} onRetry={() => window.location.reload()} />
@@ -118,6 +136,15 @@ const SubmissionsPage: FC = () => {
           )}
         </>
       )}
+
+      {/* Submission Detail Panel */}
+      <SubmissionDetailPanel
+        submission={selectedSubmission ?? null}
+        isLoading={submissionLoading}
+        error={submissionError}
+        isOpen={selectedSubmissionId !== null}
+        onClose={handleClosePanel}
+      />
 
       {/* NOTE: Reject/Update status endpoints do not exist in the API.
           Status changes must be done via direct API calls or admin tools. */}

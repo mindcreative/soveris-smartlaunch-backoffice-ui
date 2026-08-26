@@ -8,7 +8,9 @@ export interface Submission {
   formData?: Record<string, unknown>
   status: SubmissionStatus
   createdAt: string
+  updatedAt?: string
   clientId?: string
+  isVerified?: boolean
 }
 
 export interface GetSubmissionsRequest {
