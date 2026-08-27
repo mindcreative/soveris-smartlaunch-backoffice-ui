@@ -27,6 +27,7 @@ export interface ApiResponse<T = unknown> {
   data: T
   status: number
   message?: string
+  headers?: AxiosResponse['headers']
 }
 
 const API_BASE_URL =
@@ -295,6 +296,7 @@ export class ApiClient {
         data: res.data as T,
         status: res.status,
         message: res.data?.message,
+        headers: res.headers,
       }))
       .catch((err) => {
         throw this.normalizeError(err)
@@ -311,6 +313,10 @@ export class ApiClient {
 
   post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     return this.request<T>({ ...config, method: 'POST', url, data })
+  }
+
+  postApiRoot<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+    return this.request<T>({ ...config, baseURL: API_ORIGIN, method: 'POST', url, data })
   }
 
   put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {

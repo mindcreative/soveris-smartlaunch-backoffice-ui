@@ -35,8 +35,10 @@ import type {
 
 export {
   billingAccountKeys,
+  billingExportKeys,
   billingLedgerKeys,
   cancelAndRemoveBillingAccount,
+  cancelAndRemoveBillingExport,
   cancelAndRemoveBillingLedger,
   clearPrivateBillingQueries,
   useBillingAccount,

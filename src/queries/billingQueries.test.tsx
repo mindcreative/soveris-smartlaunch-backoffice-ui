@@ -6,6 +6,7 @@ import { billingApi, BillingContractError, BillingLedgerContractError } from '..
 import type { BillingAccountSnapshot, BillingLedgerPage } from '../types/billing'
 import {
   billingAccountKeys,
+  billingExportKeys,
   billingLedgerKeys,
   clearPrivateBillingQueries,
   useBillingAccount,
@@ -43,16 +44,29 @@ describe('private Billing queries', () => {
       'account',
       CLIENT_A,
     ])
+    expect(billingExportKeys.detail(CLIENT_A, 'export-id')).toEqual([
+      'backoffice', 'private', 'billing', 'exports', CLIENT_A, 'export-id',
+    ])
+    expect(billingExportKeys.request(CLIENT_A)).toEqual([
+      'backoffice', 'private', 'billing', 'exports', CLIENT_A, 'request',
+    ])
   })
 
   it('cancels and removes all private Billing data', async () => {
     const queryClient = new QueryClient()
     queryClient.setQueryData(billingAccountKeys.account(CLIENT_A), snapshot(CLIENT_A))
+    queryClient.setQueryData(billingExportKeys.detail(CLIENT_A, 'export-id'), { status: 'pending' })
+    queryClient.getMutationCache().build(queryClient, {
+      mutationKey: billingExportKeys.request(CLIENT_A),
+      mutationFn: async () => ({ exportId: 'export-id' }),
+    })
     queryClient.setQueryData(['backoffice', 'public'], 'preserve')
 
     await clearPrivateBillingQueries(queryClient)
 
     expect(queryClient.getQueryData(billingAccountKeys.account(CLIENT_A))).toBeUndefined()
+    expect(queryClient.getQueryData(billingExportKeys.detail(CLIENT_A, 'export-id'))).toBeUndefined()
+    expect(queryClient.getMutationCache().getAll()).toHaveLength(0)
     expect(queryClient.getQueryData(['backoffice', 'public'])).toBe('preserve')
   })
 

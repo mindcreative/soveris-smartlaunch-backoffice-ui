@@ -2,10 +2,16 @@ import { describe, expect, it, vi } from 'vitest'
 import { apiClient } from './apiClient'
 import {
   getBillingAccountSnapshot,
+  getBillingLedgerExportStatus,
   getBillingLedgerPage,
   parseBillingAccountSnapshot,
+  parseBillingLedgerExportAccepted,
+  parseBillingLedgerExportStatus,
   parseBillingLedgerPage,
+  redeemBillingLedgerExport,
+  requestBillingLedgerExport,
 } from './billingApi'
+import type { BillingLedgerExportAttempt, BillingLedgerExportFilters } from '../types/billing'
 
 const CLIENT_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 const ACCOUNT_ID = '11111111-2222-3333-4444-555555555555'
@@ -274,5 +280,140 @@ describe('getBillingLedgerPage', () => {
     expect(getApiRoot.mock.calls[0]?.[0]).toBe(
       `/api/billing/clients/${CLIENT_ID}/ledger?cursor=opaque+%2B%2F+token`
     )
+  })
+})
+
+const EXPORT_ID = '0198d2b0-1234-7abc-8abc-1234567890ab'
+const EXPORT_FILTERS: BillingLedgerExportFilters = {
+  creditAccountId: ACCOUNT_ID,
+  from: '2026-08-24T06:00:00+00:00',
+  to: '2026-08-24T09:00:00+00:00',
+  transactionType: 'promotion',
+  actorUserId: null,
+  jobId: null,
+  reservationId: null,
+}
+const EXPORT_ATTEMPT: BillingLedgerExportAttempt = {
+  exportId: EXPORT_ID,
+  clientId: CLIENT_ID,
+  filters: EXPORT_FILTERS,
+  requestedAt: '2026-08-24T10:00:00+00:00',
+  asOf: '2026-08-24T10:00:00+00:00',
+}
+
+function acceptedJson(overrides: Record<string, unknown> = {}): string {
+  return JSON.stringify({ ...EXPORT_ATTEMPT, status: 'pending', ...overrides })
+}
+
+function statusJson(overrides: Record<string, unknown> = {}): string {
+  return JSON.stringify({
+    ...EXPORT_ATTEMPT,
+    status: 'completed',
+    rowCount: '__ROWS__',
+    byteSize: '__BYTES__',
+    artifactExpiresAt: '2099-08-24T11:00:00+00:00',
+    failureCode: null,
+    reference: 'opaque-bearer-reference',
+    referenceExpiresAt: '2099-08-24T10:05:00+00:00',
+    ...overrides,
+  }).replace('"__ROWS__"', '9007199254740993').replace('"__BYTES__"', '9223372036854775807')
+}
+
+describe('Billing ledger export adapter', () => {
+  it('posts the exact API-root body, omits page size, uses empty filters, and forwards cancellation', async () => {
+    const postApiRoot = vi.spyOn(apiClient, 'postApiRoot').mockResolvedValue({
+      data: acceptedJson(), status: 202,
+    })
+    const signal = new AbortController().signal
+
+    await requestBillingLedgerExport(CLIENT_ID.toUpperCase(), {
+      creditAccountId: ACCOUNT_ID,
+      from: EXPORT_FILTERS.from ?? undefined,
+      to: EXPORT_FILTERS.to ?? undefined,
+      transactionType: 'promotion',
+      pageSize: 100,
+    }, signal)
+
+    expect(postApiRoot).toHaveBeenCalledWith('/api/audit/exports', {
+      clientId: CLIENT_ID,
+      filters: {
+        creditAccountId: ACCOUNT_ID,
+        from: EXPORT_FILTERS.from,
+        to: EXPORT_FILTERS.to,
+        transactionType: 'promotion',
+      },
+    }, { responseType: 'text', signal })
+
+    postApiRoot.mockResolvedValueOnce({
+      data: acceptedJson({ filters: Object.fromEntries(Object.keys(EXPORT_FILTERS).map((key) => [key, null])) }),
+      status: 202,
+    })
+    await requestBillingLedgerExport(CLIENT_ID, {})
+    expect(postApiRoot.mock.calls[1]?.[1]).toEqual({ clientId: CLIENT_ID, filters: {} })
+  })
+
+  it('enforces accepted closed shape, UUIDv7, matching scope, pending state, and one timestamp', () => {
+    expect(parseBillingLedgerExportAccepted(acceptedJson(), CLIENT_ID, EXPORT_FILTERS).exportId).toBe(EXPORT_ID)
+    expect(() => parseBillingLedgerExportAccepted(
+      acceptedJson({ exportId: '11111111-2222-3333-4444-555555555555' }), CLIENT_ID, EXPORT_FILTERS
+    )).toThrow('export identifier')
+    expect(() => parseBillingLedgerExportAccepted(
+      acceptedJson({ status: 'processing' }), CLIENT_ID, EXPORT_FILTERS
+    )).toThrow('lifecycle')
+    expect(() => parseBillingLedgerExportAccepted(
+      acceptedJson({ extra: 'private' }), CLIENT_ID, EXPORT_FILTERS
+    )).toThrow('closed contract')
+    expect(() => parseBillingLedgerExportAccepted(
+      acceptedJson({ clientId: 'ffffffff-1111-2222-3333-444444444444' }), CLIENT_ID, EXPORT_FILTERS
+    )).toThrow('scope')
+  })
+
+  it('preserves Int64 lexemes, validates lifecycle fields, and separates the ephemeral reference', () => {
+    const result = parseBillingLedgerExportStatus(statusJson(), EXPORT_ATTEMPT)
+    expect(result.metadata.rowCount).toBe('9007199254740993')
+    expect(result.metadata.byteSize).toBe('9223372036854775807')
+    expect(result.reference).toEqual({
+      value: 'opaque-bearer-reference', expiresAt: '2099-08-24T10:05:00+00:00',
+    })
+    expect(result.metadata).not.toHaveProperty('reference')
+
+    expect(() => parseBillingLedgerExportStatus(statusJson({ rowCount: -1 }), EXPORT_ATTEMPT)).toThrow('Int64')
+    expect(() => parseBillingLedgerExportStatus(statusJson({ status: 'pending' }), EXPORT_ATTEMPT)).toThrow('lifecycle')
+    expect(() => parseBillingLedgerExportStatus(statusJson({ failureCode: 'raw_internal_code' }), EXPORT_ATTEMPT)).toThrow('classification')
+    expect(() => parseBillingLedgerExportStatus(statusJson({ asOf: '2026-08-24T10:00:01+00:00' }), EXPORT_ATTEMPT)).toThrow('scope')
+    expect(() => parseBillingLedgerExportStatus(statusJson({ unknown: 'value' }), EXPORT_ATTEMPT)).toThrow('closed contract')
+  })
+
+  it('gets status with cancellation and redeems once with the closed reference body', async () => {
+    const signal = new AbortController().signal
+    const getApiRoot = vi.spyOn(apiClient, 'getApiRoot').mockResolvedValue({ data: statusJson(), status: 200 })
+    const postApiRoot = vi.spyOn(apiClient, 'postApiRoot').mockResolvedValue({
+      data: new Blob(['a,b\n1,2\n'], { type: 'text/csv; charset=utf-8' }),
+      status: 200,
+      headers: {
+        'content-type': 'text/csv; charset=utf-8',
+        'content-disposition': `attachment; filename="ledger-export-${EXPORT_ID}.csv"`,
+      },
+    })
+
+    const status = await getBillingLedgerExportStatus(EXPORT_ATTEMPT, signal)
+    await redeemBillingLedgerExport(EXPORT_ATTEMPT, status.reference!, signal)
+
+    expect(getApiRoot).toHaveBeenCalledWith(`/api/audit/exports/${EXPORT_ID}`, { responseType: 'text', signal })
+    expect(postApiRoot).toHaveBeenCalledWith(`/api/audit/exports/${EXPORT_ID}/redemptions`, {
+      reference: 'opaque-bearer-reference',
+    }, { responseType: 'blob', signal })
+  })
+
+  it('rejects a lookalike download media type before exposing a Blob', async () => {
+    vi.spyOn(apiClient, 'postApiRoot').mockResolvedValue({
+      data: new Blob(['not csv'], { type: 'text/csv-unsafe' }),
+      status: 200,
+      headers: { 'content-type': 'text/csv-unsafe' },
+    })
+
+    await expect(redeemBillingLedgerExport(EXPORT_ATTEMPT, {
+      value: 'opaque-bearer-reference', expiresAt: '2099-08-24T10:05:00+00:00',
+    })).rejects.toThrow('download response is invalid')
   })
 })

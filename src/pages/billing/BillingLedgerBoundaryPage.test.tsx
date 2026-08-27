@@ -199,12 +199,17 @@ describe('Billing ledger experience', () => {
 
   it('removes visible private rows immediately when Billing permission is lost', async () => {
     vi.spyOn(billingApi, 'getLedgerPage').mockResolvedValue(page())
+    const user = userEvent.setup()
     render(<App />)
     await screen.findByRole('table')
 
+    await user.click(screen.getByRole('button', { name: 'Request ledger CSV export' }))
+    expect(screen.getByRole('dialog', { name: 'Confirm ledger CSV export' })).toBeInTheDocument()
+
     useAuthStore.setState((state) => ({ user: state.user ? { ...state.user, role: 'Viewer' } : null }))
 
-    expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Access denied' })).toHaveFocus()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
     await waitFor(() => expect(queryClient.getQueryCache().findAll({
       queryKey: ['backoffice', 'private', 'billing', 'ledger'],

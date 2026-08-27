@@ -34,9 +34,47 @@ export const billingLedgerKeys = {
     [...privateRoot, 'billing', 'ledger', clientId, filters, traversalId] as const,
 }
 
+export const billingExportKeys = {
+  all: [...privateRoot, 'billing', 'exports'] as const,
+  client: (clientId: string) => [...privateRoot, 'billing', 'exports', clientId] as const,
+  detail: (clientId: string, exportId: string) =>
+    [...privateRoot, 'billing', 'exports', clientId, exportId] as const,
+  request: (clientId: string) =>
+    [...privateRoot, 'billing', 'exports', clientId, 'request'] as const,
+}
+
+function startsWithKey(value: readonly unknown[] | undefined, prefix: readonly unknown[]): boolean {
+  return Boolean(value && prefix.every((part, index) => value[index] === part))
+}
+
 export async function clearPrivateBillingQueries(queryClient: QueryClient): Promise<void> {
   await queryClient.cancelQueries({ queryKey: billingAccountKeys.billing })
   queryClient.removeQueries({ queryKey: billingAccountKeys.billing })
+  for (const mutation of queryClient.getMutationCache().getAll()) {
+    if (startsWithKey(mutation.options.mutationKey, billingAccountKeys.billing)) {
+      queryClient.getMutationCache().remove(mutation)
+    }
+  }
+}
+
+export async function cancelAndRemoveBillingExport(
+  queryClient: QueryClient,
+  clientId: string,
+  exportId?: string,
+  removeCommand = true
+): Promise<void> {
+  const queryKey = exportId
+    ? billingExportKeys.detail(clientId, exportId)
+    : billingExportKeys.client(clientId)
+  await queryClient.cancelQueries({ queryKey, exact: Boolean(exportId) })
+  queryClient.removeQueries({ queryKey, exact: Boolean(exportId) })
+  if (removeCommand) {
+    for (const mutation of queryClient.getMutationCache().getAll()) {
+      if (startsWithKey(mutation.options.mutationKey, billingExportKeys.request(clientId).slice(0, -1))) {
+        queryClient.getMutationCache().remove(mutation)
+      }
+    }
+  }
 }
 
 export async function cancelAndRemoveBillingAccount(

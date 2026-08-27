@@ -10,6 +10,14 @@ import {
   type BillingLedgerPage,
   type BillingLedgerPageRequest,
   type BillingLedgerTransactionType,
+  type BillingLedgerExportAccepted,
+  type BillingLedgerExportAttempt,
+  type BillingLedgerExportFailureCode,
+  type BillingLedgerExportFilters,
+  type BillingLedgerExportReference,
+  type BillingLedgerExportStatus,
+  type BillingLedgerExportStatusMetadata,
+  type BillingLedgerExportStatusResult,
 } from '../types/billing'
 
 const SNAPSHOT_KEYS = [
@@ -56,6 +64,13 @@ export class BillingLedgerContractError extends Error {
   constructor(reason: string) {
     super(`Invalid Billing ledger: ${reason}`)
     this.name = 'BillingLedgerContractError'
+  }
+}
+
+export class BillingLedgerExportContractError extends Error {
+  constructor(reason: string) {
+    super(`Invalid Billing ledger export: ${reason}`)
+    this.name = 'BillingLedgerExportContractError'
   }
 }
 
@@ -358,7 +373,276 @@ export async function getBillingLedgerPage(
   return parseBillingLedgerPage(response.data, expectedAccount)
 }
 
+const EXPORT_FILTER_KEYS = [
+  'actorUserId', 'creditAccountId', 'from', 'jobId', 'reservationId', 'to', 'transactionType',
+] as const
+const EXPORT_ACCEPTED_KEYS = ['asOf', 'clientId', 'exportId', 'filters', 'requestedAt', 'status'] as const
+const EXPORT_STATUS_KEYS = [
+  'artifactExpiresAt', 'asOf', 'byteSize', 'clientId', 'exportId', 'failureCode', 'filters',
+  'reference', 'referenceExpiresAt', 'requestedAt', 'rowCount', 'status',
+] as const
+const EXPORT_STATUSES = new Set<BillingLedgerExportStatus>([
+  'pending', 'processing', 'completed', 'failed', 'expired',
+])
+const EXPORT_FAILURE_CODES = new Set<BillingLedgerExportFailureCode>([
+  'generation_failed', 'artifact_store_failed', 'completion_failed',
+])
+
+function exportContractError(reason: string): BillingLedgerExportContractError {
+  return new BillingLedgerExportContractError(reason)
+}
+
+function readExportInstant(value: unknown, nullable: false): string
+function readExportInstant(value: unknown, nullable: true): string | null
+function readExportInstant(value: unknown, nullable: boolean): string | null {
+  if (nullable && value === null) return null
+  if (typeof value !== 'string' || !UTC_OFFSET_PATTERN.test(value) || Number.isNaN(Date.parse(value))) {
+    throw exportContractError('a timestamp is invalid')
+  }
+  return value
+}
+
+function readExportGuid(value: unknown, nullable: false): string
+function readExportGuid(value: unknown, nullable: true): string | null
+function readExportGuid(value: unknown, nullable: boolean): string | null {
+  if (nullable && value === null) return null
+  const valueAsGuid = canonicalizeGuid(typeof value === 'string' ? value : undefined)
+  if (!valueAsGuid) throw exportContractError('an identifier is invalid')
+  return valueAsGuid
+}
+
+function readExportId(value: unknown): string {
+  const exportId = readExportGuid(value, false)
+  if (exportId[14] !== '7' || !/[89ab]/.test(exportId[19] ?? '')) {
+    throw exportContractError('the export identifier is invalid')
+  }
+  return exportId
+}
+
+function parseExportFilters(value: unknown): BillingLedgerExportFilters {
+  if (!isRecord(value) || !hasExactKeys(value, EXPORT_FILTER_KEYS)) {
+    throw exportContractError('filter fields do not match the closed contract')
+  }
+  const transactionType = value.transactionType === null
+    ? null
+    : typeof value.transactionType === 'string' &&
+      LEDGER_TRANSACTION_TYPES.has(value.transactionType as BillingLedgerTransactionType)
+      ? value.transactionType as BillingLedgerTransactionType
+      : (() => { throw exportContractError('the transaction type is invalid') })()
+  const from = readExportInstant(value.from, true)
+  const to = readExportInstant(value.to, true)
+  if (from && to && Date.parse(from) >= Date.parse(to)) {
+    throw exportContractError('the filter interval is invalid')
+  }
+  return {
+    creditAccountId: readExportGuid(value.creditAccountId, true),
+    from,
+    to,
+    transactionType,
+    actorUserId: readExportGuid(value.actorUserId, true),
+    jobId: readExportGuid(value.jobId, true),
+    reservationId: readExportGuid(value.reservationId, true),
+  }
+}
+
+export function normalizeLedgerExportFilters(filters: BillingLedgerFilters): BillingLedgerExportFilters {
+  return parseExportFilters({
+    creditAccountId: filters.creditAccountId ?? null,
+    from: filters.from ?? null,
+    to: filters.to ?? null,
+    transactionType: filters.transactionType ?? null,
+    actorUserId: filters.actorUserId ?? null,
+    jobId: filters.jobId ?? null,
+    reservationId: filters.reservationId ?? null,
+  })
+}
+
+function exportFiltersMatch(left: BillingLedgerExportFilters, right: BillingLedgerExportFilters): boolean {
+  return EXPORT_FILTER_KEYS.every((key) => left[key] === right[key])
+}
+
+function parseExportJson(text: string): Record<string, unknown> {
+  let payload: unknown
+  try {
+    payload = parse(text)
+  } catch {
+    throw exportContractError('response is not valid JSON')
+  }
+  if (!isRecord(payload)) throw exportContractError('payload must be an object')
+  return payload
+}
+
+export function parseBillingLedgerExportAccepted(
+  text: string,
+  expectedClientId: string,
+  expectedFilters: BillingLedgerExportFilters
+): BillingLedgerExportAccepted {
+  const payload = parseExportJson(text)
+  if (!hasExactKeys(payload, EXPORT_ACCEPTED_KEYS)) {
+    throw exportContractError('accepted fields do not match the closed contract')
+  }
+  const clientId = readExportGuid(payload.clientId, false)
+  const canonicalExpectedClient = canonicalizeGuid(expectedClientId)
+  const filters = parseExportFilters(payload.filters)
+  const requestedAt = readExportInstant(payload.requestedAt, false)
+  const asOf = readExportInstant(payload.asOf, false)
+  if (!canonicalExpectedClient || clientId !== canonicalExpectedClient ||
+      !exportFiltersMatch(filters, expectedFilters)) {
+    throw exportContractError('accepted scope does not match the request')
+  }
+  if (payload.status !== 'pending' || requestedAt !== asOf) {
+    throw exportContractError('accepted lifecycle state is invalid')
+  }
+  return {
+    exportId: readExportId(payload.exportId), clientId, filters, requestedAt, asOf, status: 'pending',
+  }
+}
+
+function readInt64Lexeme(value: unknown, nullable: boolean): string | null {
+  if (nullable && value === null) return null
+  if (!isLosslessNumber(value) || !/^\d+$/.test(value.toString())) {
+    throw exportContractError('an Int64 metadata field is invalid')
+  }
+  const lexeme = value.toString()
+  if (BigInt(lexeme) > 9_223_372_036_854_775_807n) {
+    throw exportContractError('an Int64 metadata field is invalid')
+  }
+  return lexeme
+}
+
+function validateStatusLifecycle(metadata: BillingLedgerExportStatusMetadata, reference: BillingLedgerExportReference | null): void {
+  const emptyArtifact = metadata.rowCount === null && metadata.byteSize === null && metadata.artifactExpiresAt === null
+  if (metadata.status === 'pending' || metadata.status === 'processing') {
+    if (!emptyArtifact || metadata.failureCode !== null || reference) throw exportContractError('lifecycle metadata is invalid')
+  } else if (metadata.status === 'failed') {
+    if (!emptyArtifact || metadata.failureCode === null || reference) throw exportContractError('lifecycle metadata is invalid')
+  } else {
+    if (metadata.rowCount === null || metadata.byteSize === null || metadata.artifactExpiresAt === null ||
+        metadata.failureCode !== null || (metadata.status === 'expired' && reference)) {
+      throw exportContractError('lifecycle metadata is invalid')
+    }
+  }
+}
+
+export function parseBillingLedgerExportStatus(
+  text: string,
+  attempt: BillingLedgerExportAttempt
+): BillingLedgerExportStatusResult {
+  const payload = parseExportJson(text)
+  if (!hasExactKeys(payload, EXPORT_STATUS_KEYS)) {
+    throw exportContractError('status fields do not match the closed contract')
+  }
+  const status = typeof payload.status === 'string' && EXPORT_STATUSES.has(payload.status as BillingLedgerExportStatus)
+    ? payload.status as BillingLedgerExportStatus
+    : (() => { throw exportContractError('status is invalid') })()
+  const failureCode = payload.failureCode === null
+    ? null
+    : typeof payload.failureCode === 'string' && EXPORT_FAILURE_CODES.has(payload.failureCode as BillingLedgerExportFailureCode)
+      ? payload.failureCode as BillingLedgerExportFailureCode
+      : (() => { throw exportContractError('failure classification is invalid') })()
+  const filters = parseExportFilters(payload.filters)
+  const metadata: BillingLedgerExportStatusMetadata = {
+    exportId: readExportId(payload.exportId),
+    clientId: readExportGuid(payload.clientId, false),
+    filters,
+    requestedAt: readExportInstant(payload.requestedAt, false),
+    asOf: readExportInstant(payload.asOf, false),
+    status,
+    rowCount: readInt64Lexeme(payload.rowCount, true),
+    byteSize: readInt64Lexeme(payload.byteSize, true),
+    artifactExpiresAt: readExportInstant(payload.artifactExpiresAt, true),
+    failureCode,
+  }
+  if (metadata.exportId !== attempt.exportId || metadata.clientId !== attempt.clientId ||
+      metadata.requestedAt !== attempt.requestedAt || metadata.asOf !== attempt.asOf ||
+      !exportFiltersMatch(metadata.filters, attempt.filters)) {
+    throw exportContractError('status scope does not match the accepted export')
+  }
+  const hasReference = payload.reference !== null || payload.referenceExpiresAt !== null
+  let reference: BillingLedgerExportReference | null = null
+  if (hasReference) {
+    if (typeof payload.reference !== 'string' || !payload.reference.trim() || payload.reference.length > 4096) {
+      throw exportContractError('reference eligibility is invalid')
+    }
+    reference = { value: payload.reference, expiresAt: readExportInstant(payload.referenceExpiresAt, false) }
+  }
+  validateStatusLifecycle(metadata, reference)
+  if (reference && metadata.artifactExpiresAt &&
+      Date.parse(reference.expiresAt) > Date.parse(metadata.artifactExpiresAt)) {
+    throw exportContractError('reference eligibility is invalid')
+  }
+  return { metadata, reference }
+}
+
+function requestFilterObject(filters: BillingLedgerExportFilters): Record<string, string> {
+  const body: Record<string, string> = {}
+  for (const key of EXPORT_FILTER_KEYS) {
+    const value = filters[key]
+    if (value !== null) body[key] = value
+  }
+  return body
+}
+
+export async function requestBillingLedgerExport(
+  clientId: string,
+  filters: BillingLedgerFilters,
+  signal?: AbortSignal
+): Promise<BillingLedgerExportAccepted> {
+  const canonicalClientId = canonicalizeGuid(clientId)
+  if (!canonicalClientId) throw exportContractError('requested Client ID is invalid')
+  const normalizedFilters = normalizeLedgerExportFilters(filters)
+  const response = await apiClient.postApiRoot<string>('/api/audit/exports', {
+    clientId: canonicalClientId,
+    filters: requestFilterObject(normalizedFilters),
+  }, { responseType: 'text', signal })
+  if (response.status !== 202 || typeof response.data !== 'string') {
+    throw exportContractError('accepted response is invalid')
+  }
+  return parseBillingLedgerExportAccepted(response.data, canonicalClientId, normalizedFilters)
+}
+
+export async function getBillingLedgerExportStatus(
+  attempt: BillingLedgerExportAttempt,
+  signal?: AbortSignal
+): Promise<BillingLedgerExportStatusResult> {
+  const response = await apiClient.getApiRoot<string>(`/api/audit/exports/${attempt.exportId}`, {
+    responseType: 'text', signal,
+  })
+  if (response.status !== 200 || typeof response.data !== 'string') {
+    throw exportContractError('status response is invalid')
+  }
+  return parseBillingLedgerExportStatus(response.data, attempt)
+}
+
+export async function redeemBillingLedgerExport(
+  attempt: BillingLedgerExportAttempt,
+  reference: BillingLedgerExportReference,
+  signal?: AbortSignal
+): Promise<Blob> {
+  if (!reference.value.trim() || reference.value.length > 4096 || Date.parse(reference.expiresAt) <= Date.now()) {
+    throw exportContractError('reference eligibility is invalid')
+  }
+  const response = await apiClient.postApiRoot<Blob>(
+    `/api/audit/exports/${attempt.exportId}/redemptions`,
+    { reference: reference.value },
+    { responseType: 'blob', signal }
+  )
+  const isBlob = response.data instanceof Blob
+  const contentType = String(response.headers?.['content-type'] ?? (isBlob ? response.data.type : '')).toLowerCase()
+  const mediaType = contentType.split(';', 1)[0]?.trim()
+  const disposition = String(response.headers?.['content-disposition'] ?? '')
+  const expectedFilename = `ledger-export-${attempt.exportId}.csv`
+  if (response.status !== 200 || !isBlob || mediaType !== 'text/csv' ||
+      (disposition && !disposition.includes(expectedFilename))) {
+    throw exportContractError('download response is invalid')
+  }
+  return response.data
+}
+
 export const billingApi = {
   getAccountSnapshot: getBillingAccountSnapshot,
   getLedgerPage: getBillingLedgerPage,
+  requestLedgerExport: requestBillingLedgerExport,
+  getLedgerExportStatus: getBillingLedgerExportStatus,
+  redeemLedgerExport: redeemBillingLedgerExport,
 }

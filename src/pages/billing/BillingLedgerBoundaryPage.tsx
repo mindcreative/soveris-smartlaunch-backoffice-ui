@@ -5,6 +5,7 @@ import type { ApiError } from '../../api/apiClient'
 import { BillingLedgerContractError } from '../../api/billingApi'
 import { LedgerFilters } from '../../components/billing/LedgerFilters'
 import { LedgerResults } from '../../components/billing/LedgerResults'
+import { LedgerExportPanel } from '../../components/billing/LedgerExportPanel'
 import { BillingWorkspaceNav } from '../../components/billing/BillingWorkspaceNav'
 import { Breadcrumbs, EmptyState, ErrorDisplay, Forbidden, LoadingSpinner } from '../../components/shared'
 import { useAuth } from '../../hooks/useAuth'
@@ -62,6 +63,7 @@ function CanonicalLedgerPage({ clientId }: { clientId: string }) {
   const traversalId = view.clientId === clientId ? view.traversalId : 1
   const [transitionBusy, setTransitionBusy] = useState(false)
   const [announcement, setAnnouncement] = useState('')
+  const [exportPermissionDenied, setExportPermissionDenied] = useState(false)
   const query = useBillingLedger(clientId, filters, traversalId)
   const filtersActive = Object.keys(filters).length > 0
   const rowsPresent = query.items.length > 0
@@ -122,10 +124,16 @@ function CanonicalLedgerPage({ clientId }: { clientId: string }) {
   const laterError = query.isFetchNextPageError && rowsPresent
   const continuationInvalid = laterError && status === 400
   const durableContractFailure = query.error instanceof BillingLedgerContractError
+  const denyExportScope = useCallback(() => setExportPermissionDenied(true), [])
+
+  if (exportPermissionDenied) {
+    return <LedgerPageFrame clientId={clientId} headingRef={headingRef}><Forbidden message="The server denied access to this private Billing scope. Prior ledger and export details were removed." /></LedgerPageFrame>
+  }
 
   return (
     <LedgerPageFrame clientId={clientId} headingRef={headingRef}>
       <LedgerFilters appliedFiltersActive={filtersActive} busy={transitionBusy || query.isPending} onApply={(nextFilters) => void startTraversal(nextFilters, 'Filters applied. Loading a fresh ledger snapshot.')} onClear={clearFilters} />
+      <LedgerExportPanel clientId={clientId} filters={filters} onPermissionDenied={denyExportScope} />
       <div aria-live="polite" aria-atomic="true" className="sr-only">{announcement}</div>
 
       {query.isPending && !rowsPresent && <LoadingSpinner message="Loading ledger operations…" />}
