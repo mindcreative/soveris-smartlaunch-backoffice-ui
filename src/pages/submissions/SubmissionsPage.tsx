@@ -46,31 +46,26 @@ const SubmissionsPage: FC = () => {
         key: 'status',
         label: 'Status',
         sortable: true,
-        render: (value: unknown) => {
-          const typedValue = value as SubmissionStatusType | undefined
-          const isBackendField = value != null && (value as unknown as Record<string, unknown>).isVerified !== undefined
-          if (isBackendField) {
-            const isVerified = (value as unknown as Record<string, unknown>).isVerified as boolean | undefined
-            const resolvedStatus = isVerified === true ? 'verified' : 'pending'
-            return (
-              <Badge variant={statusColors[resolvedStatus]}>
-                {isVerified ? 'Verified' : 'Pending'}
-              </Badge>
-            )
-          }
+        render: (_value: unknown, row: Record<string, unknown>) => {
+          const isVerified = (row.isVerified as boolean | undefined)
+          const resolvedStatus = isVerified === true ? 'verified' : 'pending'
           return (
-            <Badge variant={statusColors[typedValue || 'pending']}>
-              {String(typedValue || 'pending')}
+            <Badge variant={statusColors[resolvedStatus]}>
+              {isVerified ? 'Verified' : 'Pending'}
             </Badge>
           )
         },
       },
       {
-        key: 'submittedAt',
+        key: 'submittedDate',
         label: 'Submitted',
         sortable: true,
-        render: (value: unknown) =>
-          value ? new Date(String(value)).toLocaleDateString() : '-',
+        render: (_value: unknown, row: Record<string, unknown>) => {
+          const updated = (row.updatedAt as string) || (row.updated_at as string)
+          const created = (row.createdAt as string) || (row.created_at as string)
+          const dateStr = updated || created
+          return dateStr ? new Date(dateStr).toLocaleDateString() : '-'
+        },
       },
       {
         key: 'product',

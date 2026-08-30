@@ -2,6 +2,9 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+const apiBaseUrl = process.env.VITE_API_BASE_URL || 'http://localhost:5000'
+const apiBasePath = new URL(apiBaseUrl).pathname
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -10,19 +13,13 @@ export default defineConfig({
     },
   },
   server: {
+    host: '0.0.0.0',
     port: 5173,
     proxy: {
-      '/api/backoffice': {
-        target: 'http://localhost:5000',
+      [apiBasePath]: {
+        target: apiBaseUrl.replace(apiBasePath, ''),
         changeOrigin: true,
-      },
-      '/api/billing': {
-        target: 'http://localhost:5000',
-        changeOrigin: true,
-      },
-      '/api/audit': {
-        target: 'http://localhost:5000',
-        changeOrigin: true,
+        rewritePath: '',
       },
     },
   },
