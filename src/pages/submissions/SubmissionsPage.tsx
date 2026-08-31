@@ -8,7 +8,7 @@ import { ErrorDisplay } from '@/components/shared/ErrorDisplay'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { SubmissionDetailPanel } from '@/components/submissions/SubmissionDetailPanel'
-import type { Submission, SubmissionStatus as SubmissionStatusType } from '@/types'
+import type { SubmissionSummary, SubmissionStatus as SubmissionStatusType } from '@/types'
 
 const statusColors: Record<SubmissionStatusType, 'success' | 'warning' | 'error' | 'info' | 'neutral'> = {
   pending: 'warning',
@@ -30,15 +30,15 @@ const SubmissionsPage: FC = () => {
   const columns = useMemo(
     () => [
       {
-        key: 'id',
-        label: 'ID',
+        key: 'email',
+        label: 'Email',
         sortable: true,
-        render: (value: unknown, row: Record<string, unknown>) => (
+        render: (_value: unknown, row: Record<string, unknown>) => (
           <button
             onClick={() => setSelectedSubmissionId(String(row.id))}
             className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
           >
-            {String(value).slice(0, 12)}...
+            {String(row.email)}
           </button>
         ),
       },
@@ -78,10 +78,15 @@ const SubmissionsPage: FC = () => {
   )
 
   const tableData = useMemo(() => {
-    const result = submissions as { data?: Submission[] } | undefined
+    const result = submissions as { data?: SubmissionSummary[] } | undefined
     const items = result?.data || []
     return items.map((item) => ({
-      ...item,
+      id: item.id,
+      email: item.email,
+      productName: item.productName,
+      isVerified: item.isVerified,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
     }) as Record<string, unknown>)
   }, [submissions])
 

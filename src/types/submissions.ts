@@ -1,10 +1,20 @@
 export type SubmissionStatus = 'pending' | 'verified' | 'invalid'
 
+export interface SubmissionSummary {
+  id: string
+  email: string
+  productName?: string
+  isVerified?: boolean
+  createdAt: string
+  updatedAt?: string
+}
+
 export interface Submission {
   id: string
   email: string
   name?: string
   product?: string
+  productName?: string
   formData?: Record<string, unknown>
   status: SubmissionStatus
   createdAt: string

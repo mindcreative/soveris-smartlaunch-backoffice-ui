@@ -9,6 +9,7 @@ import type {
   PaginatedResult,
   ProductContent,
   Submission,
+  SubmissionSummary,
   GetSubmissionsRequest,
   OverviewMetrics,
   FunnelStageCount,
@@ -146,7 +147,7 @@ export async function removeImage(productId: string, imageId: string): Promise<v
 
 // ==================== SUBMISSIONS ENDPOINTS ====================
 
-export async function getSubmissions(params?: GetSubmissionsRequest): Promise<PaginatedResult<Submission>> {
+export async function getSubmissions(params?: GetSubmissionsRequest): Promise<PaginatedResult<SubmissionSummary>> {
   const queryParams = new URLSearchParams()
   if (params?.page) queryParams.set('page', String(params.page))
   if (params?.pageSize) queryParams.set('pageSize', String(params.pageSize))
@@ -160,7 +161,7 @@ export async function getSubmissions(params?: GetSubmissionsRequest): Promise<Pa
 
   const queryString = queryParams.toString()
   const response = await apiClient.get(`/submissions${queryString ? `?${queryString}` : ''}`)
-  return response.data as PaginatedResult<Submission>
+  return response.data as PaginatedResult<SubmissionSummary>
 }
 
 export async function getSubmission(id: string): Promise<Submission> {

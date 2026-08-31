@@ -134,12 +134,17 @@ export function SubmissionDetailPanel({
                       <dd className="text-sm text-gray-900 mt-0.5">{submission.name}</dd>
                     </div>
                   )}
-                  {submission.product && (
+                  {(submission as unknown as Record<string, unknown>).productName ? (
+                    <div>
+                      <dt className="text-sm text-gray-500">Product</dt>
+                      <dd className="text-sm text-gray-900 mt-0.5">{(submission as unknown as Record<string, unknown>).productName as string}</dd>
+                    </div>
+                  ) : submission.product ? (
                     <div>
                       <dt className="text-sm text-gray-500">Product</dt>
                       <dd className="text-sm text-gray-900 mt-0.5">{submission.product}</dd>
                     </div>
-                  )}
+                  ) : null}
                 </dl>
               </section>
               <section>

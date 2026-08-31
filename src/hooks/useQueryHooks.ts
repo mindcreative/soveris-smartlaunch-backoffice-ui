@@ -152,14 +152,14 @@ export function useUpdateContent() {
 
 export function useSubmissions(params?: GetSubmissionsRequest) {
   return useQuery({
-    queryKey: queryKeys.submissions(),
+    queryKey: [...queryKeys.submissions(), params],
     queryFn: () => submissionsApi.getSubmissions(params),
     staleTime: 3 * 60 * 1000,
   })
 }
 
 export function useSubmission(id: string) {
-  return useQuery<Submission>({
+  return useQuery<Submission | null>({
     queryKey: queryKeys.submission(id),
     queryFn: () => submissionsApi.getSubmission(id),
     enabled: !!id,
