@@ -19,6 +19,7 @@ export interface Submission {
   status: SubmissionStatus
   createdAt: string
   updatedAt?: string
+  expiresAt?: string
   clientId?: string
   isVerified?: boolean
 }

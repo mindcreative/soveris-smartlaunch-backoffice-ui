@@ -164,6 +164,12 @@ export function SubmissionDetailPanel({
                       <dd className="text-sm text-gray-900 mt-0.5">{formatDate(submission.updatedAt)}</dd>
                     </div>
                   )}
+                  {submission.expiresAt && (
+                    <div>
+                      <dt className="text-sm text-gray-500">Expires At</dt>
+                      <dd className="text-sm text-gray-900 mt-0.5">{formatDate(submission.expiresAt)}</dd>
+                    </div>
+                  )}
                 </dl>
               </section>
               {submission.formData && Object.keys(submission.formData).length > 0 && (
