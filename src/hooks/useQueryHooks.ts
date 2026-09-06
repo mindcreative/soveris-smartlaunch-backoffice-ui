@@ -111,9 +111,6 @@ export function useUpdateClient() {
 // NOTE: API has no create/delete content endpoints. Content is per-product.
 
 export function useContent(params?: {
-  page?: number
-  pageSize?: number
-  search?: string
   clientId?: string
 }) {
   return useQuery({
@@ -179,10 +176,10 @@ export function useDeleteSubmission() {
 
 // ==================== ANALYTICS HOOKS ====================
 
-export function useOverviewMetrics() {
+export function useOverviewMetrics(params?: { fromDate?: string; toDate?: string }) {
   return useQuery({
-    queryKey: queryKeys.analytics(),
-    queryFn: () => analyticsApi.getOverviewMetrics(),
+    queryKey: [...queryKeys.analytics(), 'overview', params?.fromDate ?? '', params?.toDate ?? ''] as const,
+    queryFn: () => analyticsApi.getOverviewMetrics(params),
     staleTime: 2 * 60 * 1000,
   })
 }

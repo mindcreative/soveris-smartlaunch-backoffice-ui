@@ -1,5 +1,5 @@
 import type { FC } from 'react'
-import { useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useOverviewMetrics } from '@/hooks/useQueryHooks'
 import { StatCard } from '@/components/shared/StatCard'
 import { DataTable } from '@/components/shared/DataTable'
@@ -7,8 +7,35 @@ import { ErrorDisplay } from '@/components/shared/ErrorDisplay'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 
+// ==================== FILTER COMPONENTS ====================
+
+function DateFilter({ label, value, onChange }: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-medium text-gray-600">{label}</label>
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+      />
+    </div>
+  )
+}
+
 const AnalyticsPage: FC = () => {
-  const { data: overview, isLoading: overviewLoading, error: overviewError } = useOverviewMetrics()
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+
+  const hasFilters = !!fromDate || !!toDate
+
+  const { data: overview, isLoading: overviewLoading, error: overviewError } = useOverviewMetrics(
+    hasFilters ? { fromDate, toDate } : undefined
+  )
 
   const isLoading = overviewLoading
   const error = overviewError
@@ -80,6 +107,28 @@ const AnalyticsPage: FC = () => {
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold text-gray-900">Analytics</h1>
+
+      {/* Date Range Filter */}
+      <div className="flex flex-wrap items-end gap-4">
+        <DateFilter
+          label="From Date"
+          value={fromDate}
+          onChange={setFromDate}
+        />
+        <DateFilter
+          label="To Date"
+          value={toDate}
+          onChange={setToDate}
+        />
+        {hasFilters && (
+          <button
+            onClick={() => { setFromDate(''); setToDate('') }}
+            className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            Clear
+          </button>
+        )}
+      </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12">

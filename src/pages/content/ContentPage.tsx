@@ -2,7 +2,6 @@ import type { FC } from 'react'
 import { useState, useMemo } from 'react'
 import { useContent, useSubmissions } from '@/hooks/useQueryHooks'
 import { DataTable } from '@/components/shared/DataTable'
-import { Pagination } from '@/components/shared/Pagination'
 import { Badge } from '@/components/shared/Badge'
 import { ErrorDisplay } from '@/components/shared/ErrorDisplay'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -13,10 +12,8 @@ type TabType = 'products' | 'submissions'
 
 const ContentPage: FC = () => {
   const [tab, setTab] = useState<TabType>('products')
-  const [page, setPage] = useState(1)
-  const [pageSize] = useState(20)
 
-  const { data: contentResult, isLoading: contentLoading, error: contentError } = useContent({ page, pageSize })
+  const { data: contentResult, isLoading: contentLoading, error: contentError } = useContent()
   const { data: submissionsResult, isLoading: submissionsLoading, error: submissionsError } = useSubmissions({ page: 1, pageSize: 50 })
 
   const isLoading = contentLoading || submissionsLoading
@@ -48,10 +45,10 @@ const ContentPage: FC = () => {
         ),
       },
       {
-        key: 'createdAt',
-        label: 'Created',
+        key: 'updatedAt',
+        label: 'Updated',
         render: (_value: unknown, row: Record<string, unknown>) =>
-          row.createdAt ? new Date(String(row.createdAt)).toLocaleDateString() : '—',
+          row.updatedAt ? new Date(String(row.updatedAt)).toLocaleDateString() : '—',
       },
     ],
     []
@@ -101,13 +98,12 @@ const ContentPage: FC = () => {
   )
 
   const productData = useMemo(() => {
-    const result = contentResult as { data?: ProductSummary[] } | undefined
-    return (result?.data || []).map((p: ProductSummary) => ({
+    return (contentResult || []).map((p: ProductSummary) => ({
       id: p.id,
       name: p.name,
       slug: p.slug,
       status: p.status,
-      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
     }))
   }, [contentResult])
 
@@ -167,16 +163,7 @@ const ContentPage: FC = () => {
             description="Products will appear here once created."
           />
         ) : (
-          <>
-            <DataTable columns={productColumns} data={productData} />
-            {contentResult && typeof contentResult === 'object' && 'meta' in contentResult && (
-              <Pagination
-                currentPage={page}
-                totalPages={Math.ceil(((contentResult as { meta?: { total: number } }).meta?.total || 0) / pageSize)}
-                onPageChange={setPage}
-              />
-            )}
-          </>
+          <DataTable columns={productColumns} data={productData} />
         )
       ) : (
         !submissionData.length ? (

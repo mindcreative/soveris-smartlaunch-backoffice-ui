@@ -8,6 +8,7 @@ import type {
 import type {
   PaginatedResult,
   ProductContent,
+  ProductSummary,
   Submission,
   SubmissionSummary,
   GetSubmissionsRequest,
@@ -106,17 +107,13 @@ export async function getUserAuditLog(userId: string): Promise<PaginatedResult<A
 
 // GET /api/backoffice/products — List all products (replaces flat /content list)
 export async function getContents(params?: {
-  page?: number
-  pageSize?: number
-  search?: string
   clientId?: string
-}): Promise<PaginatedResult<ProductContent>> {
+}): Promise<ProductSummary[]> {
   const queryParams = new URLSearchParams()
   if (params?.clientId) queryParams.set('clientId', params.clientId)
-  // Note: API does not support page/pageSize/search for ListProducts
   const queryString = queryParams.toString()
   const response = await apiClient.get(`/products${queryString ? `?${queryString}` : ''}`)
-  return response.data as PaginatedResult<ProductContent>
+  return response.data as ProductSummary[]
 }
 
 // GET /api/backoffice/content/{productId} — Get content for a specific product
@@ -185,8 +182,12 @@ export async function exportSubmissions(format?: 'csv' | 'json'): Promise<Blob> 
 
 // ==================== ANALYTICS ENDPOINTS ====================
 
-export async function getOverviewMetrics(): Promise<OverviewMetrics> {
-  const response = await apiClient.get('/analytics/overview')
+export async function getOverviewMetrics(params?: { fromDate?: string; toDate?: string }): Promise<OverviewMetrics> {
+  const queryParams = new URLSearchParams()
+  if (params?.fromDate) queryParams.set('fromDate', params.fromDate)
+  if (params?.toDate) queryParams.set('toDate', params.toDate)
+  const queryString = queryParams.toString()
+  const response = await apiClient.get(`/analytics/overview${queryString ? `?${queryString}` : ''}`)
   return response.data as OverviewMetrics
 }
 

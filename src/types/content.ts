@@ -36,7 +36,10 @@ export interface ProductSummary {
   slug: string
   name: string
   status: string
-  createdAt: string
+  themeLayout?: string
+  updatedAt?: string
+  imageCount?: number
+  hasContent?: boolean
 }
 
 export interface UpdateContentRequest {
