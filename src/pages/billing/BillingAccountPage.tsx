@@ -38,12 +38,18 @@ function ClientContextUnavailable() {
 }
 
 export function BillingIndexPage() {
-  const { user } = useAuth()
+  const { hasPermission, user } = useAuth()
   const clientId = canonicalizeGuid(user?.clientId)
 
-  return clientId
-    ? <Navigate to={`/billing/clients/${clientId}/account`} replace />
-    : <ClientContextUnavailable />
+  if (!clientId) return <ClientContextUnavailable />
+  if (hasPermission('billing:view')) {
+    return <Navigate to={`/billing/clients/${clientId}/account`} replace />
+  }
+  if (hasPermission('billing:subscription')) {
+    return <Navigate to={`/billing/clients/${clientId}/subscriptions`} replace />
+  }
+
+  return <ClientContextUnavailable />
 }
 
 function CanonicalBillingAccountPage({

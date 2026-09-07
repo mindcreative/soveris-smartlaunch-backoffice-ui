@@ -35,12 +35,15 @@ export function Sidebar({ mobile = false, onClose, onNavigate }: SidebarProps) {
   const location = useLocation()
   const { hasPermission, user } = useAuth()
   const defaultClientId = canonicalizeGuid(user?.clientId)
-  const navigation = defaultClientId && hasPermission('billing:view')
+  const canViewBilling = hasPermission('billing:view')
+  const canManageSubscriptions = hasPermission('billing:subscription')
+  const billingLanding = canViewBilling ? 'account' : 'subscriptions'
+  const navigation = defaultClientId && (canViewBilling || canManageSubscriptions)
     ? [
         ...baseNavigation.slice(0, 1),
         {
           name: 'Billing',
-          href: `/billing/clients/${defaultClientId}/account`,
+          href: `/billing/clients/${defaultClientId}/${billingLanding}`,
           icon: 'billing',
         },
         ...baseNavigation.slice(1),

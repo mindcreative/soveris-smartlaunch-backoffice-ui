@@ -20,6 +20,10 @@ export interface ApiErrorResponse {
   message?: string
   statusCode?: number
   success?: boolean
+  code?: string
+  title?: string
+  detail?: string
+  status?: number
 }
 
 // Response wrapper
@@ -67,6 +71,7 @@ function isApiError(error: unknown): error is ApiError {
   return Boolean(
     error &&
     typeof error === 'object' &&
+    !('response' in error) &&
     'code' in error &&
     typeof (error as { code?: unknown }).code === 'string' &&
     'message' in error &&
@@ -185,6 +190,18 @@ export class ApiClient {
           return {
             code: envelope.statusCode ? `HTTP_${envelope.statusCode}` : fallbackCode,
             message: envelope.message,
+            status,
+          }
+        }
+
+        const problemDetail = typeof envelope.detail === 'string' ? envelope.detail.trim() : ''
+        const problemTitle = typeof envelope.title === 'string' ? envelope.title.trim() : ''
+        if (problemDetail || problemTitle) {
+          return {
+            code: typeof envelope.code === 'string' && envelope.code.trim()
+              ? envelope.code
+              : fallbackCode,
+            message: problemDetail || problemTitle,
             status,
           }
         }

@@ -9,7 +9,7 @@ function snapshotBody(clientId: string, ownedBalance = '99999999999999.9999'): s
   const availableBalance = ownedBalance === '99999999999999.9999'
     ? '99999999999979.9999'
     : ownedBalance
-  return `{"creditAccountId":"11111111-2222-3333-4444-555555555555","clientId":"${clientId}","ownedBalance":${ownedBalance},"activelyReservedAmount":20.0000,"availableBalance":${availableBalance},"activeReservationCount":0,"status":"active","asOf":"2026-08-24T07:00:00+00:00"}`
+  return `{"creditAccountId":"11111111-2222-3333-4444-555555555555","clientId":"${clientId}","ownedBalance":${ownedBalance},"activelyReservedAmount":20.0000,"availableBalance":${availableBalance},"activeReservationCount":0,"status":"active","asOf":"2026-08-24T07:00:00+00:00","walletVersion":1}`
 }
 
 async function installAdminSession(page: Page): Promise<void> {

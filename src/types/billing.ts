@@ -9,6 +9,159 @@ export interface BillingAccountSnapshot {
   activeReservationCount: number
   status: BillingAccountStatus
   asOf: string
+  walletVersion: string
+}
+
+export interface BillingEntitlementsV1 {
+  schemaVersion: 1
+  rateLimits: {
+    requestsPerMinute: number
+    concurrentAiOperations: number
+  }
+  featureFlags: {
+    contentGeneration: boolean
+    imageGeneration: boolean
+  }
+}
+
+export type BillingSubscriptionStatus = 'active' | 'paused' | 'cancelled' | 'expired'
+export type BillingSubscriptionChangePolicy = 'immediate' | 'next_billing_cycle'
+export type BillingSubscriptionProrationPolicy = 'none' | 'replace' | 'prorate'
+export type BillingSubscriptionGrantType = 'billing_cycle' | 'operator_override'
+
+export interface BillingSubscriptionUnsupportedView {
+  status: 'unsupported'
+}
+
+export interface BillingSubscriptionPendingChange {
+  schemaVersion: number
+  planChangeOperationId: string
+  planName: string
+  cycleCreditAmount: string
+  entitlements: BillingEntitlementsV1
+  changeEffectivePolicy: BillingSubscriptionChangePolicy
+  prorationPolicy: BillingSubscriptionProrationPolicy
+  unusedCreditPolicy: 'rollover'
+  effectiveCycleIndex: number
+  effectiveCycleStart: string
+  effectiveCycleEnd: string
+  scheduledAt: string
+}
+
+export interface BillingSubscriptionImmediateDebit {
+  planChangeOperationId: string
+  outstandingDebit: string
+  policyVersion: string
+  originalDebit: string
+  appliedDebit: string
+  createdAt: string
+  lastAppliedAt?: string
+  lastAppliedCycleIndex?: number
+  lastAppliedCycleStart?: string
+}
+
+export interface BillingSubscriptionImmediateContext {
+  cycleIndex: number
+  cycleStart: string
+  cycleEnd: string
+  grantOperationId?: string
+}
+
+export interface BillingSubscriptionItem {
+  subscriptionId: string
+  creationOperationId: string
+  planTermsOperationId: string
+  clientId: string
+  planName: string
+  cycleCreditAmount: string
+  entitlements: BillingEntitlementsV1
+  changeEffectivePolicy: BillingSubscriptionChangePolicy
+  prorationPolicy: BillingSubscriptionProrationPolicy
+  unusedCreditPolicy: 'rollover'
+  billingCycleAnchor: string
+  status: BillingSubscriptionStatus
+  validFrom: string
+  validTo: string | null
+  createdAt: string
+  updatedAt: string
+  pendingImmediateDebit?: BillingSubscriptionImmediateDebit | BillingSubscriptionUnsupportedView
+  immediateChangeContext?: BillingSubscriptionImmediateContext | BillingSubscriptionUnsupportedView
+}
+
+export interface BillingSubscriptionGrant {
+  grantId: string
+  grantOperationId: string
+  subscriptionId: string
+  planTermsOperationId: string
+  planNameSnapshot: string
+  entitlementsSnapshot: BillingEntitlementsV1
+  grantType: BillingSubscriptionGrantType
+  cycleStart: string
+  cycleEnd: string
+  creditAmount: string
+  ledgerEntryId: string
+  createdAt: string
+}
+
+export interface BillingSubscriptionGrantHistory {
+  items: BillingSubscriptionGrant[]
+  historyAsOf: string
+  nextCursor: string | null
+}
+
+export interface BillingSubscriptionState {
+  clientId: string
+  stateAsOf: string
+  current: BillingSubscriptionItem | null
+  pendingChange: BillingSubscriptionPendingChange | BillingSubscriptionUnsupportedView | null
+  subscriptionHistory: BillingSubscriptionItem[]
+  grantHistory: BillingSubscriptionGrantHistory
+  pendingImmediateDebit?: BillingSubscriptionImmediateDebit | BillingSubscriptionUnsupportedView
+  immediateChangeContext?: BillingSubscriptionImmediateContext | BillingSubscriptionUnsupportedView
+}
+
+export type BillingSubscriptionPageRequest =
+  | { pageSize?: number; cursor?: never }
+  | { cursor: string; pageSize?: never }
+
+export interface CreateBillingSubscriptionRequest {
+  creationOperationId: string
+  planName: string
+  cycleCreditAmount: string
+  validFrom: string
+  validTo: string | null
+  changeEffectivePolicy: 'immediate'
+  prorationPolicy: 'replace'
+  unusedCreditPolicy: 'rollover'
+  entitlements: BillingEntitlementsV1
+}
+
+export type CreateBillingSubscriptionMaterial = Omit<
+  CreateBillingSubscriptionRequest,
+  'creationOperationId'
+>
+
+export interface BillingSubscriptionCreationAttempt {
+  clientId: string
+  request: CreateBillingSubscriptionRequest
+  serializedBody: string
+}
+
+export interface BillingSubscriptionCreationAccount {
+  creditAccountId: string
+  clientId: string
+  ownedBalance: string
+  activelyReservedAmount: string
+  availableBalance: string
+  status: BillingAccountStatus
+  asOf: string
+}
+
+export interface BillingSubscriptionCreationReceipt {
+  created: boolean
+  subscription: Omit<BillingSubscriptionItem, 'createdAt' | 'updatedAt' | 'pendingImmediateDebit' | 'immediateChangeContext'>
+  initialGrant: Omit<BillingSubscriptionGrant, 'subscriptionId' | 'createdAt'>
+  account: BillingSubscriptionCreationAccount
 }
 
 export const BILLING_LEDGER_TRANSACTION_TYPES = [

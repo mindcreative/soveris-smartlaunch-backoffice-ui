@@ -17,6 +17,7 @@ import type { UserRole } from './types/auth'
 import { queryClient } from './queryClient'
 import { BillingAccountPage, BillingIndexPage } from './pages/billing/BillingAccountPage'
 import { BillingLedgerBoundaryPage } from './pages/billing/BillingLedgerBoundaryPage'
+import { BillingSubscriptionPage } from './pages/billing/BillingSubscriptionPage'
 
 // Protected route wrapper with role-based access
 function ProtectedRoute({
@@ -53,6 +54,7 @@ function App() {
               <Route path="/billing" element={<BillingIndexPage />} />
               <Route path="/billing/clients/:clientId/account" element={<BillingAccountPage />} />
               <Route path="/billing/clients/:clientId/ledger" element={<BillingLedgerBoundaryPage />} />
+              <Route path="/billing/clients/:clientId/subscriptions" element={<BillingSubscriptionPage />} />
 
               {/* Placeholder routes for future pages */}
               <Route path="/themes" element={

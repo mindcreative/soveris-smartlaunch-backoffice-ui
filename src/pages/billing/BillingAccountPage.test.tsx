@@ -17,6 +17,7 @@ const SNAPSHOT: BillingAccountSnapshot = {
   activeReservationCount: 0,
   status: 'active',
   asOf: '2026-08-24T07:00:00+00:00',
+  walletVersion: '1',
 }
 
 function authenticate(role: 'Admin' | 'Viewer' = 'Admin') {

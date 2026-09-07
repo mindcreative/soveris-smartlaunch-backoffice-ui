@@ -68,6 +68,60 @@ describe('ApiClient error normalization', () => {
       status: 500,
     })
   })
+
+  it('preserves a stable top-level ProblemDetails code and safe detail', () => {
+    expect(
+      apiClient.normalizeError({
+        response: {
+          status: 409,
+          data: {
+            type: 'about:blank',
+            title: 'Subscription conflict',
+            status: 409,
+            detail: 'The subscription command conflicts with current state.',
+            code: 'subscription_current_conflict',
+          },
+        },
+      })
+    ).toEqual({
+      code: 'subscription_current_conflict',
+      message: 'The subscription command conflicts with current state.',
+      status: 409,
+    })
+  })
+
+  it('normalizes an Axios-shaped error before considering its transport code', () => {
+    expect(apiClient.normalizeError({
+      code: 'ERR_BAD_REQUEST',
+      message: 'Request failed with status code 409',
+      response: {
+        status: 409,
+        data: {
+          title: 'Subscription conflict',
+          detail: 'The operation conflicts.',
+          code: 'subscription_operation_conflict',
+        },
+      },
+    })).toEqual({
+      code: 'subscription_operation_conflict', message: 'The operation conflicts.', status: 409,
+    })
+  })
+
+  it('falls back from ProblemDetails detail to title without weakening old envelopes', () => {
+    expect(apiClient.normalizeError({
+      response: { status: 400, data: '{"title":"Invalid subscription creation request","status":400}' },
+    })).toEqual({
+      code: 'HTTP_400', message: 'Invalid subscription creation request', status: 400,
+    })
+  })
+
+  it('does not expose blank ProblemDetails fields as an empty message', () => {
+    expect(apiClient.normalizeError({
+      response: { status: 500, data: { title: '   ', detail: '\n', status: 500 } },
+    })).toEqual({
+      code: 'HTTP_500', message: 'Request failed with status 500', status: 500,
+    })
+  })
 })
 
 describe('successful refresh lifecycle', () => {

@@ -1,10 +1,17 @@
 import { Link, useLocation } from 'react-router-dom'
+import { useAuth } from '../../hooks/useAuth'
 
 export function BillingWorkspaceNav({ clientId }: { clientId: string }) {
   const location = useLocation()
+  const { hasPermission } = useAuth()
   const items = [
-    { label: 'Account', href: `/billing/clients/${clientId}/account` },
-    { label: 'Ledger', href: `/billing/clients/${clientId}/ledger` },
+    ...(hasPermission('billing:view') ? [
+      { label: 'Account', href: `/billing/clients/${clientId}/account` },
+      { label: 'Ledger', href: `/billing/clients/${clientId}/ledger` },
+    ] : []),
+    ...(hasPermission('billing:subscription') ? [
+      { label: 'Subscriptions', href: `/billing/clients/${clientId}/subscriptions` },
+    ] : []),
   ]
 
   return (

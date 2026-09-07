@@ -2,15 +2,22 @@ import type { PropsWithChildren } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { billingApi, BillingContractError, BillingLedgerContractError } from '../api/billingApi'
-import type { BillingAccountSnapshot, BillingLedgerPage } from '../types/billing'
+import {
+  billingApi,
+  BillingContractError,
+  BillingLedgerContractError,
+  BillingSubscriptionContractError,
+} from '../api/billingApi'
+import type { BillingAccountSnapshot, BillingLedgerPage, BillingSubscriptionState } from '../types/billing'
 import {
   billingAccountKeys,
   billingExportKeys,
   billingLedgerKeys,
+  billingSubscriptionKeys,
   clearPrivateBillingQueries,
   useBillingAccount,
   useBillingLedger,
+  useBillingSubscriptions,
 } from './billingQueries'
 
 const CLIENT_A = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
@@ -26,6 +33,7 @@ function snapshot(clientId: string): BillingAccountSnapshot {
     activeReservationCount: 0,
     status: 'active',
     asOf: '2026-08-24T07:00:00+00:00',
+    walletVersion: '1',
   }
 }
 
@@ -50,6 +58,12 @@ describe('private Billing queries', () => {
     expect(billingExportKeys.request(CLIENT_A)).toEqual([
       'backoffice', 'private', 'billing', 'exports', CLIENT_A, 'request',
     ])
+    expect(billingSubscriptionKeys.state(CLIENT_A)).toEqual([
+      'backoffice', 'private', 'billing', 'subscriptions', CLIENT_A, 'state',
+    ])
+    expect(billingSubscriptionKeys.create(CLIENT_A)).toEqual([
+      'backoffice', 'private', 'billing', 'subscriptions', CLIENT_A, 'create',
+    ])
   })
 
   it('cancels and removes all private Billing data', async () => {
@@ -60,12 +74,18 @@ describe('private Billing queries', () => {
       mutationKey: billingExportKeys.request(CLIENT_A),
       mutationFn: async () => ({ exportId: 'export-id' }),
     })
+    queryClient.setQueryData(billingSubscriptionKeys.state(CLIENT_A), { clientId: CLIENT_A })
+    queryClient.getMutationCache().build(queryClient, {
+      mutationKey: billingSubscriptionKeys.create(CLIENT_A),
+      mutationFn: async () => ({ created: true }),
+    })
     queryClient.setQueryData(['backoffice', 'public'], 'preserve')
 
     await clearPrivateBillingQueries(queryClient)
 
     expect(queryClient.getQueryData(billingAccountKeys.account(CLIENT_A))).toBeUndefined()
     expect(queryClient.getQueryData(billingExportKeys.detail(CLIENT_A, 'export-id'))).toBeUndefined()
+    expect(queryClient.getQueryData(billingSubscriptionKeys.state(CLIENT_A))).toBeUndefined()
     expect(queryClient.getMutationCache().getAll()).toHaveLength(0)
     expect(queryClient.getQueryData(['backoffice', 'public'])).toBe('preserve')
   })
@@ -157,6 +177,106 @@ describe('private Billing queries', () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true))
     expect(request).toHaveBeenCalledTimes(2)
+  })
+})
+
+function subscriptionState(clientId: string): BillingSubscriptionState {
+  return {
+    clientId,
+    stateAsOf: '2026-09-06T12:00:00+00:00',
+    current: null,
+    pendingChange: null,
+    subscriptionHistory: [],
+    grantHistory: {
+      items: [], historyAsOf: '2026-09-06T12:00:00+00:00', nextCursor: null,
+    },
+  }
+}
+
+describe('private Billing subscription queries', () => {
+  it('cancels and removes the former Client before accepting a late response', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    let resolveA: ((value: BillingSubscriptionState) => void) | undefined
+    let signalA: AbortSignal | undefined
+    const request = vi.spyOn(billingApi, 'getSubscriptionState').mockImplementation(
+      (clientId, _request, signal) => {
+        if (clientId === CLIENT_A) {
+          signalA = signal
+          return new Promise((resolve) => { resolveA = resolve })
+        }
+        return Promise.resolve(subscriptionState(CLIENT_B))
+      }
+    )
+    const { result, rerender } = renderHook(
+      ({ clientId }) => useBillingSubscriptions(clientId),
+      { initialProps: { clientId: CLIENT_A }, wrapper: createWrapper(queryClient) }
+    )
+    await waitFor(() => expect(request).toHaveBeenCalledWith(
+      CLIENT_A, { pageSize: 20 }, expect.any(AbortSignal)
+    ))
+    rerender({ clientId: CLIENT_B })
+    await waitFor(() => expect(result.current.data?.clientId).toBe(CLIENT_B))
+    expect(signalA?.aborted).toBe(true)
+    expect(queryClient.getQueryData(billingSubscriptionKeys.state(CLIENT_A))).toBeUndefined()
+    resolveA?.(subscriptionState(CLIENT_A))
+    await Promise.resolve()
+    expect(result.current.data?.clientId).toBe(CLIENT_B)
+  })
+
+  it('fails closed and removes malformed subscription state', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    vi.spyOn(billingApi, 'getSubscriptionState').mockRejectedValue(
+      new BillingSubscriptionContractError('state fields do not match the closed contract')
+    )
+    const { result } = renderHook(() => useBillingSubscriptions(CLIENT_A), {
+      wrapper: createWrapper(queryClient),
+    })
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    await waitFor(() => {
+      expect(queryClient.getQueryData(billingSubscriptionKeys.state(CLIENT_A))).toBeUndefined()
+    })
+  })
+
+  it('loads bounded grant continuations and rejects duplicate evidence', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const first = subscriptionState(CLIENT_A)
+    first.grantHistory.nextCursor = 'next'
+    const grant = {
+      grantId: '33333333-3333-4333-8333-555555555555',
+      grantOperationId: '01991f20-2234-7abc-8abc-1234567890ab',
+      subscriptionId: '22222222-2222-3333-8444-555555555555',
+      planTermsOperationId: '01991f20-1234-7abc-8abc-1234567890ab',
+      planNameSnapshot: 'Pro',
+      entitlementsSnapshot: {
+        schemaVersion: 1 as const,
+        rateLimits: { requestsPerMinute: 60, concurrentAiOperations: 4 },
+        featureFlags: { contentGeneration: true, imageGeneration: false },
+      },
+      grantType: 'billing_cycle' as const,
+      cycleStart: '2026-02-15T12:00:00.000000Z', cycleEnd: '2026-03-15T12:00:00.000000Z',
+      creditAmount: '1250.0000', ledgerEntryId: '44444444-4444-4444-8444-555555555555',
+      createdAt: '2026-02-15T12:00:01.000000Z',
+    }
+    const next = subscriptionState(CLIENT_A)
+    next.grantHistory = { items: [grant], historyAsOf: first.grantHistory.historyAsOf, nextCursor: null }
+    const request = vi.spyOn(billingApi, 'getSubscriptionState')
+      .mockResolvedValueOnce(first).mockResolvedValueOnce(next)
+    const { result } = renderHook(() => useBillingSubscriptions(CLIENT_A), {
+      wrapper: createWrapper(queryClient),
+    })
+    await waitFor(() => expect(result.current.hasNextPage).toBe(true))
+    await result.current.loadMore()
+    await waitFor(() => expect(result.current.data?.grantHistory.items).toEqual([grant]))
+    expect(request).toHaveBeenLastCalledWith(CLIENT_A, { cursor: 'next' }, expect.any(AbortSignal))
+
+    first.grantHistory.items = [grant]
+    first.grantHistory.nextCursor = 'duplicate'
+    request.mockResolvedValueOnce({
+      ...next, grantHistory: { ...next.grantHistory, items: [grant] },
+    })
+    await queryClient.setQueryData(billingSubscriptionKeys.state(CLIENT_A), first)
+    await waitFor(() => expect(result.current.hasNextPage).toBe(true))
+    await expect(result.current.loadMore()).rejects.toThrow('duplicate grant')
   })
 })
 

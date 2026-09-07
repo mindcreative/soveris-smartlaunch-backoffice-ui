@@ -4,14 +4,22 @@ import {
   getBillingAccountSnapshot,
   getBillingLedgerExportStatus,
   getBillingLedgerPage,
+  getBillingSubscriptionState,
   parseBillingAccountSnapshot,
   parseBillingLedgerExportAccepted,
   parseBillingLedgerExportStatus,
   parseBillingLedgerPage,
+  parseBillingSubscriptionCreationReceipt,
+  parseBillingSubscriptionState,
   redeemBillingLedgerExport,
   requestBillingLedgerExport,
+  serializeCreateBillingSubscriptionRequest,
 } from './billingApi'
-import type { BillingLedgerExportAttempt, BillingLedgerExportFilters } from '../types/billing'
+import type {
+  BillingLedgerExportAttempt,
+  BillingLedgerExportFilters,
+  CreateBillingSubscriptionRequest,
+} from '../types/billing'
 
 const CLIENT_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 const ACCOUNT_ID = '11111111-2222-3333-4444-555555555555'
@@ -26,11 +34,13 @@ function snapshotJson(overrides: Record<string, string | number> = {}) {
     activeReservationCount: 0,
     status: 'active',
     asOf: '2026-08-24T07:00:00+00:00',
+    walletVersion: '__WALLET_VERSION__',
     ...overrides,
   })
     .replace('"__OWNED__"', '99999999999999.9999')
     .replace('"__RESERVED__"', '0.0001')
     .replace('"__AVAILABLE__"', '99999999999999.9998')
+    .replace('"__WALLET_VERSION__"', '9223372036854775807')
 }
 
 describe('parseBillingAccountSnapshot', () => {
@@ -42,6 +52,7 @@ describe('parseBillingAccountSnapshot', () => {
     expect(result.availableBalance).toBe('99999999999999.9998')
     expect(result.activeReservationCount).toBe(0)
     expect(result.asOf).toBe('2026-08-24T07:00:00+00:00')
+    expect(result.walletVersion).toBe('9223372036854775807')
   })
 
   it('preserves zero decimal scale', () => {
@@ -74,6 +85,8 @@ describe('parseBillingAccountSnapshot', () => {
     snapshotJson({ asOf: 'not-a-date' }),
     snapshotJson({ asOf: '2026-08-24T09:00:00+02:00' }),
     snapshotJson({ extra: 'not-allowed' }),
+    snapshotJson({ walletVersion: -1 }),
+    snapshotJson({ walletVersion: '__TOO_LARGE__' }).replace('"__TOO_LARGE__"', '9223372036854775808'),
   ])('rejects malformed or non-contract payloads', (payload) => {
     expect(() => parseBillingAccountSnapshot(payload, CLIENT_ID)).toThrow()
   })
@@ -82,6 +95,288 @@ describe('parseBillingAccountSnapshot', () => {
     expect(() => parseBillingAccountSnapshot('{invalid', CLIENT_ID)).toThrow(
       'Invalid Billing snapshot: response is not valid JSON'
     )
+  })
+})
+
+const SUBSCRIPTION_ID = '22222222-2222-3333-8444-555555555555'
+const CREATION_OPERATION_ID = '01991f20-1234-7abc-8abc-1234567890ab'
+const GRANT_ID = '33333333-2222-3333-8444-555555555555'
+const GRANT_OPERATION_ID = '44444444-2222-3333-8444-555555555555'
+const LEDGER_ENTRY_ID = '55555555-2222-3333-8444-555555555555'
+
+const ENTITLEMENTS = {
+  schemaVersion: 1 as const,
+  rateLimits: { requestsPerMinute: 60, concurrentAiOperations: 4 },
+  featureFlags: { contentGeneration: true, imageGeneration: true },
+}
+
+const CREATION_REQUEST: CreateBillingSubscriptionRequest = {
+  creationOperationId: CREATION_OPERATION_ID,
+  planName: 'Pro',
+  cycleCreditAmount: '99999999999999.9999',
+  validFrom: '2026-09-01T00:00:00.000Z',
+  validTo: null,
+  changeEffectivePolicy: 'immediate',
+  prorationPolicy: 'replace',
+  unusedCreditPolicy: 'rollover',
+  entitlements: ENTITLEMENTS,
+}
+
+function subscriptionItem(overrides: Record<string, unknown> = {}) {
+  return {
+    subscriptionId: SUBSCRIPTION_ID,
+    creationOperationId: CREATION_OPERATION_ID,
+    planTermsOperationId: CREATION_OPERATION_ID,
+    clientId: CLIENT_ID,
+    planName: 'Pro',
+    cycleCreditAmount: '__AMOUNT__',
+    entitlements: ENTITLEMENTS,
+    changeEffectivePolicy: 'immediate',
+    prorationPolicy: 'replace',
+    unusedCreditPolicy: 'rollover',
+    billingCycleAnchor: '2026-09-01T00:00:00+00:00',
+    status: 'active',
+    validFrom: '2026-09-01T00:00:00+00:00',
+    validTo: null,
+    createdAt: '2026-09-01T00:00:00+00:00',
+    updatedAt: '2026-09-01T00:00:00+00:00',
+    ...overrides,
+  }
+}
+
+function grantItem(overrides: Record<string, unknown> = {}) {
+  return {
+    grantId: GRANT_ID,
+    grantOperationId: GRANT_OPERATION_ID,
+    subscriptionId: SUBSCRIPTION_ID,
+    planTermsOperationId: CREATION_OPERATION_ID,
+    planNameSnapshot: 'Pro',
+    entitlementsSnapshot: ENTITLEMENTS,
+    grantType: 'billing_cycle',
+    cycleStart: '2026-09-01T00:00:00+00:00',
+    cycleEnd: '2026-10-01T00:00:00+00:00',
+    creditAmount: '__AMOUNT__',
+    ledgerEntryId: LEDGER_ENTRY_ID,
+    createdAt: '2026-09-01T00:00:00+00:00',
+    ...overrides,
+  }
+}
+
+function subscriptionStateJson(overrides: Record<string, unknown> = {}): string {
+  return JSON.stringify({
+    clientId: CLIENT_ID,
+    stateAsOf: '2026-09-06T12:00:00+00:00',
+    current: subscriptionItem({
+      pendingImmediateDebit: { status: 'unsupported' },
+      immediateChangeContext: { status: 'unsupported' },
+    }),
+    pendingChange: { status: 'unsupported' },
+    subscriptionHistory: [],
+    grantHistory: {
+      items: [grantItem()], historyAsOf: '2026-09-06T12:00:00+00:00', nextCursor: 'opaque cursor',
+    },
+    pendingImmediateDebit: { status: 'unsupported' },
+    immediateChangeContext: { status: 'unsupported' },
+    ...overrides,
+  }).replace(/"__AMOUNT__"/g, '99999999999999.9999')
+}
+
+function creationReceiptJson(overrides: Record<string, unknown> = {}): string {
+  return JSON.stringify({
+    created: true,
+    subscription: {
+      subscriptionId: SUBSCRIPTION_ID,
+      creationOperationId: CREATION_OPERATION_ID,
+      planTermsOperationId: CREATION_OPERATION_ID,
+      clientId: CLIENT_ID,
+      planName: 'Pro',
+      cycleCreditAmount: '__AMOUNT__',
+      entitlements: ENTITLEMENTS,
+      changeEffectivePolicy: 'immediate', prorationPolicy: 'replace', unusedCreditPolicy: 'rollover',
+      billingCycleAnchor: '2026-09-01T00:00:00+00:00', status: 'active',
+      validFrom: '2026-09-01T00:00:00+00:00', validTo: null,
+    },
+    initialGrant: {
+      grantId: GRANT_ID, grantOperationId: GRANT_OPERATION_ID, ledgerEntryId: LEDGER_ENTRY_ID,
+      planTermsOperationId: CREATION_OPERATION_ID, planNameSnapshot: 'Pro',
+      entitlementsSnapshot: ENTITLEMENTS, grantType: 'billing_cycle',
+      cycleStart: '2026-09-01T00:00:00+00:00', cycleEnd: '2026-10-01T00:00:00+00:00',
+      creditAmount: '__AMOUNT__',
+    },
+    account: {
+      creditAccountId: ACCOUNT_ID, clientId: CLIENT_ID, ownedBalance: '__AMOUNT__',
+      activelyReservedAmount: 0.0000, availableBalance: '__AMOUNT__', status: 'active',
+      asOf: '2026-09-06T12:00:00+00:00',
+    },
+    ...overrides,
+  }).replace(/"__AMOUNT__"/g, '99999999999999.9999')
+}
+
+describe('Billing subscription state adapter', () => {
+  it('parses exact decimals, current/grant identities, and completed later-story markers', () => {
+    const result = parseBillingSubscriptionState(subscriptionStateJson(), CLIENT_ID)
+    expect(result.current?.cycleCreditAmount).toBe('99999999999999.9999')
+    expect(result.grantHistory.items[0]?.creditAmount).toBe('99999999999999.9999')
+    expect(result.pendingChange).toEqual({ status: 'unsupported' })
+    expect(result.current?.pendingImmediateDebit).toEqual({ status: 'unsupported' })
+    expect(result.grantHistory.nextCursor).toBe('opaque cursor')
+  })
+
+  it('accepts authorized absence and rejects unknown, duplicate, and cross-Client evidence', () => {
+    const empty = subscriptionStateJson({
+      current: null, pendingChange: null, subscriptionHistory: [],
+      grantHistory: { items: [], historyAsOf: '2026-09-06T12:00:00+00:00', nextCursor: null },
+      pendingImmediateDebit: undefined, immediateChangeContext: undefined,
+    })
+    expect(parseBillingSubscriptionState(empty, CLIENT_ID).current).toBeNull()
+    expect(() => parseBillingSubscriptionState(subscriptionStateJson({ extra: 'private' }), CLIENT_ID)).toThrow('closed contract')
+    expect(() => parseBillingSubscriptionState(subscriptionStateJson({
+      clientId: 'ffffffff-1111-2222-3333-444444444444',
+    }), CLIENT_ID)).toThrow('state Client')
+    expect(() => parseBillingSubscriptionState(subscriptionStateJson({
+      grantHistory: {
+        items: [grantItem(), grantItem()], historyAsOf: '2026-09-06T12:00:00+00:00', nextCursor: null,
+      },
+    }), CLIENT_ID)).toThrow('duplicate grant')
+    expect(() => parseBillingSubscriptionState(subscriptionStateJson({
+      grantHistory: {
+        items: [grantItem(), grantItem({
+          grantId: '66666666-6666-4666-8666-666666666666',
+          ledgerEntryId: '77777777-7777-4777-8777-777777777777',
+        })],
+        historyAsOf: '2026-09-06T12:00:00+00:00', nextCursor: null,
+      },
+    }), CLIENT_ID)).toThrow('duplicate grant identity')
+  })
+
+  it('rejects invalid status partitions, relationships, intervals, and server order', () => {
+    expect(() => parseBillingSubscriptionState(subscriptionStateJson({
+      current: subscriptionItem({ status: 'cancelled' }),
+    }), CLIENT_ID)).toThrow()
+    expect(() => parseBillingSubscriptionState(subscriptionStateJson({
+      subscriptionHistory: [subscriptionItem({ status: 'active' })],
+    }), CLIENT_ID)).toThrow()
+    expect(() => parseBillingSubscriptionState(subscriptionStateJson({
+      grantHistory: {
+        items: [grantItem({ subscriptionId: '99999999-2222-4333-8444-555555555555' })],
+        historyAsOf: '2026-09-06T12:00:00+00:00', nextCursor: null,
+      },
+    }), CLIENT_ID)).toThrow()
+    expect(() => parseBillingSubscriptionState(subscriptionStateJson({
+      grantHistory: {
+        items: [grantItem({ cycleEnd: '2026-09-01T00:00:00+00:00' })],
+        historyAsOf: '2026-09-06T12:00:00+00:00', nextCursor: null,
+      },
+    }), CLIENT_ID)).toThrow()
+    expect(() => parseBillingSubscriptionState(subscriptionStateJson({
+      grantHistory: {
+        items: [
+          grantItem({ cycleStart: '2026-08-01T00:00:00+00:00', cycleEnd: '2026-09-01T00:00:00+00:00' }),
+          grantItem({
+            grantId: '66666666-6666-4666-8666-666666666666',
+            grantOperationId: '77777777-7777-4777-8777-777777777777',
+            ledgerEntryId: '88888888-7777-4777-8777-777777777777',
+            cycleStart: '2026-09-01T00:00:00+00:00', cycleEnd: '2026-10-01T00:00:00+00:00',
+          }),
+        ], historyAsOf: '2026-09-06T12:00:00+00:00', nextCursor: null,
+      },
+    }), CLIENT_ID)).toThrow()
+  })
+
+  it('uses initial pageSize or exactly one encoded continuation cursor', async () => {
+    const getApiRoot = vi.spyOn(apiClient, 'getApiRoot').mockResolvedValue({
+      data: subscriptionStateJson(), status: 200,
+    })
+    const signal = new AbortController().signal
+    await getBillingSubscriptionState(CLIENT_ID, { pageSize: 20 }, signal)
+    await getBillingSubscriptionState(CLIENT_ID, { cursor: 'opaque +/ cursor' })
+    expect(getApiRoot.mock.calls[0]).toEqual([
+      `/api/billing/clients/${CLIENT_ID}/subscriptions?pageSize=20`,
+      { responseType: 'text', signal },
+    ])
+    expect(getApiRoot.mock.calls[1]?.[0]).toBe(
+      `/api/billing/clients/${CLIENT_ID}/subscriptions?cursor=opaque+%2B%2F+cursor`
+    )
+  })
+})
+
+describe('Billing subscription creation adapter', () => {
+  it('serializes the high-magnitude amount as an exact JSON number and no extra identities', () => {
+    const body = serializeCreateBillingSubscriptionRequest(CREATION_REQUEST)
+    expect(body).toContain('"cycleCreditAmount":99999999999999.9999')
+    expect(JSON.parse(body)).toEqual({
+      ...CREATION_REQUEST,
+      cycleCreditAmount: 100000000000000,
+    })
+    expect(body).not.toContain('clientId')
+    expect(body).not.toContain('grantOperationId')
+    expect(body).not.toContain('correlation')
+  })
+
+  it('rejects invalid runtime policies, entitlement values, and over-precision instants', () => {
+    expect(() => serializeCreateBillingSubscriptionRequest({
+      ...CREATION_REQUEST,
+      prorationPolicy: 'none',
+    } as unknown as CreateBillingSubscriptionRequest)).toThrow('policies')
+    expect(() => serializeCreateBillingSubscriptionRequest({
+      ...CREATION_REQUEST,
+      entitlements: { ...ENTITLEMENTS, schemaVersion: 2 },
+    } as unknown as CreateBillingSubscriptionRequest)).toThrow('entitlements')
+    expect(() => serializeCreateBillingSubscriptionRequest({
+      ...CREATION_REQUEST,
+      validFrom: '2026-09-01T00:00:00.1234567Z',
+    })).toThrow('UTC instant')
+  })
+
+  it('validates the immutable receipt and accepts equivalent UTC rendering', () => {
+    const result = parseBillingSubscriptionCreationReceipt(
+      creationReceiptJson(), CLIENT_ID, CREATION_REQUEST
+    )
+    expect(result.subscription.creationOperationId).toBe(CREATION_OPERATION_ID)
+    expect(result.initialGrant.ledgerEntryId).toBe(LEDGER_ENTRY_ID)
+    expect(result.account.ownedBalance).toBe('99999999999999.9999')
+
+    const boundedRequest = {
+      ...CREATION_REQUEST,
+      validTo: '2026-10-01T00:00:00.000000Z',
+    }
+    const boundedReceipt = creationReceiptJson()
+      .replace('"validTo":null', '"validTo":"2026-10-01T00:00:00+00:00"')
+    expect(parseBillingSubscriptionCreationReceipt(
+      boundedReceipt, CLIENT_ID, boundedRequest
+    ).subscription.validTo).toBe('2026-10-01T00:00:00+00:00')
+  })
+
+  it('rejects mismatched material and closed receipt violations', () => {
+    expect(() => parseBillingSubscriptionCreationReceipt(
+      creationReceiptJson({ created: true, extra: 'private' }), CLIENT_ID, CREATION_REQUEST
+    )).toThrow('closed contract')
+    expect(() => parseBillingSubscriptionCreationReceipt(
+      creationReceiptJson(), CLIENT_ID, {
+        ...CREATION_REQUEST,
+        creationOperationId: '01991f20-9999-7abc-8abc-1234567890ab',
+      }
+    )).toThrow('confirmed operation')
+  })
+
+  it('rejects a non-B1 receipt or an inconsistent immutable account projection', () => {
+    const wrongAnchor = JSON.parse(creationReceiptJson()) as Record<string, unknown>
+    ;(wrongAnchor.subscription as Record<string, unknown>).billingCycleAnchor = '2026-09-02T00:00:00Z'
+    expect(() => parseBillingSubscriptionCreationReceipt(
+      JSON.stringify(wrongAnchor), CLIENT_ID, CREATION_REQUEST
+    )).toThrow()
+
+    const wrongCycle = JSON.parse(creationReceiptJson()) as Record<string, unknown>
+    ;(wrongCycle.initialGrant as Record<string, unknown>).cycleEnd = '2026-10-02T00:00:00Z'
+    expect(() => parseBillingSubscriptionCreationReceipt(
+      JSON.stringify(wrongCycle), CLIENT_ID, CREATION_REQUEST
+    )).toThrow()
+
+    const wrongBalance = JSON.parse(creationReceiptJson()) as Record<string, unknown>
+    ;(wrongBalance.account as Record<string, unknown>).availableBalance = 1
+    expect(() => parseBillingSubscriptionCreationReceipt(
+      JSON.stringify(wrongBalance), CLIENT_ID, CREATION_REQUEST
+    )).toThrow()
   })
 })
 

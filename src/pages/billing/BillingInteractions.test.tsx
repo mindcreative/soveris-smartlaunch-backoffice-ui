@@ -22,6 +22,7 @@ function snapshot(clientId: string, ownedBalance: string): BillingAccountSnapsho
     activeReservationCount: 0,
     status: 'active',
     asOf: '2026-08-24T07:00:00+00:00',
+    walletVersion: '1',
   }
 }
 

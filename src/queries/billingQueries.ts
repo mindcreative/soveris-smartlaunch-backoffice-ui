@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   useInfiniteQuery,
+  useMutation,
   useQuery,
   useQueryClient,
   type InfiniteData,
@@ -11,12 +12,16 @@ import {
   billingApi,
   BillingContractError,
   BillingLedgerContractError,
+  BillingSubscriptionContractError,
 } from '../api/billingApi'
 import type { ApiError } from '../api/apiClient'
 import type {
   BillingAccountSnapshot,
   BillingLedgerFilters,
   BillingLedgerPage,
+  BillingSubscriptionCreationReceipt,
+  BillingSubscriptionState,
+  CreateBillingSubscriptionRequest,
 } from '../types/billing'
 
 const privateRoot = ['backoffice', 'private'] as const
@@ -32,6 +37,13 @@ export const billingLedgerKeys = {
   client: (clientId: string) => [...privateRoot, 'billing', 'ledger', clientId] as const,
   traversal: (clientId: string, filters: BillingLedgerFilters, traversalId: number) =>
     [...privateRoot, 'billing', 'ledger', clientId, filters, traversalId] as const,
+}
+
+export const billingSubscriptionKeys = {
+  all: [...privateRoot, 'billing', 'subscriptions'] as const,
+  client: (clientId: string) => [...privateRoot, 'billing', 'subscriptions', clientId] as const,
+  state: (clientId: string) => [...privateRoot, 'billing', 'subscriptions', clientId, 'state'] as const,
+  create: (clientId: string) => [...privateRoot, 'billing', 'subscriptions', clientId, 'create'] as const,
 }
 
 export const billingExportKeys = {
@@ -95,6 +107,20 @@ export async function cancelAndRemoveBillingLedger(
   queryClient.removeQueries({ queryKey, exact })
 }
 
+export async function cancelAndRemoveBillingSubscriptions(
+  queryClient: QueryClient,
+  clientId: string
+): Promise<void> {
+  const queryKey = billingSubscriptionKeys.client(clientId)
+  await queryClient.cancelQueries({ queryKey })
+  queryClient.removeQueries({ queryKey })
+  for (const mutation of queryClient.getMutationCache().getAll()) {
+    if (startsWithKey(mutation.options.mutationKey, queryKey)) {
+      queryClient.getMutationCache().remove(mutation)
+    }
+  }
+}
+
 function isDurablePermissionError(error: unknown): error is ApiError {
   const status = getErrorStatus(error)
   return status === 401 || status === 403
@@ -109,6 +135,7 @@ function getErrorStatus(error: unknown): number | undefined {
 export function useBillingAccount(clientId: string | null) {
   const queryClient = useQueryClient()
   const previousClientId = useRef<string | null>(null)
+  const mountGenerationRef = useRef(0)
   const [durableError, setDurableError] = useState<Error | ApiError | null>(null)
 
   useEffect(() => {
@@ -118,6 +145,17 @@ export function useBillingAccount(clientId: string | null) {
 
     if (previous && previous !== clientId) {
       void cancelAndRemoveBillingAccount(queryClient, previous)
+    }
+  }, [clientId, queryClient])
+
+  useEffect(() => {
+    const generation = ++mountGenerationRef.current
+    return () => {
+      queueMicrotask(() => {
+        if (mountGenerationRef.current === generation && clientId) {
+          void cancelAndRemoveBillingAccount(queryClient, clientId)
+        }
+      })
     }
   }, [clientId, queryClient])
 
@@ -164,6 +202,206 @@ export function useBillingAccount(clientId: string | null) {
     error: durableError ?? query.error,
     isError: Boolean(durableError) || query.isError,
   }
+}
+
+export function useBillingSubscriptions(clientId: string | null) {
+  const queryClient = useQueryClient()
+  const previousClientId = useRef<string | null>(null)
+  const mountGenerationRef = useRef(0)
+  const [durableError, setDurableError] = useState<Error | ApiError | null>(null)
+  const [continuationPages, setContinuationPages] = useState<BillingSubscriptionState[]>([])
+  const [continuationError, setContinuationError] = useState<Error | ApiError | null>(null)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const continuationPagesRef = useRef<BillingSubscriptionState[]>([])
+  const continuationAbortRef = useRef<AbortController | null>(null)
+  const loadingMoreRef = useRef(false)
+  const continuationEpochRef = useRef(0)
+
+  useEffect(() => {
+    const previous = previousClientId.current
+    previousClientId.current = clientId
+    setDurableError(null)
+    continuationAbortRef.current?.abort()
+    continuationPagesRef.current = []
+    setContinuationPages([])
+    setContinuationError(null)
+    setIsLoadingMore(false)
+    loadingMoreRef.current = false
+    if (previous && previous !== clientId) {
+      void cancelAndRemoveBillingSubscriptions(queryClient, previous)
+    }
+  }, [clientId, queryClient])
+
+  useEffect(() => {
+    const generation = ++mountGenerationRef.current
+    return () => {
+      queueMicrotask(() => {
+        if (mountGenerationRef.current === generation && clientId) {
+          void cancelAndRemoveBillingSubscriptions(queryClient, clientId)
+        }
+      })
+    }
+  }, [clientId, queryClient])
+
+  const query = useQuery<BillingSubscriptionState, Error | ApiError>({
+    queryKey: billingSubscriptionKeys.state(clientId ?? 'invalid-client'),
+    queryFn: ({ signal }) => {
+      if (!clientId) throw new Error('A valid Client is required')
+      return billingApi.getSubscriptionState(clientId, { pageSize: 20 }, signal)
+    },
+    enabled: Boolean(clientId),
+    retry: (failureCount, error) => {
+      if (error instanceof BillingSubscriptionContractError) return false
+      const status = getErrorStatus(error)
+      if (status && status >= 400 && status < 500 && status !== 429) return false
+      return failureCount < 1
+    },
+    retryDelay: 250,
+  })
+
+  useEffect(() => {
+    if (query.error instanceof BillingSubscriptionContractError && clientId) {
+      setDurableError(query.error)
+      void cancelAndRemoveBillingSubscriptions(queryClient, clientId)
+      return
+    }
+    if (isDurablePermissionError(query.error)) {
+      setDurableError(query.error)
+      void clearPrivateBillingQueries(queryClient)
+      if (query.error.status === 401) window.dispatchEvent(new CustomEvent('auth:cleared'))
+    }
+  }, [clientId, query.error, queryClient])
+
+  useEffect(() => {
+    continuationEpochRef.current += 1
+    continuationAbortRef.current?.abort()
+    continuationPagesRef.current = []
+    setContinuationPages([])
+    setContinuationError(null)
+    setIsLoadingMore(false)
+    loadingMoreRef.current = false
+  }, [query.dataUpdatedAt])
+
+  useEffect(() => {
+    const clearContinuations = () => {
+      continuationAbortRef.current?.abort()
+      continuationPagesRef.current = []
+      setContinuationPages([])
+      setContinuationError(null)
+      setIsLoadingMore(false)
+      loadingMoreRef.current = false
+    }
+    window.addEventListener('auth:cleared', clearContinuations)
+    window.addEventListener('auth:refreshed', clearContinuations)
+    return () => {
+      window.removeEventListener('auth:cleared', clearContinuations)
+      window.removeEventListener('auth:refreshed', clearContinuations)
+      continuationAbortRef.current?.abort()
+    }
+  }, [])
+
+  const mergedData = useMemo(() => {
+    if (!query.data || continuationPages.length === 0) return query.data
+    const last = continuationPages[continuationPages.length - 1]!
+    return {
+      ...query.data,
+      grantHistory: {
+        ...query.data.grantHistory,
+        items: [
+          ...query.data.grantHistory.items,
+          ...continuationPages.flatMap((page) => page.grantHistory.items),
+        ],
+        nextCursor: last.grantHistory.nextCursor,
+      },
+    }
+  }, [continuationPages, query.data])
+
+  const loadMore = useCallback(async () => {
+    const first = query.data
+    const pages = continuationPagesRef.current
+    const prior = pages[pages.length - 1] ?? first
+    const cursor = prior?.grantHistory.nextCursor
+    if (!clientId || !first || !cursor || loadingMoreRef.current) return
+    loadingMoreRef.current = true
+    setIsLoadingMore(true)
+    setContinuationError(null)
+    const controller = new AbortController()
+    const epoch = continuationEpochRef.current
+    continuationAbortRef.current = controller
+    try {
+      const page = await billingApi.getSubscriptionState(clientId, { cursor }, controller.signal)
+      if (controller.signal.aborted || epoch !== continuationEpochRef.current) return
+      if (page.clientId !== clientId || page.grantHistory.historyAsOf !== first.grantHistory.historyAsOf) {
+        throw new BillingSubscriptionContractError('grant continuation does not match the active Client snapshot')
+      }
+      if (page.grantHistory.nextCursor === cursor) {
+        throw new BillingSubscriptionContractError('grant continuation cursor did not advance')
+      }
+      const existingItems = [first, ...pages].flatMap((value) => value.grantHistory.items)
+      const identities = new Set(existingItems.flatMap((item) => [
+        `grant:${item.grantId}`,
+        `operation:${item.grantOperationId}`,
+        `ledger:${item.ledgerEntryId}`,
+      ]))
+      if (page.grantHistory.items.some((item) => [
+        `grant:${item.grantId}`,
+        `operation:${item.grantOperationId}`,
+        `ledger:${item.ledgerEntryId}`,
+      ].some((identity) => identities.has(identity)))) {
+        throw new BillingSubscriptionContractError('grant continuation contains a duplicate grant identity')
+      }
+      const previous = existingItems[existingItems.length - 1]
+      const next = page.grantHistory.items[0]
+      if (previous && next) {
+        const timeOrder = Date.parse(previous.cycleStart) - Date.parse(next.cycleStart)
+        if (timeOrder < 0 || (timeOrder === 0 && previous.grantId.localeCompare(next.grantId) < 0)) {
+          throw new BillingSubscriptionContractError('grant continuation is not in server order')
+        }
+      }
+      const updated = [...pages, page]
+      continuationPagesRef.current = updated
+      setContinuationPages(updated)
+    } catch (error) {
+      if ((error as { name?: string }).name === 'AbortError') return
+      const nextError = error instanceof Error || (error && typeof error === 'object')
+        ? error as Error | ApiError
+        : new Error('Grant history continuation failed')
+      setContinuationError(nextError)
+      if (isDurablePermissionError(nextError)) {
+        await clearPrivateBillingQueries(queryClient)
+        if (nextError.status === 401) window.dispatchEvent(new CustomEvent('auth:cleared'))
+      }
+      throw nextError
+    } finally {
+      if (continuationAbortRef.current === controller) continuationAbortRef.current = null
+      loadingMoreRef.current = false
+      setIsLoadingMore(false)
+    }
+  }, [clientId, query.data, queryClient])
+
+  return {
+    ...query,
+    data: mergedData,
+    error: durableError ?? query.error,
+    isError: Boolean(durableError) || query.isError,
+    hasNextPage: Boolean(mergedData?.grantHistory.nextCursor),
+    loadMore,
+    isLoadingMore,
+    continuationError,
+  }
+}
+
+export function useCreateBillingSubscription(clientId: string) {
+  return useMutation<
+    BillingSubscriptionCreationReceipt,
+    Error | ApiError,
+    { request: CreateBillingSubscriptionRequest; serializedBody: string; signal?: AbortSignal }
+  >({
+    mutationKey: billingSubscriptionKeys.create(clientId),
+    mutationFn: ({ request, serializedBody, signal }) =>
+      billingApi.createSubscription(clientId, request, signal, serializedBody),
+    retry: false,
+  })
 }
 
 function validateContinuation(
