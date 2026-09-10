@@ -307,7 +307,7 @@ function CanonicalSubscriptionPage({ clientId, canCreate, onDurableError }: {
         <CreationOutcomePanel creation={creation} canViewAccount={canViewAccount} clientId={clientId} state={subscription} reconciliation={reconciliation} />
         <SubscriptionCreationForm
           clientId={clientId}
-          onConfirm={creation.confirm}
+          onConfirm={() => undefined}
           disabled={creation.outcome !== 'idle'}
           draft={draft}
           onDraftChange={setDraft}

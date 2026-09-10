@@ -255,6 +255,8 @@ describe('private Billing subscription queries', () => {
       subscriptionId: '22222222-2222-3333-8444-555555555555',
       planTermsOperationId: '01991f20-1234-7abc-8abc-1234567890ab',
       planNameSnapshot: 'Pro',
+      subscriptionTierSnapshot: 'brand' as const,
+      tierRevisionSnapshot: '0',
       entitlementsSnapshot: {
         schemaVersion: 1 as const,
         rateLimits: { requestsPerMinute: 60, concurrentAiOperations: 4 },

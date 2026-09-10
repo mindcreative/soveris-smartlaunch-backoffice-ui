@@ -5,11 +5,7 @@ import App from '../../App'
 import { billingApi } from '../../api/billingApi'
 import { queryClient } from '../../queryClient'
 import { useAuthStore } from '../../stores/authStore'
-import type {
-  BillingSubscriptionCreationReceipt,
-  BillingSubscriptionState,
-  CreateBillingSubscriptionRequest,
-} from '../../types/billing'
+import type { BillingSubscriptionState } from '../../types/billing'
 
 const CLIENT_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 
@@ -47,7 +43,8 @@ function currentState(): BillingSubscriptionState {
       subscriptionId: '22222222-2222-3333-8444-555555555555',
       creationOperationId: '01991f20-1234-7abc-8abc-1234567890ab',
       planTermsOperationId: '01991f20-1234-7abc-8abc-1234567890ab', clientId: CLIENT_ID,
-      planName: 'Pro', cycleCreditAmount: '1250.0000',
+      planName: 'Pro', subscriptionTier: 'brand', tierRevision: '0',
+      cycleCreditAmount: '1250.0000',
       entitlements: {
         schemaVersion: 1 as const,
         rateLimits: { requestsPerMinute: 60, concurrentAiOperations: 4 },
@@ -59,55 +56,6 @@ function currentState(): BillingSubscriptionState {
       createdAt: '2026-09-01T00:00:00+00:00', updatedAt: '2026-09-01T00:00:00+00:00',
     },
   }
-}
-
-function creationReceipt(
-  request: CreateBillingSubscriptionRequest,
-  created = true
-): BillingSubscriptionCreationReceipt {
-  return {
-    created,
-    subscription: {
-      subscriptionId: '22222222-2222-3333-8444-555555555555',
-      creationOperationId: request.creationOperationId,
-      planTermsOperationId: request.creationOperationId,
-      clientId: CLIENT_ID,
-      planName: request.planName,
-      cycleCreditAmount: request.cycleCreditAmount,
-      entitlements: request.entitlements,
-      changeEffectivePolicy: request.changeEffectivePolicy,
-      prorationPolicy: request.prorationPolicy,
-      unusedCreditPolicy: request.unusedCreditPolicy,
-      billingCycleAnchor: request.validFrom,
-      status: 'active', validFrom: request.validFrom, validTo: request.validTo,
-    },
-    initialGrant: {
-      grantId: '33333333-3333-4333-8333-555555555555',
-      grantOperationId: '01991f20-2234-7abc-8abc-1234567890ab',
-      ledgerEntryId: '44444444-4444-4444-8444-555555555555',
-      planTermsOperationId: request.creationOperationId,
-      planNameSnapshot: request.planName, entitlementsSnapshot: request.entitlements,
-      grantType: 'billing_cycle', cycleStart: request.validFrom,
-      cycleEnd: '2026-10-06T12:00:00.000000Z', creditAmount: request.cycleCreditAmount,
-    },
-    account: {
-      creditAccountId: '11111111-2222-3333-4444-555555555555', clientId: CLIENT_ID,
-      ownedBalance: '1260.0000', activelyReservedAmount: '0.0000',
-      availableBalance: '1260.0000', status: 'active', asOf: '2026-09-06T12:00:01.000000Z',
-    },
-  }
-}
-
-async function fillValidSubscription() {
-  const user = userEvent.setup()
-  await user.type(screen.getByLabelText('Plan name'), 'Pro')
-  await user.type(screen.getByLabelText('Cycle credit amount'), '1250.0000')
-  await user.type(screen.getByLabelText('Requests per minute'), '60')
-  await user.type(screen.getByLabelText('Concurrent AI operations'), '4')
-  await user.click(screen.getByLabelText('Content generation'))
-  await user.type(screen.getByLabelText('Valid from (UTC)'), new Date().toISOString().slice(0, 16))
-  await user.click(screen.getByRole('button', { name: 'Review subscription' }))
-  return user
 }
 
 describe('Billing subscription route and page state', () => {
@@ -260,87 +208,16 @@ describe('Billing subscription route and page state', () => {
     expect(accountRequest).toHaveBeenCalledTimes(3)
   })
 
-  it('creates once and retains the immutable receipt separately from current state', async () => {
-    vi.spyOn(billingApi, 'getSubscriptionState').mockResolvedValue(emptyState())
-    vi.spyOn(billingApi, 'getAccountSnapshot').mockResolvedValue(account())
-    const create = vi.spyOn(billingApi, 'createSubscription').mockImplementation(
-      async (_clientId, request) => creationReceipt(request)
-    )
-    window.history.replaceState({}, '', `/billing/clients/${CLIENT_ID}/subscriptions`)
-    render(<App />)
-    await screen.findByRole('heading', { name: 'Create subscription' })
-    const user = await fillValidSubscription()
-    await user.dblClick(screen.getByRole('button', { name: 'Confirm creation' }))
-
-    expect(await screen.findByRole('heading', { name: 'Created' })).toBeInTheDocument()
-    expect(screen.getByText('Original balance outcome')).toBeInTheDocument()
-    expect(create).toHaveBeenCalledTimes(1)
-    const sent = create.mock.calls[0]![1]
-    expect(sent.creationOperationId).toMatch(/^........-....-7...-[89ab]...-............$/)
-    expect(sent).not.toHaveProperty('clientId')
-  })
-
-  it('retains an unknown operation and offers only exact-body retry', async () => {
+  it('disables the obsolete tierless submission without adding or inferring a tier', async () => {
     vi.spyOn(billingApi, 'getSubscriptionState').mockResolvedValue(emptyState())
     vi.spyOn(billingApi, 'getAccountSnapshot').mockResolvedValue(account())
     const create = vi.spyOn(billingApi, 'createSubscription')
-      .mockRejectedValueOnce(new Error('network disconnected'))
-      .mockImplementationOnce(async (_clientId, request) => creationReceipt(request, false))
     window.history.replaceState({}, '', `/billing/clients/${CLIENT_ID}/subscriptions`)
     render(<App />)
     await screen.findByRole('heading', { name: 'Create subscription' })
-    const user = await fillValidSubscription()
-    await user.click(screen.getByRole('button', { name: 'Confirm creation' }))
-    expect(await screen.findByRole('heading', { name: 'Outcome unknown' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Retry exact operation' }))
-    expect(await screen.findByRole('heading', { name: 'Already completed' })).toBeInTheDocument()
-    expect(create).toHaveBeenCalledTimes(2)
-    expect(create.mock.calls[1]?.[1].creationOperationId).toBe(create.mock.calls[0]?.[1].creationOperationId)
-    expect(create.mock.calls[1]?.[3]).toBe(create.mock.calls[0]?.[3])
-  })
-
-  it.each([
-    [400, 'HTTP_400', 'Invalid subscription creation request'],
-    [404, 'HTTP_404', 'Billing not configured'],
-    [409, 'subscription_operation_conflict', 'Operation identity conflict'],
-    [409, 'subscription_current_conflict', 'Current subscription conflict'],
-    [409, 'credit_account_inactive', 'Credit account inactive'],
-    [409, 'credit_balance_overflow', 'Credit balance capacity conflict'],
-    [413, 'HTTP_413', 'Subscription request contract failure'],
-    [415, 'HTTP_415', 'Subscription request contract failure'],
-  ])('renders safe determinate outcome %s/%s', async (status, code, heading) => {
-    vi.spyOn(billingApi, 'getSubscriptionState').mockResolvedValue(emptyState())
-    vi.spyOn(billingApi, 'getAccountSnapshot').mockResolvedValue(account())
-    vi.spyOn(billingApi, 'createSubscription').mockRejectedValue({
-      status, code, message: 'raw server detail must not be displayed',
-    })
-    window.history.replaceState({}, '', `/billing/clients/${CLIENT_ID}/subscriptions`)
-    render(<App />)
-    await screen.findByRole('heading', { name: 'Create subscription' })
-    const user = await fillValidSubscription()
-    await user.click(screen.getByRole('button', { name: 'Confirm creation' }))
-    const outcomeHeading = await screen.findByRole('heading', { name: heading })
-    if (status === 400) {
-      expect(screen.getByRole('alert', { name: 'Correct the subscription form' })).toHaveFocus()
-    } else {
-      expect(outcomeHeading).toHaveFocus()
-    }
-    expect(screen.queryByText('raw server detail must not be displayed')).not.toBeInTheDocument()
-  })
-
-  it('clears private state and creation controls on fresh POST authorization loss', async () => {
-    vi.spyOn(billingApi, 'getSubscriptionState').mockResolvedValue(emptyState())
-    vi.spyOn(billingApi, 'getAccountSnapshot').mockResolvedValue(account())
-    vi.spyOn(billingApi, 'createSubscription').mockRejectedValue({
-      status: 403, code: 'HTTP_403', message: 'Insufficient permissions',
-    })
-    window.history.replaceState({}, '', `/billing/clients/${CLIENT_ID}/subscriptions`)
-    render(<App />)
-    await screen.findByRole('heading', { name: 'Create subscription' })
-    const user = await fillValidSubscription()
-    await user.click(screen.getByRole('button', { name: 'Confirm creation' }))
-    expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
-    expect(screen.queryByLabelText('Plan name')).not.toBeInTheDocument()
-    await waitFor(() => expect(queryClient.getQueryCache().findAll()).toHaveLength(0))
+    expect(screen.getByRole('status')).toHaveTextContent(/unavailable.*explicit tier/i)
+    expect(screen.getByRole('button', { name: 'Review subscription' })).toBeDisabled()
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    expect(create).not.toHaveBeenCalled()
   })
 })

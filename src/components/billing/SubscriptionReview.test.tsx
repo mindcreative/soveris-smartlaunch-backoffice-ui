@@ -25,6 +25,7 @@ function receipt(created = true): BillingSubscriptionCreationReceipt {
     subscription: {
       subscriptionId: SUBSCRIPTION_ID, creationOperationId: OPERATION_ID,
       planTermsOperationId: OPERATION_ID, clientId: CLIENT_ID, planName: 'Pro',
+      subscriptionTier: 'brand_premium', tierRevision: '0',
       cycleCreditAmount: '1250.0000', entitlements: ENTITLEMENTS,
       changeEffectivePolicy: 'immediate', prorationPolicy: 'replace',
       unusedCreditPolicy: 'rollover', billingCycleAnchor: '2026-02-15T12:00:00.000000Z',
@@ -33,6 +34,7 @@ function receipt(created = true): BillingSubscriptionCreationReceipt {
     initialGrant: {
       grantId: GRANT_ID, grantOperationId: GRANT_OPERATION_ID, ledgerEntryId: LEDGER_ID,
       planTermsOperationId: OPERATION_ID, planNameSnapshot: 'Pro',
+      subscriptionTierSnapshot: 'brand_premium', tierRevisionSnapshot: '0',
       entitlementsSnapshot: ENTITLEMENTS, grantType: 'billing_cycle',
       cycleStart: '2026-02-15T12:00:00.000000Z', cycleEnd: '2026-03-15T12:00:00.000000Z',
       creditAmount: '1250.0000',

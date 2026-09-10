@@ -14,7 +14,7 @@ const CLIENT_B = 'ffffffff-1111-2222-3333-444444444444'
 const OPERATION_ID = '01991f20-1234-7abc-8abc-1234567890ab'
 
 const MATERIAL: CreateBillingSubscriptionMaterial = {
-  planName: 'Pro', cycleCreditAmount: '1250.0000',
+  planName: 'Pro', subscriptionTier: 'brand_premium', cycleCreditAmount: '1250.0000',
   validFrom: '2026-09-01T00:00:00.000Z', validTo: null,
   changeEffectivePolicy: 'immediate', prorationPolicy: 'replace', unusedCreditPolicy: 'rollover',
   entitlements: {
@@ -53,6 +53,7 @@ describe('useSubscriptionCreation', () => {
     await waitFor(() => expect(create).toHaveBeenCalledTimes(1))
     expect(uuidFactory).toHaveBeenCalledTimes(1)
     expect(result.current.attempt?.request.planName).toBe('Pro')
+    expect(result.current.attempt?.request.subscriptionTier).toBe('brand_premium')
     expect(result.current.attempt?.request.creationOperationId).toBe(OPERATION_ID)
     resolve?.(RECEIPT)
     await waitFor(() => expect(result.current.outcome).toBe('created'))
@@ -72,6 +73,7 @@ describe('useSubscriptionCreation', () => {
     expect(result.current.outcome).toBe('unknown')
     const retained = result.current.attempt
     expect(retained?.serializedBody).toContain(OPERATION_ID)
+    expect(retained?.serializedBody).toContain('"subscriptionTier":"brand_premium"')
 
     await act(async () => { await result.current.retry() })
     expect(result.current.outcome).toBe('replayed')

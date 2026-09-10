@@ -46,6 +46,7 @@ function cloneRequest(
   const request: CreateBillingSubscriptionRequest = {
     creationOperationId,
     planName: material.planName,
+    subscriptionTier: material.subscriptionTier,
     cycleCreditAmount: material.cycleCreditAmount,
     validFrom: material.validFrom,
     validTo: material.validTo,

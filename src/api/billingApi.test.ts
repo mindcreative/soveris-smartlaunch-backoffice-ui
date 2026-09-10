@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { apiClient } from './apiClient'
 import {
+  BillingSubscriptionContractError,
   getBillingAccountSnapshot,
   getBillingLedgerExportStatus,
   getBillingLedgerPage,
@@ -117,6 +118,7 @@ const ENTITLEMENTS = {
 const CREATION_REQUEST: CreateBillingSubscriptionRequest = {
   creationOperationId: CREATION_OPERATION_ID,
   planName: 'Pro',
+  subscriptionTier: 'brand_premium',
   cycleCreditAmount: '99999999999999.9999',
   validFrom: '2026-09-01T00:00:00.000Z',
   validTo: null,
@@ -133,6 +135,8 @@ function subscriptionItem(overrides: Record<string, unknown> = {}) {
     planTermsOperationId: CREATION_OPERATION_ID,
     clientId: CLIENT_ID,
     planName: 'Pro',
+    subscriptionTier: 'brand_premium',
+    tierRevision: '__TIER_REVISION__',
     cycleCreditAmount: '__AMOUNT__',
     entitlements: ENTITLEMENTS,
     changeEffectivePolicy: 'immediate',
@@ -155,6 +159,8 @@ function grantItem(overrides: Record<string, unknown> = {}) {
     subscriptionId: SUBSCRIPTION_ID,
     planTermsOperationId: CREATION_OPERATION_ID,
     planNameSnapshot: 'Pro',
+    subscriptionTierSnapshot: 'brand_premium',
+    tierRevisionSnapshot: '__TIER_REVISION__',
     entitlementsSnapshot: ENTITLEMENTS,
     grantType: 'billing_cycle',
     cycleStart: '2026-09-01T00:00:00+00:00',
@@ -183,6 +189,7 @@ function subscriptionStateJson(overrides: Record<string, unknown> = {}): string 
     immediateChangeContext: { status: 'unsupported' },
     ...overrides,
   }).replace(/"__AMOUNT__"/g, '99999999999999.9999')
+    .replace(/"__TIER_REVISION__"/g, '9223372036854775807')
 }
 
 function creationReceiptJson(overrides: Record<string, unknown> = {}): string {
@@ -194,6 +201,7 @@ function creationReceiptJson(overrides: Record<string, unknown> = {}): string {
       planTermsOperationId: CREATION_OPERATION_ID,
       clientId: CLIENT_ID,
       planName: 'Pro',
+      subscriptionTier: 'brand_premium', tierRevision: 0,
       cycleCreditAmount: '__AMOUNT__',
       entitlements: ENTITLEMENTS,
       changeEffectivePolicy: 'immediate', prorationPolicy: 'replace', unusedCreditPolicy: 'rollover',
@@ -203,6 +211,7 @@ function creationReceiptJson(overrides: Record<string, unknown> = {}): string {
     initialGrant: {
       grantId: GRANT_ID, grantOperationId: GRANT_OPERATION_ID, ledgerEntryId: LEDGER_ENTRY_ID,
       planTermsOperationId: CREATION_OPERATION_ID, planNameSnapshot: 'Pro',
+      subscriptionTierSnapshot: 'brand_premium', tierRevisionSnapshot: 0,
       entitlementsSnapshot: ENTITLEMENTS, grantType: 'billing_cycle',
       cycleStart: '2026-09-01T00:00:00+00:00', cycleEnd: '2026-10-01T00:00:00+00:00',
       creditAmount: '__AMOUNT__',
@@ -220,10 +229,41 @@ describe('Billing subscription state adapter', () => {
   it('parses exact decimals, current/grant identities, and completed later-story markers', () => {
     const result = parseBillingSubscriptionState(subscriptionStateJson(), CLIENT_ID)
     expect(result.current?.cycleCreditAmount).toBe('99999999999999.9999')
+    expect(result.current?.subscriptionTier).toBe('brand_premium')
+    expect(result.current?.tierRevision).toBe('9223372036854775807')
     expect(result.grantHistory.items[0]?.creditAmount).toBe('99999999999999.9999')
+    expect(result.grantHistory.items[0]?.tierRevisionSnapshot).toBe('9223372036854775807')
     expect(result.pendingChange).toEqual({ status: 'unsupported' })
     expect(result.current?.pendingImmediateDebit).toEqual({ status: 'unsupported' })
     expect(result.grantHistory.nextCursor).toBe('opaque cursor')
+  })
+
+  it('parses current and historical grant tier evidence independently', () => {
+    const result = parseBillingSubscriptionState(subscriptionStateJson({
+      current: subscriptionItem({ subscriptionTier: 'brand', tierRevision: 7 }),
+      grantHistory: {
+        items: [grantItem({ subscriptionTierSnapshot: 'basic', tierRevisionSnapshot: 2 })],
+        historyAsOf: '2026-09-06T12:00:00+00:00', nextCursor: null,
+      },
+    }), CLIENT_ID)
+    expect(result.current?.subscriptionTier).toBe('brand')
+    expect(result.current?.tierRevision).toBe('7')
+    expect(result.grantHistory.items[0]?.subscriptionTierSnapshot).toBe('basic')
+    expect(result.grantHistory.items[0]?.tierRevisionSnapshot).toBe('2')
+  })
+
+  it.each([
+    ['"subscriptionTier":"brand_premium"', '"subscriptionTier":"Brand Premium"'],
+    ['"subscriptionTier":"brand_premium"', '"subscriptionTier":"BRAND_PREMIUM"'],
+    ['"subscriptionTier":"brand_premium"', '"subscriptionTier":null'],
+    ['"subscriptionTier":"brand_premium"', '"subscriptionTier":3'],
+    ['"tierRevision":9223372036854775807', '"tierRevision":-1'],
+    ['"tierRevision":9223372036854775807', '"tierRevision":"0"'],
+    ['"tierRevision":9223372036854775807', '"tierRevision":9223372036854775808'],
+  ])('rejects invalid tier evidence', (before, after) => {
+    expect(() => parseBillingSubscriptionState(
+      subscriptionStateJson().replace(before, after), CLIENT_ID
+    )).toThrow(BillingSubscriptionContractError)
   })
 
   it('accepts authorized absence and rejects unknown, duplicate, and cross-Client evidence', () => {
@@ -305,6 +345,21 @@ describe('Billing subscription state adapter', () => {
 })
 
 describe('Billing subscription creation adapter', () => {
+  it.each(['freemium', 'basic', 'brand', 'brand_premium'] as const)(
+    'serializes and validates the exact %s tier',
+    (subscriptionTier) => {
+      const request = { ...CREATION_REQUEST, subscriptionTier }
+      const receipt = creationReceiptJson()
+        .split('brand_premium').join(subscriptionTier)
+      expect(serializeCreateBillingSubscriptionRequest(request)).toContain(
+        `"subscriptionTier":"${subscriptionTier}"`
+      )
+      expect(parseBillingSubscriptionCreationReceipt(
+        receipt, CLIENT_ID, request
+      ).subscription.subscriptionTier).toBe(subscriptionTier)
+    }
+  )
+
   it('serializes the high-magnitude amount as an exact JSON number and no extra identities', () => {
     const body = serializeCreateBillingSubscriptionRequest(CREATION_REQUEST)
     expect(body).toContain('"cycleCreditAmount":99999999999999.9999')
@@ -332,12 +387,43 @@ describe('Billing subscription creation adapter', () => {
     })).toThrow('UTC instant')
   })
 
+  it.each([undefined, null, 'Brand Premium', 'BRAND_PREMIUM', 'brand-premium', 3])(
+    'rejects a non-canonical runtime tier %s',
+    (subscriptionTier) => {
+      expect(() => serializeCreateBillingSubscriptionRequest({
+        ...CREATION_REQUEST,
+        subscriptionTier,
+      } as unknown as CreateBillingSubscriptionRequest)).toThrow('subscriptionTier')
+    }
+  )
+
+  it.each([
+    { tierRevision: 0 },
+    { subscription_tier: 'brand_premium' },
+  ])('rejects extra or aliased creation material %o', (extra) => {
+    expect(() => serializeCreateBillingSubscriptionRequest({
+      ...CREATION_REQUEST,
+      ...extra,
+    })).toThrow('closed contract')
+  })
+
+  it('rejects tier fields nested in entitlements v1', () => {
+    expect(() => serializeCreateBillingSubscriptionRequest({
+      ...CREATION_REQUEST,
+      entitlements: { ...ENTITLEMENTS, subscriptionTier: 'brand_premium' },
+    } as unknown as CreateBillingSubscriptionRequest)).toThrow('closed contract')
+  })
+
   it('validates the immutable receipt and accepts equivalent UTC rendering', () => {
     const result = parseBillingSubscriptionCreationReceipt(
       creationReceiptJson(), CLIENT_ID, CREATION_REQUEST
     )
     expect(result.subscription.creationOperationId).toBe(CREATION_OPERATION_ID)
+    expect(result.subscription.subscriptionTier).toBe('brand_premium')
+    expect(result.subscription.tierRevision).toBe('0')
     expect(result.initialGrant.ledgerEntryId).toBe(LEDGER_ENTRY_ID)
+    expect(result.initialGrant.subscriptionTierSnapshot).toBe('brand_premium')
+    expect(result.initialGrant.tierRevisionSnapshot).toBe('0')
     expect(result.account.ownedBalance).toBe('99999999999999.9999')
 
     const boundedRequest = {
@@ -360,6 +446,17 @@ describe('Billing subscription creation adapter', () => {
         ...CREATION_REQUEST,
         creationOperationId: '01991f20-9999-7abc-8abc-1234567890ab',
       }
+    )).toThrow('confirmed operation')
+    expect(() => parseBillingSubscriptionCreationReceipt(
+      creationReceiptJson().replace(
+        '"subscriptionTier":"brand_premium"', '"subscriptionTier":"brand"'
+      ), CLIENT_ID, CREATION_REQUEST
+    )).toThrow('confirmed operation')
+    expect(() => parseBillingSubscriptionCreationReceipt(
+      creationReceiptJson().replace(
+        '"subscriptionTierSnapshot":"brand_premium"',
+        '"subscriptionTierSnapshot":"basic"'
+      ), CLIENT_ID, CREATION_REQUEST
     )).toThrow('confirmed operation')
   })
 

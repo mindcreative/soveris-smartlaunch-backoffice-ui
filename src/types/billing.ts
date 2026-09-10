@@ -25,6 +25,7 @@ export interface BillingEntitlementsV1 {
 }
 
 export type BillingSubscriptionStatus = 'active' | 'paused' | 'cancelled' | 'expired'
+export type BillingSubscriptionTier = 'freemium' | 'basic' | 'brand' | 'brand_premium'
 export type BillingSubscriptionChangePolicy = 'immediate' | 'next_billing_cycle'
 export type BillingSubscriptionProrationPolicy = 'none' | 'replace' | 'prorate'
 export type BillingSubscriptionGrantType = 'billing_cycle' | 'operator_override'
@@ -73,6 +74,8 @@ export interface BillingSubscriptionItem {
   planTermsOperationId: string
   clientId: string
   planName: string
+  subscriptionTier: BillingSubscriptionTier
+  tierRevision: string
   cycleCreditAmount: string
   entitlements: BillingEntitlementsV1
   changeEffectivePolicy: BillingSubscriptionChangePolicy
@@ -94,6 +97,8 @@ export interface BillingSubscriptionGrant {
   subscriptionId: string
   planTermsOperationId: string
   planNameSnapshot: string
+  subscriptionTierSnapshot: BillingSubscriptionTier
+  tierRevisionSnapshot: string
   entitlementsSnapshot: BillingEntitlementsV1
   grantType: BillingSubscriptionGrantType
   cycleStart: string
@@ -127,6 +132,7 @@ export type BillingSubscriptionPageRequest =
 export interface CreateBillingSubscriptionRequest {
   creationOperationId: string
   planName: string
+  subscriptionTier: BillingSubscriptionTier
   cycleCreditAmount: string
   validFrom: string
   validTo: string | null

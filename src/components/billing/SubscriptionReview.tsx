@@ -36,6 +36,8 @@ export function matchSubscriptionReceipt(
     subscription.creationOperationId === receipt.subscription.creationOperationId &&
     subscription.planTermsOperationId === receipt.subscription.planTermsOperationId &&
     subscription.planName === receipt.subscription.planName &&
+    subscription.subscriptionTier === receipt.subscription.subscriptionTier &&
+    subscription.tierRevision === receipt.subscription.tierRevision &&
     decimalsEqual(subscription.cycleCreditAmount, receipt.subscription.cycleCreditAmount) &&
     entitlementsEqual(subscription.entitlements, receipt.subscription.entitlements) &&
     subscription.changeEffectivePolicy === receipt.subscription.changeEffectivePolicy &&
@@ -58,6 +60,8 @@ export function matchSubscriptionReceipt(
     grant.subscriptionId === receipt.subscription.subscriptionId &&
     grant.planTermsOperationId === receipt.initialGrant.planTermsOperationId &&
     grant.planNameSnapshot === receipt.initialGrant.planNameSnapshot &&
+    grant.subscriptionTierSnapshot === receipt.initialGrant.subscriptionTierSnapshot &&
+    grant.tierRevisionSnapshot === receipt.initialGrant.tierRevisionSnapshot &&
     entitlementsEqual(grant.entitlementsSnapshot, receipt.initialGrant.entitlementsSnapshot) &&
     decimalsEqual(grant.creditAmount, receipt.initialGrant.creditAmount) &&
     grant.grantType === receipt.initialGrant.grantType &&
@@ -109,6 +113,8 @@ export function SubscriptionReview({
           <Value label="Plan terms operation ID" value={receipt.subscription.planTermsOperationId} mono />
           <Value label="Client" value={receipt.subscription.clientId} mono />
           <Value label="Plan" value={receipt.subscription.planName} />
+          <Value label="Subscription tier" value={receipt.subscription.subscriptionTier} />
+          <Value label="Tier revision" value={receipt.subscription.tierRevision} mono />
           <Value label="Cycle credits" value={receipt.subscription.cycleCreditAmount} mono />
           <Value label="Status" value={receipt.subscription.status} />
           <Value label="Valid from" value={receipt.subscription.validFrom} mono />
@@ -126,6 +132,8 @@ export function SubscriptionReview({
           <Value label="Ledger entry ID" value={receipt.initialGrant.ledgerEntryId} mono />
           <Value label="Granted credits" value={receipt.initialGrant.creditAmount} mono />
           <Value label="Plan snapshot" value={receipt.initialGrant.planNameSnapshot} />
+          <Value label="Tier snapshot" value={receipt.initialGrant.subscriptionTierSnapshot} />
+          <Value label="Tier revision snapshot" value={receipt.initialGrant.tierRevisionSnapshot} mono />
           <Value label="Grant type" value="Billing cycle" />
         </dl>
 
@@ -148,7 +156,7 @@ export function SubscriptionReview({
         {state && !evidence.mismatch && evidence.subscription && evidence.grant && <p role="status" className="state-indicator mt-3 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-950">The receipt matches authoritative subscription and grant history.</p>}
         {state && !evidence.mismatch && evidence.subscription && !evidence.grant && <p role="status" className="state-indicator mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">The subscription matches. The initial grant has not yet been found in the loaded authoritative history.</p>}
         {state && !evidence.mismatch && !evidence.subscription && <p role="status" className="state-indicator mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">The immutable receipt is retained, but matching current subscription evidence is not available yet.</p>}
-        {state?.current && <dl className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2"><Value label="Current subscription ID" value={state.current.subscriptionId} mono /><Value label="Current plan" value={state.current.planName} /><Value label="Current cycle credits" value={state.current.cycleCreditAmount} mono /><Value label="Current state as of" value={state.stateAsOf} mono /></dl>}
+        {state?.current && <dl className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2"><Value label="Current subscription ID" value={state.current.subscriptionId} mono /><Value label="Current plan" value={state.current.planName} /><Value label="Current subscription tier" value={state.current.subscriptionTier} /><Value label="Current tier revision" value={state.current.tierRevision} mono /><Value label="Current cycle credits" value={state.current.cycleCreditAmount} mono /><Value label="Current state as of" value={state.stateAsOf} mono /></dl>}
         {hasNextPage && onLoadMore && <div className="mt-4"><button type="button" onClick={() => { void Promise.resolve(onLoadMore()).catch(() => undefined) }} disabled={isLoadingMore} className="min-h-11 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:cursor-wait disabled:opacity-60">{isLoadingMore ? 'Loading grant history…' : 'Load more grant history'}</button></div>}
         {Boolean(continuationError) && <p role="alert" className="state-indicator mt-3 text-sm text-red-800">More grant history could not be validated. Previously validated evidence remains visible.</p>}
 

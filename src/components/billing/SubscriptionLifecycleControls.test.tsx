@@ -19,7 +19,8 @@ function item(overrides: Partial<BillingSubscriptionItem> = {}): BillingSubscrip
     subscriptionId: SUBSCRIPTION_ID,
     creationOperationId: '01991f20-1234-7abc-8abc-1234567890ab',
     planTermsOperationId: '01991f20-1234-7abc-8abc-1234567890ab',
-    clientId: CLIENT_ID, planName: 'Pro', cycleCreditAmount: '99999999999999.9999',
+    clientId: CLIENT_ID, planName: 'Pro', subscriptionTier: 'brand', tierRevision: '0',
+    cycleCreditAmount: '99999999999999.9999',
     entitlements: {
       schemaVersion: 1,
       rateLimits: { requestsPerMinute: 60, concurrentAiOperations: 4 },

@@ -24,6 +24,7 @@ import {
   type BillingSubscriptionPendingChange,
   type BillingSubscriptionProrationPolicy,
   type BillingSubscriptionState,
+  type BillingSubscriptionTier,
   type BillingSubscriptionUnsupportedView,
   type CreateBillingSubscriptionRequest,
   type BillingLedgerExportAccepted,
@@ -50,6 +51,7 @@ const SNAPSHOT_KEYS = [
 
 const DECIMAL_18_4_PATTERN = /^-?(?:0|[1-9]\d{0,13})(?:\.\d{1,4})?$/
 const UTC_OFFSET_PATTERN = /(Z|\+00:00)$/i
+const INT64_MAX = 9_223_372_036_854_775_807n
 const ACCOUNT_STATUSES = new Set<BillingAccountStatus>(['active', 'suspended', 'closed'])
 const LEDGER_TRANSACTION_TYPES = new Set<BillingLedgerTransactionType>(BILLING_LEDGER_TRANSACTION_TYPES)
 const LEDGER_PAGE_KEYS = ['asOf', 'items', 'nextCursor'] as const
@@ -135,7 +137,7 @@ function readWalletVersion(value: unknown): string {
     throw contractError('walletVersion must be a non-negative Int64')
   }
   const lexeme = value.toString()
-  if (BigInt(lexeme) > 9_223_372_036_854_775_807n) {
+  if (BigInt(lexeme) > INT64_MAX) {
     throw contractError('walletVersion must be a non-negative Int64')
   }
   return lexeme
@@ -533,7 +535,7 @@ function readInt64Lexeme(value: unknown, nullable: boolean): string | null {
     throw exportContractError('an Int64 metadata field is invalid')
   }
   const lexeme = value.toString()
-  if (BigInt(lexeme) > 9_223_372_036_854_775_807n) {
+  if (BigInt(lexeme) > INT64_MAX) {
     throw exportContractError('an Int64 metadata field is invalid')
   }
   return lexeme
@@ -675,13 +677,13 @@ const SUBSCRIPTION_REQUIRED_KEYS = [
   'billingCycleAnchor', 'changeEffectivePolicy', 'clientId', 'createdAt',
   'creationOperationId', 'cycleCreditAmount', 'entitlements', 'planName',
   'planTermsOperationId', 'prorationPolicy', 'status', 'subscriptionId',
-  'unusedCreditPolicy', 'updatedAt', 'validFrom', 'validTo',
+  'subscriptionTier', 'tierRevision', 'unusedCreditPolicy', 'updatedAt', 'validFrom', 'validTo',
 ] as const
 const SUBSCRIPTION_OPTIONAL_KEYS = ['immediateChangeContext', 'pendingImmediateDebit'] as const
 const GRANT_KEYS = [
   'createdAt', 'creditAmount', 'cycleEnd', 'cycleStart', 'entitlementsSnapshot',
   'grantId', 'grantOperationId', 'grantType', 'ledgerEntryId', 'planNameSnapshot',
-  'planTermsOperationId', 'subscriptionId',
+  'planTermsOperationId', 'subscriptionId', 'subscriptionTierSnapshot', 'tierRevisionSnapshot',
 ] as const
 const GRANT_HISTORY_KEYS = ['historyAsOf', 'items', 'nextCursor'] as const
 const STATE_REQUIRED_KEYS = [
@@ -705,18 +707,27 @@ const IMMEDIATE_CONTEXT_OPTIONAL_KEYS = ['grantOperationId'] as const
 const CREATION_SUBSCRIPTION_KEYS = [
   'billingCycleAnchor', 'changeEffectivePolicy', 'clientId', 'creationOperationId',
   'cycleCreditAmount', 'entitlements', 'planName', 'planTermsOperationId',
-  'prorationPolicy', 'status', 'subscriptionId', 'unusedCreditPolicy', 'validFrom', 'validTo',
+  'prorationPolicy', 'status', 'subscriptionId', 'subscriptionTier', 'tierRevision',
+  'unusedCreditPolicy', 'validFrom', 'validTo',
 ] as const
 const CREATION_GRANT_KEYS = [
   'creditAmount', 'cycleEnd', 'cycleStart', 'entitlementsSnapshot', 'grantId',
   'grantOperationId', 'grantType', 'ledgerEntryId', 'planNameSnapshot', 'planTermsOperationId',
+  'subscriptionTierSnapshot', 'tierRevisionSnapshot',
 ] as const
 const CREATION_ACCOUNT_KEYS = [
   'activelyReservedAmount', 'asOf', 'availableBalance', 'clientId',
   'creditAccountId', 'ownedBalance', 'status',
 ] as const
 const CREATION_RECEIPT_KEYS = ['account', 'created', 'initialGrant', 'subscription'] as const
+const CREATION_REQUEST_KEYS = [
+  'changeEffectivePolicy', 'creationOperationId', 'cycleCreditAmount', 'entitlements',
+  'planName', 'prorationPolicy', 'subscriptionTier', 'unusedCreditPolicy', 'validFrom', 'validTo',
+] as const
 const SUBSCRIPTION_STATUSES = new Set(['active', 'paused', 'cancelled', 'expired'])
+const SUBSCRIPTION_TIERS = new Set<BillingSubscriptionTier>([
+  'freemium', 'basic', 'brand', 'brand_premium',
+])
 const CHANGE_POLICIES = new Set<BillingSubscriptionChangePolicy>(['immediate', 'next_billing_cycle'])
 const PRORATION_POLICIES = new Set<BillingSubscriptionProrationPolicy>(['none', 'replace', 'prorate'])
 const GRANT_TYPES = new Set(['billing_cycle', 'operator_override'])
@@ -809,6 +820,24 @@ function readSubscriptionPlanName(value: unknown, field = 'planName'): string {
     throw subscriptionContractError(`${field} is invalid`)
   }
   return value
+}
+
+function readSubscriptionTier(value: unknown, field = 'subscriptionTier'): BillingSubscriptionTier {
+  if (typeof value !== 'string' || !SUBSCRIPTION_TIERS.has(value as BillingSubscriptionTier)) {
+    throw subscriptionContractError(`${field} is unsupported`)
+  }
+  return value as BillingSubscriptionTier
+}
+
+function readTierRevision(value: unknown, field = 'tierRevision'): string {
+  if (!isLosslessNumber(value) || !/^\d+$/.test(value.toString())) {
+    throw subscriptionContractError(`${field} must be a non-negative Int64`)
+  }
+  const lexeme = value.toString()
+  if (BigInt(lexeme) > INT64_MAX) {
+    throw subscriptionContractError(`${field} must be a non-negative Int64`)
+  }
+  return lexeme
 }
 
 function parseEntitlements(value: unknown): BillingEntitlementsV1 {
@@ -948,6 +977,8 @@ function parseSubscriptionItem(value: unknown, expectedClientId: string): Billin
     planTermsOperationId: readSubscriptionGuid(value.planTermsOperationId, 'planTermsOperationId'),
     clientId,
     planName: readSubscriptionPlanName(value.planName),
+    subscriptionTier: readSubscriptionTier(value.subscriptionTier),
+    tierRevision: readTierRevision(value.tierRevision),
     cycleCreditAmount: readSubscriptionDecimal(value.cycleCreditAmount, 'cycleCreditAmount', true),
     entitlements: parseEntitlements(value.entitlements),
     changeEffectivePolicy: readChangePolicy(value.changeEffectivePolicy),
@@ -979,6 +1010,10 @@ function parseGrant(value: unknown): BillingSubscriptionGrant {
     subscriptionId: readSubscriptionGuid(value.subscriptionId, 'subscriptionId'),
     planTermsOperationId: readSubscriptionGuid(value.planTermsOperationId, 'planTermsOperationId'),
     planNameSnapshot: readSubscriptionPlanName(value.planNameSnapshot, 'planNameSnapshot'),
+    subscriptionTierSnapshot: readSubscriptionTier(
+      value.subscriptionTierSnapshot, 'subscriptionTierSnapshot'
+    ),
+    tierRevisionSnapshot: readTierRevision(value.tierRevisionSnapshot, 'tierRevisionSnapshot'),
     entitlementsSnapshot: parseEntitlements(value.entitlementsSnapshot),
     grantType,
     cycleStart: readSubscriptionInstant(value.cycleStart, 'cycleStart'),
@@ -1223,10 +1258,19 @@ function decimalUnits(value: string): bigint {
 export function serializeCreateBillingSubscriptionRequest(
   request: CreateBillingSubscriptionRequest
 ): string {
+  if (!isRecord(request) || !hasExactKeys(request, CREATION_REQUEST_KEYS) ||
+      !isRecord(request.entitlements) || !hasExactKeys(request.entitlements, ENTITLEMENT_KEYS) ||
+      !isRecord(request.entitlements.rateLimits) ||
+      !hasExactKeys(request.entitlements.rateLimits, RATE_LIMIT_KEYS) ||
+      !isRecord(request.entitlements.featureFlags) ||
+      !hasExactKeys(request.entitlements.featureFlags, FEATURE_FLAG_KEYS)) {
+    throw subscriptionContractError('creation request fields do not match the closed contract')
+  }
   if (!UUID_V7_PATTERN.test(request.creationOperationId)) {
     throw subscriptionContractError('creationOperationId must be UUIDv7')
   }
   readSubscriptionPlanName(request.planName)
+  readSubscriptionTier(request.subscriptionTier)
   if (!POSITIVE_DECIMAL_PATTERN.test(request.cycleCreditAmount) ||
       /^0(?:\.0+)?$/.test(request.cycleCreditAmount)) {
     throw subscriptionContractError('cycleCreditAmount is outside the DECIMAL(18,4) contract')
@@ -1257,6 +1301,7 @@ export function serializeCreateBillingSubscriptionRequest(
   const body = stringify({
     creationOperationId: request.creationOperationId,
     planName: request.planName,
+    subscriptionTier: request.subscriptionTier,
     cycleCreditAmount: new LosslessNumber(request.cycleCreditAmount),
     validFrom: request.validFrom,
     validTo: request.validTo,
@@ -1311,6 +1356,14 @@ export function parseBillingSubscriptionCreationReceipt(
   const subscriptionAmount = readSubscriptionDecimal(
     subscriptionValue.cycleCreditAmount, 'cycleCreditAmount', true
   )
+  const subscriptionTier = readSubscriptionTier(subscriptionValue.subscriptionTier)
+  const tierRevision = readTierRevision(subscriptionValue.tierRevision)
+  const grantTier = readSubscriptionTier(
+    grantValue.subscriptionTierSnapshot, 'subscriptionTierSnapshot'
+  )
+  const grantTierRevision = readTierRevision(
+    grantValue.tierRevisionSnapshot, 'tierRevisionSnapshot'
+  )
   const validFrom = readSubscriptionInstant(subscriptionValue.validFrom, 'validFrom')
   const validTo = subscriptionValue.validTo === null
     ? null : readSubscriptionInstant(subscriptionValue.validTo, 'validTo')
@@ -1331,6 +1384,10 @@ export function parseBillingSubscriptionCreationReceipt(
       grantPlanTermsOperationId !== planTermsOperationId ||
       subscriptionValue.planName !== request.planName ||
       grantValue.planNameSnapshot !== request.planName ||
+      subscriptionTier !== request.subscriptionTier ||
+      grantTier !== request.subscriptionTier ||
+      grantTier !== subscriptionTier ||
+      tierRevision !== '0' || grantTierRevision !== tierRevision ||
       !decimalsEqual(subscriptionAmount, request.cycleCreditAmount) ||
       !decimalsEqual(grantAmount, request.cycleCreditAmount) ||
       !entitlementsEqual(entitlements, request.entitlements) ||
@@ -1357,7 +1414,8 @@ export function parseBillingSubscriptionCreationReceipt(
     created: payload.created,
     subscription: {
       subscriptionId, creationOperationId, planTermsOperationId, clientId: subscriptionClient,
-      planName: request.planName, cycleCreditAmount: subscriptionAmount, entitlements,
+      planName: request.planName, subscriptionTier, tierRevision,
+      cycleCreditAmount: subscriptionAmount, entitlements,
       changeEffectivePolicy: 'immediate', prorationPolicy: 'replace', unusedCreditPolicy: 'rollover',
       billingCycleAnchor,
       status: 'active', validFrom, validTo,
@@ -1368,6 +1426,8 @@ export function parseBillingSubscriptionCreationReceipt(
       ledgerEntryId: readSubscriptionGuid(grantValue.ledgerEntryId, 'ledgerEntryId'),
       planTermsOperationId: grantPlanTermsOperationId,
       planNameSnapshot: request.planName,
+      subscriptionTierSnapshot: grantTier,
+      tierRevisionSnapshot: grantTierRevision,
       entitlementsSnapshot: grantEntitlements,
       grantType: 'billing_cycle',
       cycleStart,

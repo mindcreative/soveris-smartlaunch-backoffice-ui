@@ -2,6 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import type { CreateBillingSubscriptionMaterial } from '../../types/billing'
 import { Modal } from '../shared/Modal'
 
+type TierlessSubscriptionCreationMaterial = Omit<
+  CreateBillingSubscriptionMaterial,
+  'subscriptionTier'
+>
+
 export interface SubscriptionDraft {
   planName: string
   cycleCreditAmount: string
@@ -41,6 +46,10 @@ const FIELD_LABELS: Record<DraftField, string> = {
 
 const UTC_INPUT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,6}))?)?$/
 const UTC_INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d{6})Z$/
+
+function isTierSelectionUnavailable(): boolean {
+  return true
+}
 
 function pad(value: number, width = 2): string {
   return String(value).padStart(width, '0')
@@ -96,7 +105,7 @@ function wholeNumber(value: string, minimum: number, maximum: number): number | 
 
 export function validateSubscriptionDraft(draft: SubscriptionDraft, nowMs: number): {
   errors: DraftErrors
-  material: CreateBillingSubscriptionMaterial | null
+  material: TierlessSubscriptionCreationMaterial | null
 } {
   const errors: DraftErrors = {}
   if (draft.planName.length < 1 || draft.planName.length > 128 ||
@@ -165,7 +174,7 @@ export function validateSubscriptionDraft(draft: SubscriptionDraft, nowMs: numbe
 
 interface SubscriptionCreationFormProps {
   clientId: string
-  onConfirm: (material: CreateBillingSubscriptionMaterial) => void | Promise<void>
+  onConfirm: (material: TierlessSubscriptionCreationMaterial) => void | Promise<void>
   now?: () => number
   disabled?: boolean
   draft?: SubscriptionDraft
@@ -181,7 +190,7 @@ export function SubscriptionCreationForm({
   const [localDraft, setLocalDraft] = useState<SubscriptionDraft>(EMPTY_SUBSCRIPTION_DRAFT)
   const draft = controlledDraft ?? localDraft
   const [errors, setErrors] = useState<DraftErrors>({})
-  const [review, setReview] = useState<CreateBillingSubscriptionMaterial | null>(null)
+  const [review, setReview] = useState<TierlessSubscriptionCreationMaterial | null>(null)
   const summaryRef = useRef<HTMLDivElement>(null)
   const confirmingRef = useRef(false)
   const focusSummaryRef = useRef(false)
@@ -229,6 +238,7 @@ export function SubscriptionCreationForm({
     if (!result.material) {
       return
     }
+    if (isTierSelectionUnavailable()) return
     if (onPreconfirm) {
       void onPreconfirm().then((ready) => { if (ready) setReview(result.material) })
       return
@@ -246,6 +256,9 @@ export function SubscriptionCreationForm({
     <section aria-labelledby="create-subscription-heading" className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6">
       <h2 id="create-subscription-heading" className="text-lg font-semibold text-gray-950">Create subscription</h2>
       <p className="mt-1 text-sm text-gray-600">All dates and monthly boundaries are evaluated in UTC.</p>
+      <p role="status" className="state-indicator mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+        Subscription creation is temporarily unavailable until an explicit tier can be selected.
+      </p>
       <p id="subscription-form-constraints" className="mt-1 text-sm text-gray-600">Required fields use the browser required state. Amounts allow four decimal places; select at least one feature.</p>
       {(Object.keys(errors).length > 0 || serverValidationError) && (
         <div ref={summaryRef} tabIndex={-1} role="alert" aria-label="Correct the subscription form" className="state-indicator mt-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-950 outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
@@ -284,7 +297,7 @@ export function SubscriptionCreationForm({
           <p className="mt-2 text-sm text-gray-700">Monthly credits renewed by UTC calendar month from the subscription start.</p>
         </div>
         <div className="sm:col-span-2">
-          <button type="submit" disabled={disabled} className="min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">Review subscription</button>
+          <button type="submit" disabled={disabled || isTierSelectionUnavailable()} className="min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">Review subscription</button>
         </div>
       </form>
 
@@ -322,7 +335,7 @@ function Checkbox({ field, label, checked, onChange }: {
 
 function ReviewDetails({ clientId, material }: {
   clientId: string
-  material: CreateBillingSubscriptionMaterial
+  material: TierlessSubscriptionCreationMaterial
 }) {
   return <div className="min-w-0 text-sm"><p className="text-gray-700">This write is immediate. Verify the immutable operation material before confirming. Unused credits remain owned and carry forward into later cycles.</p><dl className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2"><ReviewValue label="Client" value={clientId} /><ReviewValue label="Plan" value={material.planName} /><ReviewValue label="Cycle credits" value={material.cycleCreditAmount} /><ReviewValue label="Valid from" value={material.validFrom} /><ReviewValue label="Valid to" value={material.validTo ?? 'No end date'} /><ReviewValue label="Change effective policy" value="Immediate" /><ReviewValue label="Proration policy" value="Replace" /><ReviewValue label="Unused credit policy" value="Rollover" /><ReviewValue label="Cadence" value="UTC calendar month" /><ReviewValue label="Requests per minute" value={String(material.entitlements.rateLimits.requestsPerMinute)} /><ReviewValue label="Concurrent AI operations" value={String(material.entitlements.rateLimits.concurrentAiOperations)} /><ReviewValue label="Features" value={[material.entitlements.featureFlags.contentGeneration && 'Content generation', material.entitlements.featureFlags.imageGeneration && 'Image generation'].filter(Boolean).join(', ')} /></dl></div>
 }

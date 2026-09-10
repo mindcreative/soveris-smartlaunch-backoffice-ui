@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -50,7 +50,7 @@ describe('SubscriptionCreationForm', () => {
     render(<SubscriptionCreationForm clientId={CLIENT_ID} onConfirm={vi.fn()} now={() => NOW} />)
     await user.type(screen.getByLabelText('Plan name'), ' Pro ')
     await user.type(screen.getByLabelText('Cycle credit amount'), '1.12345')
-    await user.click(screen.getByRole('button', { name: 'Review subscription' }))
+    fireEvent.submit(screen.getByRole('button', { name: 'Review subscription' }).closest('form')!)
 
     const summary = screen.getByRole('alert', { name: 'Correct the subscription form' })
     expect(summary).toHaveFocus()
@@ -60,7 +60,7 @@ describe('SubscriptionCreationForm', () => {
     expect(screen.getByLabelText('Plan name')).toHaveFocus()
   })
 
-  it('confirms exact public material once and restores focus after safe cancellation', async () => {
+  it('keeps the obsolete tierless submission unavailable without inferring a tier', async () => {
     const user = userEvent.setup()
     const onConfirm = vi.fn()
     render(<SubscriptionCreationForm clientId={CLIENT_ID} onConfirm={onConfirm} now={() => NOW} />)
@@ -73,35 +73,12 @@ describe('SubscriptionCreationForm', () => {
     await user.type(screen.getByLabelText('Valid to (UTC, optional)'), '2026-03-15T12:00')
 
     const review = screen.getByRole('button', { name: 'Review subscription' })
+    expect(review).toBeDisabled()
+    expect(screen.getByRole('status')).toHaveTextContent(/unavailable.*explicit tier/i)
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
     await user.click(review)
-    const dialog = screen.getByRole('dialog', { name: 'Confirm subscription creation' })
-    expect(dialog).toContainElement(screen.getByText(CLIENT_ID))
-    expect(dialog).toHaveTextContent('1250.0000')
-    expect(dialog).toHaveTextContent('Immediate')
-    expect(dialog).toHaveTextContent('Replace')
-    expect(dialog).toHaveTextContent('Rollover')
-    expect(dialog).toHaveTextContent('UTC calendar month')
-    expect(dialog).not.toHaveTextContent(/billing cycle anchor|cycle start|cycle end/i)
-
-    await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(review).toHaveFocus()
-
-    await user.click(review)
-    await user.dblClick(screen.getByRole('button', { name: 'Confirm creation' }))
-    expect(onConfirm).toHaveBeenCalledTimes(1)
-    expect(onConfirm).toHaveBeenCalledWith({
-      planName: 'Pro', cycleCreditAmount: '1250.0000',
-      validFrom: '2026-02-15T12:00:00.000000Z',
-      validTo: '2026-03-15T12:00:00.000000Z',
-      changeEffectivePolicy: 'immediate', prorationPolicy: 'replace',
-      unusedCreditPolicy: 'rollover',
-      entitlements: {
-        schemaVersion: 1,
-        rateLimits: { requestsPerMinute: 60, concurrentAiOperations: 4 },
-        featureFlags: { contentGeneration: true, imageGeneration: false },
-      },
-    })
+    expect(onConfirm).not.toHaveBeenCalled()
   })
 
   it('clears private draft material on auth refresh', async () => {
