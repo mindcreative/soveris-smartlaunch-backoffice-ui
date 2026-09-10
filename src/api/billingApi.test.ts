@@ -2,11 +2,13 @@ import { describe, expect, it, vi } from 'vitest'
 import { apiClient } from './apiClient'
 import {
   BillingSubscriptionContractError,
+  ClientCapabilitiesContractError,
   getBillingAccountSnapshot,
   getBillingLedgerExportStatus,
   getBillingLedgerPage,
   postBillingSubscriptionLifecycle,
   getBillingSubscriptionState,
+  getClientCapabilities,
   parseBillingAccountSnapshot,
   parseBillingLedgerExportAccepted,
   parseBillingLedgerExportStatus,
@@ -14,6 +16,7 @@ import {
   parseBillingSubscriptionCreationReceipt,
   parseBillingSubscriptionLifecycleReceipt,
   parseBillingSubscriptionState,
+  parseClientCapabilities,
   redeemBillingLedgerExport,
   requestBillingLedgerExport,
   serializeCreateBillingSubscriptionRequest,
@@ -98,6 +101,137 @@ describe('parseBillingAccountSnapshot', () => {
   it('normalizes invalid JSON into a safe contract error', () => {
     expect(() => parseBillingAccountSnapshot('{invalid', CLIENT_ID)).toThrow(
       'Invalid Billing snapshot: response is not valid JSON'
+    )
+  })
+})
+
+const CAPABILITY_KEYS = [
+  'manual_content_editing', 'ordinary_image_upload', 'ai_content_generation',
+  'ai_image_generation', 'ai_source_ingestion', 'client_domain_binding',
+  'product_domain_binding', 'analytics', 'ab_testing',
+] as const
+
+const CAPABILITY_LIMITS = [
+  ['active_products', 'count', 2],
+  ['hostnames', 'count', 2],
+  ['storage_bytes', 'bytes', 10485760],
+  ['requests_per_minute', 'requests_per_minute', 6],
+  ['concurrent_ai_operations', 'count', 1],
+  ['retention_days', 'days', 30],
+] as const
+
+function capabilitiesJson(overrides: Record<string, unknown> = {}): string {
+  return JSON.stringify({
+    clientId: CLIENT_ID,
+    classificationSource: 'back_office.clients',
+    classification: 'customer',
+    classificationRevision: '__REVISION__',
+    policySource: 'customer_subscription',
+    policyVersion: 'fixture-9.3-v1',
+    subscription: {
+      storedTier: 'brand', effectiveTier: 'brand', status: 'active',
+      tierRevision: '__TIER_REVISION__', validFrom: '2026-09-01T00:00:00+00:00',
+      validTo: '2026-10-01T00:00:00+00:00',
+    },
+    flags: CAPABILITY_KEYS.map((key) => ({ key, enabled: key !== 'ai_source_ingestion' })),
+    limits: CAPABILITY_LIMITS.map(([key, unit, value]) => ({ key, unit, value })),
+    usage: CAPABILITY_LIMITS.map(([key, unit]) => ({
+      key, unit, value: 0, measuredAt: '2026-09-10T12:00:00+00:00',
+    })),
+    operations: CAPABILITY_KEYS.map((key) => ({
+      key,
+      outcome: key === 'ai_source_ingestion' ? 'denied' : 'eligible',
+      permission: 'satisfied',
+      feature: key === 'ai_source_ingestion' ? 'denied' : 'satisfied',
+      entitlement: key.startsWith('ai_')
+        ? (key === 'ai_source_ingestion' ? 'denied' : 'satisfied')
+        : 'not_applicable',
+      resourceLimit: 'satisfied',
+      provider: key.startsWith('ai_') ? 'satisfied' : 'not_applicable',
+      pricing: key.startsWith('ai_') ? 'satisfied' : 'not_applicable',
+      funding: key.startsWith('ai_') ? 'available_requires_quote' : 'not_applicable',
+      denialConditions: key === 'ai_source_ingestion'
+        ? ['feature_not_available', 'entitlement_not_available'] : [],
+    })),
+    evaluatedAt: '2026-09-10T12:00:00+00:00',
+    nextBoundary: '2026-10-01T00:00:00+00:00',
+    ...overrides,
+  }).replace('"__REVISION__"', '9223372036854775807')
+    .replace('"__TIER_REVISION__"', '9007199254740993')
+}
+
+describe('Client capabilities adapter', () => {
+  it('preserves every Int64 lexeme as an exact decimal string', () => {
+    const result = parseClientCapabilities(capabilitiesJson(), CLIENT_ID)
+    expect(result.classificationRevision).toBe('9223372036854775807')
+    expect(result.subscription?.tierRevision).toBe('9007199254740993')
+    expect(result.limits[0]?.value).toBe('2')
+    expect(result.usage[0]?.value).toBe('0')
+  })
+
+  it('accepts only consistent internal and absent-customer subscription nullability', () => {
+    const internal = parseClientCapabilities(capabilitiesJson({
+      classification: 'soveris_internal', policySource: 'internal',
+      subscription: null,
+      operations: JSON.parse(capabilitiesJson()).operations.map((operation: Record<string, unknown>) => ({
+        ...operation,
+        entitlement: String(operation.key).startsWith('ai_') ? 'not_applicable' : operation.entitlement,
+        denialConditions: operation.key === 'ai_source_ingestion' ? ['feature_not_available'] : [],
+      })),
+    }), CLIENT_ID)
+    expect(internal.subscription).toBeNull()
+
+    const freemium = parseClientCapabilities(capabilitiesJson({
+      policySource: 'customer_freemium', subscription: null,
+      operations: JSON.parse(capabilitiesJson()).operations.map((operation: Record<string, unknown>) => ({
+        ...operation,
+        outcome: String(operation.key).startsWith('ai_') ? 'denied' : operation.outcome,
+        entitlement: String(operation.key).startsWith('ai_') ? 'denied' : operation.entitlement,
+        denialConditions: String(operation.key).startsWith('ai_')
+          ? [
+              ...(operation.key === 'ai_source_ingestion' ? ['feature_not_available'] : []),
+              'entitlement_not_available',
+            ]
+          : [],
+      })),
+    }), CLIENT_ID)
+    expect(freemium.policySource).toBe('customer_freemium')
+  })
+
+  it.each([
+    capabilitiesJson({ extra: true }),
+    capabilitiesJson({ classificationSource: 'jwt' }),
+    capabilitiesJson({ classification: 'Customer' }),
+    capabilitiesJson({ policySource: 'customer_freemium' }),
+    capabilitiesJson({
+      operations: JSON.parse(capabilitiesJson()).operations.map((operation: Record<string, unknown>) =>
+        operation.key === 'ai_content_generation'
+          ? { ...operation, funding: 'sufficient_for_quote' }
+          : operation),
+    }),
+    capabilitiesJson({ nextBoundary: '2026-09-10T11:59:59+00:00' }),
+    capabilitiesJson().replace('"classificationRevision":9223372036854775807', '"classificationRevision":-1'),
+    capabilitiesJson().replace('"value":10485760', '"value":9223372036854775808'),
+    capabilitiesJson().replace('"unit":"bytes"', '"unit":"count"'),
+    capabilitiesJson().replace('"manual_content_editing"', '"unknown_feature"'),
+    capabilitiesJson().replace('"manual_content_editing"', '"ai_content_generation"'),
+    capabilitiesJson().replace('"clientId"', '"client_id"'),
+    capabilitiesJson().replace('"clientId":', '"clientId":"duplicate","clientId":'),
+  ])('rejects malformed, extra, unknown, duplicate, or inconsistent evidence', (payload) => {
+    expect(() => parseClientCapabilities(payload, CLIENT_ID)).toThrow(ClientCapabilitiesContractError)
+  })
+
+  it('uses an API-root text response and canonical Client route', async () => {
+    const getApiRoot = vi.spyOn(apiClient, 'getApiRoot').mockResolvedValue({
+      data: capabilitiesJson(), status: 200,
+    })
+    const signal = new AbortController().signal
+
+    await getClientCapabilities(CLIENT_ID.toUpperCase(), signal)
+
+    expect(getApiRoot).toHaveBeenCalledWith(
+      `/api/backoffice/clients/${CLIENT_ID}/capabilities`,
+      { responseType: 'text', signal }
     )
   })
 })

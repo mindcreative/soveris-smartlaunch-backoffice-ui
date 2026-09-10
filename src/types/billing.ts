@@ -125,6 +125,115 @@ export interface BillingSubscriptionState {
   immediateChangeContext?: BillingSubscriptionImmediateContext | BillingSubscriptionUnsupportedView
 }
 
+export const CLIENT_CAPABILITY_KEYS = [
+  'manual_content_editing',
+  'ordinary_image_upload',
+  'ai_content_generation',
+  'ai_image_generation',
+  'ai_source_ingestion',
+  'client_domain_binding',
+  'product_domain_binding',
+  'analytics',
+  'ab_testing',
+] as const
+
+export type ClientCapabilityKey = typeof CLIENT_CAPABILITY_KEYS[number]
+export type ClientClassification = 'customer' | 'soveris_internal'
+export type ClientCapabilityPolicySource =
+  | 'internal'
+  | 'customer_subscription'
+  | 'customer_freemium'
+export type ClientCapabilityLimitKey =
+  | 'active_products'
+  | 'hostnames'
+  | 'storage_bytes'
+  | 'requests_per_minute'
+  | 'concurrent_ai_operations'
+  | 'retention_days'
+export type ClientCapabilityLimitUnit = 'count' | 'bytes' | 'requests_per_minute' | 'days'
+export type ClientCapabilityEvidenceStatus =
+  | 'satisfied'
+  | 'denied'
+  | 'unavailable'
+  | 'not_applicable'
+export type ClientCapabilityFundingEvidence =
+  | 'not_applicable'
+  | 'wallet_missing'
+  | 'wallet_ineligible'
+  | 'zero_available'
+  | 'available_requires_quote'
+  | 'sufficient_for_quote'
+  | 'insufficient_credits'
+  | 'unavailable'
+export type ClientCapabilityDenialCondition =
+  | 'permission_denied'
+  | 'client_inactive'
+  | 'feature_not_available'
+  | 'entitlement_not_available'
+  | 'limit_reached'
+  | 'provider_unavailable'
+  | 'pricing_unavailable'
+  | 'wallet_missing'
+  | 'wallet_ineligible'
+  | 'insufficient_credits'
+  | 'configuration_unavailable'
+  | 'dependency_unavailable'
+  | 'transition_pending'
+  | 'stale_capability_evidence'
+
+export interface ClientCapabilitySubscription {
+  storedTier: BillingSubscriptionTier
+  effectiveTier: BillingSubscriptionTier | null
+  status: BillingSubscriptionStatus
+  tierRevision: string
+  validFrom: string
+  validTo: string | null
+}
+
+export interface ClientCapabilityFlag {
+  key: ClientCapabilityKey
+  enabled: boolean
+}
+
+export interface ClientCapabilityLimit {
+  key: ClientCapabilityLimitKey
+  unit: ClientCapabilityLimitUnit
+  value: string
+}
+
+export interface ClientCapabilityUsage extends ClientCapabilityLimit {
+  measuredAt: string
+}
+
+export interface ClientCapabilityOperation {
+  key: ClientCapabilityKey
+  outcome: 'eligible' | 'denied'
+  permission: ClientCapabilityEvidenceStatus
+  feature: ClientCapabilityEvidenceStatus
+  entitlement: ClientCapabilityEvidenceStatus
+  resourceLimit: ClientCapabilityEvidenceStatus
+  provider: ClientCapabilityEvidenceStatus
+  pricing: ClientCapabilityEvidenceStatus
+  funding: ClientCapabilityFundingEvidence
+  denialConditions: ClientCapabilityDenialCondition[]
+}
+
+export interface ClientCapabilities {
+  clientId: string
+  classificationSource: 'back_office.clients'
+  classification: ClientClassification
+  classificationRevision: string
+  policySource: ClientCapabilityPolicySource
+  policyVersion: string
+  subscription: ClientCapabilitySubscription | null
+  flags: ClientCapabilityFlag[]
+  limits: ClientCapabilityLimit[]
+  usage: ClientCapabilityUsage[]
+  operations: ClientCapabilityOperation[]
+  evaluatedAt: string
+  nextBoundary: string | null
+}
+
 export type BillingSubscriptionPageRequest =
   | { pageSize?: number; cursor?: never }
   | { cursor: string; pageSize?: never }

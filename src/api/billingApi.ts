@@ -35,6 +35,19 @@ import {
   type BillingLedgerExportStatus,
   type BillingLedgerExportStatusMetadata,
   type BillingLedgerExportStatusResult,
+  CLIENT_CAPABILITY_KEYS,
+  type ClientCapabilities,
+  type ClientCapabilityDenialCondition,
+  type ClientCapabilityEvidenceStatus,
+  type ClientCapabilityFundingEvidence,
+  type ClientCapabilityKey,
+  type ClientCapabilityLimit,
+  type ClientCapabilityLimitKey,
+  type ClientCapabilityOperation,
+  type ClientCapabilityPolicySource,
+  type ClientCapabilitySubscription,
+  type ClientCapabilityUsage,
+  type ClientClassification,
 } from '../types/billing'
 
 const SNAPSHOT_KEYS = [
@@ -236,6 +249,341 @@ export async function getBillingAccountSnapshot(
   }
 
   return parseBillingAccountSnapshot(response.data, canonicalClientId)
+}
+
+const CAPABILITY_TOP_KEYS = [
+  'classification', 'classificationRevision', 'classificationSource', 'clientId',
+  'evaluatedAt', 'flags', 'limits', 'nextBoundary', 'operations', 'policySource',
+  'policyVersion', 'subscription', 'usage',
+] as const
+const CAPABILITY_SUBSCRIPTION_KEYS = [
+  'effectiveTier', 'status', 'storedTier', 'tierRevision', 'validFrom', 'validTo',
+] as const
+const CAPABILITY_FLAG_KEYS = ['enabled', 'key'] as const
+const CAPABILITY_LIMIT_KEYS = ['key', 'unit', 'value'] as const
+const CAPABILITY_USAGE_KEYS = ['key', 'measuredAt', 'unit', 'value'] as const
+const CAPABILITY_OPERATION_KEYS = [
+  'denialConditions', 'entitlement', 'feature', 'funding', 'key', 'outcome',
+  'permission', 'pricing', 'provider', 'resourceLimit',
+] as const
+const CAPABILITY_KEY_SET = new Set<string>(CLIENT_CAPABILITY_KEYS)
+const CAPABILITY_LIMIT_UNITS = new Map<ClientCapabilityLimitKey, ClientCapabilityLimit['unit']>([
+  ['active_products', 'count'],
+  ['hostnames', 'count'],
+  ['storage_bytes', 'bytes'],
+  ['requests_per_minute', 'requests_per_minute'],
+  ['concurrent_ai_operations', 'count'],
+  ['retention_days', 'days'],
+])
+const CAPABILITY_EVIDENCE = new Set<ClientCapabilityEvidenceStatus>([
+  'satisfied', 'denied', 'unavailable', 'not_applicable',
+])
+const CAPABILITY_FUNDING = new Set<ClientCapabilityFundingEvidence>([
+  'not_applicable', 'wallet_missing', 'wallet_ineligible', 'zero_available',
+  'available_requires_quote', 'sufficient_for_quote', 'insufficient_credits', 'unavailable',
+])
+const CAPABILITY_DENIALS = new Set<ClientCapabilityDenialCondition>([
+  'permission_denied', 'client_inactive', 'feature_not_available',
+  'entitlement_not_available', 'limit_reached', 'provider_unavailable',
+  'pricing_unavailable', 'wallet_missing', 'wallet_ineligible', 'insufficient_credits',
+  'configuration_unavailable', 'dependency_unavailable', 'transition_pending',
+  'stale_capability_evidence',
+])
+const CAPABILITY_CLASSIFICATIONS = new Set<ClientClassification>(['customer', 'soveris_internal'])
+const CAPABILITY_POLICY_SOURCES = new Set<ClientCapabilityPolicySource>([
+  'internal', 'customer_subscription', 'customer_freemium',
+])
+
+export class ClientCapabilitiesContractError extends Error {
+  constructor(reason: string) {
+    super(`Invalid Client capabilities: ${reason}`)
+    this.name = 'ClientCapabilitiesContractError'
+  }
+}
+
+function capabilityError(reason: string): ClientCapabilitiesContractError {
+  return new ClientCapabilitiesContractError(reason)
+}
+
+function parseCapabilitiesPayload(text: string): Record<string, unknown> {
+  try {
+    assertNoDuplicateJsonObjectKeys(text)
+  } catch {
+    throw capabilityError('response contains a duplicate object property')
+  }
+  let value: unknown
+  try {
+    value = parse(text)
+  } catch {
+    throw capabilityError('response is not valid JSON')
+  }
+  if (!isRecord(value)) throw capabilityError('payload must be an object')
+  return value
+}
+
+function readCapabilityInt64(value: unknown, field: string, positive = false): string {
+  if (!isLosslessNumber(value) || !/^\d+$/.test(value.toString())) {
+    throw capabilityError(`${field} must be a JSON non-negative Int64`)
+  }
+  const lexeme = value.toString()
+  if (BigInt(lexeme) > INT64_MAX || (positive && lexeme === '0')) {
+    throw capabilityError(`${field} must be a JSON non-negative Int64`)
+  }
+  return lexeme
+}
+
+function readCapabilityInstant(value: unknown, field: string): string {
+  const instant = typeof value === 'string' ? value : ''
+  const match = SUBSCRIPTION_INSTANT_PATTERN.exec(instant)
+  if (!match || Number.isNaN(Date.parse(instant))) {
+    throw capabilityError(`${field} must be a UTC instant`)
+  }
+  const [year, month, day, hour, minute, second] = match.slice(1, 7).map(Number)
+  const check = new Date(0)
+  check.setUTCFullYear(year!, month! - 1, day!)
+  check.setUTCHours(hour!, minute!, second!, 0)
+  if (year! < 1 || check.getUTCFullYear() !== year || check.getUTCMonth() !== month! - 1 ||
+      check.getUTCDate() !== day || check.getUTCHours() !== hour ||
+      check.getUTCMinutes() !== minute || check.getUTCSeconds() !== second) {
+    throw capabilityError(`${field} must be a UTC instant`)
+  }
+  return instant
+}
+
+function readCapabilityTier(value: unknown, nullable: boolean): BillingSubscriptionTier | null {
+  if (nullable && value === null) return null
+  if (typeof value !== 'string' || !SUBSCRIPTION_TIERS.has(value as BillingSubscriptionTier)) {
+    throw capabilityError('subscription tier is unsupported')
+  }
+  return value as BillingSubscriptionTier
+}
+
+function parseCapabilitySubscription(value: unknown): ClientCapabilitySubscription | null {
+  if (value === null) return null
+  if (!isRecord(value) || !hasExactKeys(value, CAPABILITY_SUBSCRIPTION_KEYS)) {
+    throw capabilityError('subscription fields do not match the closed contract')
+  }
+  const storedTier = readCapabilityTier(value.storedTier, false)!
+  const effectiveTier = readCapabilityTier(value.effectiveTier, true)
+  if (typeof value.status !== 'string' || !SUBSCRIPTION_STATUSES.has(value.status)) {
+    throw capabilityError('subscription status is unsupported')
+  }
+  const validFrom = readCapabilityInstant(value.validFrom, 'validFrom')
+  const validTo = value.validTo === null ? null : readCapabilityInstant(value.validTo, 'validTo')
+  if (validTo !== null && Date.parse(validTo) <= Date.parse(validFrom)) {
+    throw capabilityError('subscription validity is inconsistent')
+  }
+  return {
+    storedTier,
+    effectiveTier,
+    status: value.status as ClientCapabilitySubscription['status'],
+    tierRevision: readCapabilityInt64(value.tierRevision, 'tierRevision'),
+    validFrom,
+    validTo,
+  }
+}
+
+function readCapabilityEvidence(value: unknown, field: string): ClientCapabilityEvidenceStatus {
+  if (typeof value !== 'string' || !CAPABILITY_EVIDENCE.has(value as ClientCapabilityEvidenceStatus)) {
+    throw capabilityError(`${field} evidence is unsupported`)
+  }
+  return value as ClientCapabilityEvidenceStatus
+}
+
+function parseCapabilityOperation(
+  value: unknown,
+  classification: ClientClassification,
+  flag: boolean
+): ClientCapabilityOperation {
+  if (!isRecord(value) || !hasExactKeys(value, CAPABILITY_OPERATION_KEYS) ||
+      typeof value.key !== 'string' || !CAPABILITY_KEY_SET.has(value.key)) {
+    throw capabilityError('operation fields do not match the closed contract')
+  }
+  const key = value.key as ClientCapabilityKey
+  const isAi = key.startsWith('ai_')
+  const permission = readCapabilityEvidence(value.permission, 'permission')
+  const feature = readCapabilityEvidence(value.feature, 'feature')
+  const entitlement = readCapabilityEvidence(value.entitlement, 'entitlement')
+  const resourceLimit = readCapabilityEvidence(value.resourceLimit, 'resourceLimit')
+  const provider = readCapabilityEvidence(value.provider, 'provider')
+  const pricing = readCapabilityEvidence(value.pricing, 'pricing')
+  if (typeof value.funding !== 'string' ||
+      !CAPABILITY_FUNDING.has(value.funding as ClientCapabilityFundingEvidence) ||
+      !Array.isArray(value.denialConditions)) {
+    throw capabilityError('operation funding or denial evidence is invalid')
+  }
+  const funding = value.funding as ClientCapabilityFundingEvidence
+  const denialConditions = value.denialConditions.map((condition) => {
+    if (typeof condition !== 'string' ||
+        !CAPABILITY_DENIALS.has(condition as ClientCapabilityDenialCondition)) {
+      throw capabilityError('operation denial condition is unsupported')
+    }
+    return condition as ClientCapabilityDenialCondition
+  })
+  if (new Set(denialConditions).size !== denialConditions.length ||
+      (value.outcome !== 'eligible' && value.outcome !== 'denied') ||
+      permission === 'not_applicable' || permission === 'unavailable' ||
+      resourceLimit === 'not_applicable' || resourceLimit === 'unavailable' ||
+      (flag ? feature !== 'satisfied' : feature !== 'denied') ||
+      (isAi ? provider === 'not_applicable' || pricing === 'not_applicable' || funding === 'not_applicable'
+        : provider !== 'not_applicable' || pricing !== 'not_applicable' || funding !== 'not_applicable') ||
+      funding === 'sufficient_for_quote' || funding === 'unavailable' ||
+      (isAi && classification === 'customer' && entitlement === 'not_applicable') ||
+      ((!isAi || classification === 'soveris_internal') && entitlement !== 'not_applicable')) {
+    throw capabilityError('operation evidence is inconsistent')
+  }
+  const expected: ClientCapabilityDenialCondition[] = []
+  if (permission === 'denied') expected.push('permission_denied')
+  if (feature === 'denied') expected.push('feature_not_available')
+  if (entitlement === 'denied') expected.push('entitlement_not_available')
+  if (resourceLimit === 'denied') expected.push('limit_reached')
+  if (provider === 'unavailable') expected.push('provider_unavailable')
+  if (pricing === 'unavailable') expected.push('pricing_unavailable')
+  if (funding === 'wallet_missing') expected.push('wallet_missing')
+  if (funding === 'wallet_ineligible') expected.push('wallet_ineligible')
+  if (funding === 'zero_available' || funding === 'insufficient_credits') expected.push('insufficient_credits')
+  if (expected.length !== denialConditions.length ||
+      expected.some((condition, index) => denialConditions[index] !== condition) ||
+      (value.outcome === 'eligible') !== (expected.length === 0)) {
+    throw capabilityError('operation outcome and denial conditions are inconsistent')
+  }
+  return {
+    key,
+    outcome: value.outcome,
+    permission,
+    feature,
+    entitlement,
+    resourceLimit,
+    provider,
+    pricing,
+    funding,
+    denialConditions,
+  }
+}
+
+export function parseClientCapabilities(text: string, expectedClientId: string): ClientCapabilities {
+  const expectedClient = canonicalizeGuid(expectedClientId)
+  if (!expectedClient) throw capabilityError('requested Client ID is invalid')
+  const payload = parseCapabilitiesPayload(text)
+  if (!hasExactKeys(payload, CAPABILITY_TOP_KEYS)) {
+    throw capabilityError('payload fields do not match the closed contract')
+  }
+  const clientId = canonicalizeGuid(typeof payload.clientId === 'string' ? payload.clientId : undefined)
+  if (!clientId || clientId !== expectedClient || payload.classificationSource !== 'back_office.clients' ||
+      typeof payload.classification !== 'string' ||
+      !CAPABILITY_CLASSIFICATIONS.has(payload.classification as ClientClassification) ||
+      typeof payload.policySource !== 'string' ||
+      !CAPABILITY_POLICY_SOURCES.has(payload.policySource as ClientCapabilityPolicySource) ||
+      typeof payload.policyVersion !== 'string' || !payload.policyVersion.trim() ||
+      !Array.isArray(payload.flags) || !Array.isArray(payload.limits) ||
+      !Array.isArray(payload.usage) || !Array.isArray(payload.operations)) {
+    throw capabilityError('source, identity, policy, or collection evidence is invalid')
+  }
+  const classification = payload.classification as ClientClassification
+  const policySource = payload.policySource as ClientCapabilityPolicySource
+  const evaluatedAt = readCapabilityInstant(payload.evaluatedAt, 'evaluatedAt')
+  const nextBoundary = payload.nextBoundary === null
+    ? null : readCapabilityInstant(payload.nextBoundary, 'nextBoundary')
+  if (nextBoundary !== null && Date.parse(nextBoundary) <= Date.parse(evaluatedAt)) {
+    throw capabilityError('nextBoundary must be later than evaluatedAt')
+  }
+  const subscription = parseCapabilitySubscription(payload.subscription)
+  const effective = subscription?.effectiveTier !== null && subscription?.effectiveTier !== undefined
+  const activeInWindow = subscription?.status === 'active' &&
+    Date.parse(subscription.validFrom) <= Date.parse(evaluatedAt) &&
+    (subscription.validTo === null || Date.parse(evaluatedAt) < Date.parse(subscription.validTo))
+  if ((classification === 'soveris_internal' && (policySource !== 'internal' || effective)) ||
+      (classification === 'customer' && policySource === 'internal') ||
+      (policySource === 'customer_subscription' &&
+        (!subscription || !effective || subscription.effectiveTier !== subscription.storedTier ||
+         subscription.status !== 'active' || Date.parse(subscription.validFrom) > Date.parse(evaluatedAt) ||
+         (subscription.validTo !== null && Date.parse(evaluatedAt) >= Date.parse(subscription.validTo)))) ||
+      (policySource === 'customer_freemium' && (effective || activeInWindow)) ||
+      (!subscription && policySource === 'customer_subscription')) {
+    throw capabilityError('classification, policy source, and subscription are inconsistent')
+  }
+
+  const flags = payload.flags.map((value) => {
+    if (!isRecord(value) || !hasExactKeys(value, CAPABILITY_FLAG_KEYS) ||
+        typeof value.key !== 'string' || !CAPABILITY_KEY_SET.has(value.key) ||
+        typeof value.enabled !== 'boolean') throw capabilityError('flag evidence is invalid')
+    return { key: value.key as ClientCapabilityKey, enabled: value.enabled }
+  })
+  const flagMap = new Map(flags.map((flag) => [flag.key, flag.enabled]))
+  if (flags.length !== CLIENT_CAPABILITY_KEYS.length || flagMap.size !== flags.length ||
+      CLIENT_CAPABILITY_KEYS.some((key) => !flagMap.has(key))) {
+    throw capabilityError('flag keys must be the unique closed capability set')
+  }
+  if (flagMap.get('ai_source_ingestion') !== false ||
+      (classification === 'soveris_internal' && CLIENT_CAPABILITY_KEYS
+        .filter((key) => key !== 'ai_source_ingestion').some((key) => flagMap.get(key) !== true))) {
+    throw capabilityError('registered delivered feature evidence is inconsistent')
+  }
+
+  const parseLimit = (value: unknown, measured: boolean): ClientCapabilityLimit | ClientCapabilityUsage => {
+    if (!isRecord(value) || !hasExactKeys(value, measured ? CAPABILITY_USAGE_KEYS : CAPABILITY_LIMIT_KEYS) ||
+        typeof value.key !== 'string' || !CAPABILITY_LIMIT_UNITS.has(value.key as ClientCapabilityLimitKey)) {
+      throw capabilityError('limit or usage evidence is invalid')
+    }
+    const key = value.key as ClientCapabilityLimitKey
+    const unit = CAPABILITY_LIMIT_UNITS.get(key)!
+    if (value.unit !== unit) throw capabilityError('limit or usage unit is invalid')
+    const base = { key, unit, value: readCapabilityInt64(value.value, measured ? 'usage.value' : 'limit.value', !measured) }
+    if (!measured) return base
+    const measuredAt = readCapabilityInstant(value.measuredAt, 'measuredAt')
+    if (Date.parse(measuredAt) > Date.parse(evaluatedAt)) throw capabilityError('usage occurs after evaluation')
+    return { ...base, measuredAt }
+  }
+  const limits = payload.limits.map((value) => parseLimit(value, false) as ClientCapabilityLimit)
+  const usage = payload.usage.map((value) => parseLimit(value, true) as ClientCapabilityUsage)
+  for (const entries of [limits, usage]) {
+    const keys = new Set(entries.map((entry) => entry.key))
+    if (entries.length !== CAPABILITY_LIMIT_UNITS.size || keys.size !== entries.length ||
+        [...CAPABILITY_LIMIT_UNITS.keys()].some((key) => !keys.has(key))) {
+      throw capabilityError('limit and usage keys must be complete and unique')
+    }
+  }
+  const operations = payload.operations.map((value) => {
+    const key = isRecord(value) && typeof value.key === 'string'
+      ? value.key as ClientCapabilityKey : '' as ClientCapabilityKey
+    return parseCapabilityOperation(value, classification, flagMap.get(key) ?? false)
+  })
+  const operationKeys = new Set(operations.map((operation) => operation.key))
+  if (operations.length !== CLIENT_CAPABILITY_KEYS.length || operationKeys.size !== operations.length ||
+      CLIENT_CAPABILITY_KEYS.some((key) => !operationKeys.has(key))) {
+    throw capabilityError('operation keys must be the unique closed capability set')
+  }
+  return {
+    clientId,
+    classificationSource: 'back_office.clients',
+    classification,
+    classificationRevision: readCapabilityInt64(payload.classificationRevision, 'classificationRevision'),
+    policySource,
+    policyVersion: payload.policyVersion,
+    subscription,
+    flags,
+    limits,
+    usage,
+    operations,
+    evaluatedAt,
+    nextBoundary,
+  }
+}
+
+export async function getClientCapabilities(
+  clientId: string,
+  signal?: AbortSignal
+): Promise<ClientCapabilities> {
+  const canonicalClientId = canonicalizeGuid(clientId)
+  if (!canonicalClientId) throw capabilityError('requested Client ID is invalid')
+  const response = await apiClient.getApiRoot<string>(
+    `/api/backoffice/clients/${canonicalClientId}/capabilities`,
+    { responseType: 'text', signal }
+  )
+  if (response.status !== 200 || typeof response.data !== 'string') {
+    throw capabilityError('response is not valid capability JSON text')
+  }
+  return parseClientCapabilities(response.data, canonicalClientId)
 }
 
 function ledgerContractError(reason: string): BillingLedgerContractError {
@@ -1636,4 +1984,5 @@ export const billingApi = {
   requestLedgerExport: requestBillingLedgerExport,
   getLedgerExportStatus: getBillingLedgerExportStatus,
   redeemLedgerExport: redeemBillingLedgerExport,
+  getClientCapabilities,
 }
