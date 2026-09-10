@@ -164,6 +164,36 @@ export interface BillingSubscriptionCreationReceipt {
   account: BillingSubscriptionCreationAccount
 }
 
+export type BillingSubscriptionLifecycleAction = 'pause' | 'reactivate' | 'cancel' | 'expire'
+export type BillingSubscriptionLifecycleSourceStatus = 'active' | 'paused'
+
+export interface BillingSubscriptionLifecycleRequest {
+  lifecycleOperationId: string
+  action: BillingSubscriptionLifecycleAction
+  expectedStatus: BillingSubscriptionLifecycleSourceStatus
+  reason: string
+}
+
+export interface BillingSubscriptionLifecycleAttempt {
+  clientId: string
+  subscriptionId: string
+  request: BillingSubscriptionLifecycleRequest
+  serializedBody: string
+  validTo: string | null
+}
+
+export interface BillingSubscriptionLifecycleReceipt {
+  lifecycleOperationId: string
+  clientId: string
+  subscriptionId: string
+  action: BillingSubscriptionLifecycleAction
+  previousStatus: BillingSubscriptionLifecycleSourceStatus
+  status: BillingSubscriptionStatus
+  reason: string
+  effectiveAt: string
+  operationAsOf: string
+}
+
 export const BILLING_LEDGER_TRANSACTION_TYPES = [
   'subscription_grant',
   'reservation',

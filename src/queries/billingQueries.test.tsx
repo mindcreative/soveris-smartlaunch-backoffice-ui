@@ -64,6 +64,10 @@ describe('private Billing queries', () => {
     expect(billingSubscriptionKeys.create(CLIENT_A)).toEqual([
       'backoffice', 'private', 'billing', 'subscriptions', CLIENT_A, 'create',
     ])
+    expect(billingSubscriptionKeys.lifecycle(CLIENT_A, 'subscription-id')).toEqual([
+      'backoffice', 'private', 'billing', 'subscriptions', CLIENT_A,
+      'subscription-id', 'lifecycle',
+    ])
   })
 
   it('cancels and removes all private Billing data', async () => {
@@ -78,6 +82,10 @@ describe('private Billing queries', () => {
     queryClient.getMutationCache().build(queryClient, {
       mutationKey: billingSubscriptionKeys.create(CLIENT_A),
       mutationFn: async () => ({ created: true }),
+    })
+    queryClient.getMutationCache().build(queryClient, {
+      mutationKey: billingSubscriptionKeys.lifecycle(CLIENT_A, 'subscription-id'),
+      mutationFn: async () => ({ status: 'paused' }),
     })
     queryClient.setQueryData(['backoffice', 'public'], 'preserve')
 

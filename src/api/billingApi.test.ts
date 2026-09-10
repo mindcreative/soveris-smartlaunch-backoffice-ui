@@ -4,16 +4,19 @@ import {
   getBillingAccountSnapshot,
   getBillingLedgerExportStatus,
   getBillingLedgerPage,
+  postBillingSubscriptionLifecycle,
   getBillingSubscriptionState,
   parseBillingAccountSnapshot,
   parseBillingLedgerExportAccepted,
   parseBillingLedgerExportStatus,
   parseBillingLedgerPage,
   parseBillingSubscriptionCreationReceipt,
+  parseBillingSubscriptionLifecycleReceipt,
   parseBillingSubscriptionState,
   redeemBillingLedgerExport,
   requestBillingLedgerExport,
   serializeCreateBillingSubscriptionRequest,
+  serializeBillingSubscriptionLifecycleRequest,
 } from './billingApi'
 import type {
   BillingLedgerExportAttempt,
@@ -103,6 +106,7 @@ const CREATION_OPERATION_ID = '01991f20-1234-7abc-8abc-1234567890ab'
 const GRANT_ID = '33333333-2222-3333-8444-555555555555'
 const GRANT_OPERATION_ID = '44444444-2222-3333-8444-555555555555'
 const LEDGER_ENTRY_ID = '55555555-2222-3333-8444-555555555555'
+const LIFECYCLE_OPERATION_ID = '01991f20-5678-7abc-8abc-1234567890ab'
 
 const ENTITLEMENTS = {
   schemaVersion: 1 as const,
@@ -377,6 +381,184 @@ describe('Billing subscription creation adapter', () => {
     expect(() => parseBillingSubscriptionCreationReceipt(
       JSON.stringify(wrongBalance), CLIENT_ID, CREATION_REQUEST
     )).toThrow()
+  })
+})
+
+describe('Billing subscription lifecycle adapter', () => {
+  const request = {
+    lifecycleOperationId: LIFECYCLE_OPERATION_ID,
+    action: 'pause' as const,
+    expectedStatus: 'active' as const,
+    reason: 'Temporary administrative hold',
+  }
+  const receipt = {
+    lifecycleOperationId: LIFECYCLE_OPERATION_ID,
+    clientId: CLIENT_ID,
+    subscriptionId: SUBSCRIPTION_ID,
+    action: 'pause',
+    previousStatus: 'active',
+    status: 'paused',
+    reason: request.reason,
+    effectiveAt: '2026-09-07T09:00:00.123456+00:00',
+    operationAsOf: '2026-09-07T09:00:00.123456+00:00',
+  }
+
+  it('serializes only the four exact material fields and validates Unicode scalars', () => {
+    const body = serializeBillingSubscriptionLifecycleRequest(request)
+    expect(JSON.parse(body)).toEqual(request)
+    expect(body).toBe(JSON.stringify(request))
+    expect(body).not.toContain('clientId')
+    expect(body).not.toContain('subscriptionId')
+
+    expect(() => serializeBillingSubscriptionLifecycleRequest({ ...request, reason: '' })).toThrow('reason')
+    expect(() => serializeBillingSubscriptionLifecycleRequest({ ...request, reason: ' leading' })).toThrow('reason')
+    expect(() => serializeBillingSubscriptionLifecycleRequest({ ...request, reason: 'trailing\u00a0' })).toThrow('reason')
+    expect(() => serializeBillingSubscriptionLifecycleRequest({ ...request, reason: 'control\u0000' })).toThrow('reason')
+    expect(() => serializeBillingSubscriptionLifecycleRequest({ ...request, reason: '\ud800' })).toThrow('reason')
+    expect(serializeBillingSubscriptionLifecycleRequest({ ...request, reason: '😀'.repeat(512) })).toBeTruthy()
+    expect(() => serializeBillingSubscriptionLifecycleRequest({ ...request, reason: '😀'.repeat(513) })).toThrow('reason')
+    expect(JSON.parse(serializeBillingSubscriptionLifecycleRequest({
+      ...request, lifecycleOperationId: LIFECYCLE_OPERATION_ID.toUpperCase(),
+    })).lifecycleOperationId).toBe(LIFECYCLE_OPERATION_ID)
+  })
+
+  it('rejects invalid identity, action/status pairs, and runtime extra fields', () => {
+    expect(() => serializeBillingSubscriptionLifecycleRequest({
+      ...request, lifecycleOperationId: '11111111-2222-3333-8444-555555555555',
+    })).toThrow('UUIDv7')
+    expect(() => serializeBillingSubscriptionLifecycleRequest({
+      ...request, action: 'reactivate', expectedStatus: 'active',
+    } as unknown as typeof request)).toThrow('action')
+    expect(() => serializeBillingSubscriptionLifecycleRequest({
+      ...request, action: 'pause', expectedStatus: 'paused',
+    } as unknown as typeof request)).toThrow('action')
+    expect(serializeBillingSubscriptionLifecycleRequest({
+      ...request, action: 'reactivate', expectedStatus: 'paused',
+    })).toContain('"action":"reactivate"')
+    for (const expectedStatus of ['active', 'paused'] as const) {
+      expect(serializeBillingSubscriptionLifecycleRequest({
+        ...request, action: 'cancel', expectedStatus,
+      })).toContain('"action":"cancel"')
+      expect(serializeBillingSubscriptionLifecycleRequest({
+        ...request, action: 'expire', expectedStatus,
+      })).toContain('"action":"expire"')
+    }
+    expect(() => serializeBillingSubscriptionLifecycleRequest({
+      ...request, clientId: CLIENT_ID,
+    } as typeof request)).toThrow('fields')
+  })
+
+  it('validates the closed nine-field receipt and transition timestamps', () => {
+    const parsed = parseBillingSubscriptionLifecycleReceipt(
+      JSON.stringify(receipt), CLIENT_ID, SUBSCRIPTION_ID, request
+    )
+    expect(parsed).toEqual(receipt)
+
+    expect(() => parseBillingSubscriptionLifecycleReceipt(
+      JSON.stringify({ ...receipt, extra: 'private' }), CLIENT_ID, SUBSCRIPTION_ID, request
+    )).toThrow('closed contract')
+    expect(() => parseBillingSubscriptionLifecycleReceipt(
+      JSON.stringify({ ...receipt, clientId: 'ffffffff-1111-2222-8333-444444444444' }),
+      CLIENT_ID, SUBSCRIPTION_ID, request
+    )).toThrow('confirmed operation')
+    expect(() => parseBillingSubscriptionLifecycleReceipt(
+      JSON.stringify({ ...receipt, status: 'cancelled' }), CLIENT_ID, SUBSCRIPTION_ID, request
+    )).toThrow('transition')
+    expect(() => parseBillingSubscriptionLifecycleReceipt(
+      JSON.stringify({ ...receipt, effectiveAt: '2026-09-07T09:00:00.123455+00:00' }),
+      CLIENT_ID, SUBSCRIPTION_ID, request
+    )).toThrow('timestamp')
+    expect(() => parseBillingSubscriptionLifecycleReceipt(
+      JSON.stringify(receipt).replace('"action":"pause"', '"action":"pause","action":"pause"'),
+      CLIENT_ID, SUBSCRIPTION_ID, request
+    )).toThrow('duplicate')
+    expect(() => parseBillingSubscriptionLifecycleReceipt(
+      '{"lifecycleOperationId":', CLIENT_ID, SUBSCRIPTION_ID, request
+    )).toThrow()
+    expect(() => parseBillingSubscriptionLifecycleReceipt(
+      JSON.stringify({ ...receipt, reason: 'different' }), CLIENT_ID, SUBSCRIPTION_ID, request
+    )).toThrow('confirmed operation')
+    const mismatches = [
+      ['subscriptionId', 'ffffffff-1111-2222-8333-444444444444'],
+      ['lifecycleOperationId', '01991f20-5678-7abc-8abc-1234567890ac'],
+      ['action', 'cancel'],
+      ['previousStatus', 'paused'],
+    ] as const
+    for (const [field, value] of mismatches) {
+      expect(() => parseBillingSubscriptionLifecycleReceipt(
+        JSON.stringify({ ...receipt, [field]: value }), CLIENT_ID, SUBSCRIPTION_ID, request
+      )).toThrow()
+    }
+    const { reason: _missingReason, ...missingField } = receipt
+    expect(() => parseBillingSubscriptionLifecycleReceipt(
+      JSON.stringify(missingField), CLIENT_ID, SUBSCRIPTION_ID, request
+    )).toThrow('closed contract')
+    expect(() => parseBillingSubscriptionLifecycleReceipt(
+      JSON.stringify({ ...receipt, effectiveAt: 'not-an-instant' }),
+      CLIENT_ID, SUBSCRIPTION_ID, request
+    )).toThrow('UTC instant')
+  })
+
+  it('accepts all valid lifecycle transitions without altering exact reason text', () => {
+    const cases = [
+      ['reactivate', 'paused', 'active'],
+      ['cancel', 'active', 'cancelled'],
+      ['cancel', 'paused', 'cancelled'],
+      ['expire', 'active', 'expired'],
+      ['expire', 'paused', 'expired'],
+    ] as const
+    for (const [action, previousStatus, status] of cases) {
+      const exactReason = `Exact ${action} reason {"scope":"Client"}`
+      const actionRequest = { ...request, action, expectedStatus: previousStatus, reason: exactReason }
+      const actionReceipt = {
+        ...receipt, action, previousStatus, status, reason: exactReason,
+        ...(action === 'expire' ? {
+          effectiveAt: '2026-09-01T00:00:00.000000+00:00',
+          operationAsOf: '2026-09-07T09:00:00.123456+00:00',
+        } : {}),
+      }
+      expect(parseBillingSubscriptionLifecycleReceipt(
+        JSON.stringify(actionReceipt), CLIENT_ID, SUBSCRIPTION_ID, actionRequest,
+        action === 'expire' ? '2026-09-01T00:00:00Z' : null
+      )).toEqual(actionReceipt)
+    }
+  })
+
+  it('requires expire to use the confirmed validTo and posts the retained body once', async () => {
+    const expireRequest = {
+      ...request, action: 'expire' as const, expectedStatus: 'active' as const,
+    }
+    const expireReceipt = {
+      ...receipt, action: 'expire', status: 'expired',
+      effectiveAt: '2026-09-01T00:00:00.000000+00:00',
+      operationAsOf: '2026-09-07T09:00:00.123456+00:00',
+    }
+    expect(parseBillingSubscriptionLifecycleReceipt(
+      JSON.stringify(expireReceipt), CLIENT_ID, SUBSCRIPTION_ID, expireRequest,
+      '2026-09-01T00:00:00Z'
+    ).status).toBe('expired')
+    expect(() => parseBillingSubscriptionLifecycleReceipt(
+      JSON.stringify({ ...expireReceipt, effectiveAt: '2026-09-02T00:00:00Z' }),
+      CLIENT_ID, SUBSCRIPTION_ID, expireRequest, '2026-09-01T00:00:00Z'
+    )).toThrow('validTo')
+    expect(() => parseBillingSubscriptionLifecycleReceipt(
+      JSON.stringify({
+        ...expireReceipt,
+        effectiveAt: '2026-09-08T00:00:00Z',
+        operationAsOf: '2026-09-07T09:00:00Z',
+      }), CLIENT_ID, SUBSCRIPTION_ID, expireRequest, '2026-09-08T00:00:00Z'
+    )).toThrow('timestamp')
+
+    const body = serializeBillingSubscriptionLifecycleRequest(request)
+    const post = vi.spyOn(apiClient, 'postApiRoot').mockResolvedValue({
+      data: JSON.stringify(receipt), status: 200,
+    })
+    await postBillingSubscriptionLifecycle(CLIENT_ID, SUBSCRIPTION_ID, request, undefined, body)
+    expect(post).toHaveBeenCalledWith(
+      `/api/billing/clients/${CLIENT_ID}/subscriptions/${SUBSCRIPTION_ID}/lifecycle`,
+      body,
+      { responseType: 'text', signal: undefined, headers: { 'Content-Type': 'application/json' } }
+    )
   })
 })
 

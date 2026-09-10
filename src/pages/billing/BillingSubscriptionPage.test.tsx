@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../../App'
@@ -139,9 +139,28 @@ describe('Billing subscription route and page state', () => {
     render(<App />)
 
     expect(await screen.findByRole('heading', { name: 'Current subscription' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Subscription lifecycle' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pause subscription' })).toBeInTheDocument()
     expect(screen.getByText('Pro')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Create subscription' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /create subscription/i })).not.toBeInTheDocument()
+  })
+
+  it('removes an open lifecycle confirmation on local permission revocation', async () => {
+    vi.spyOn(billingApi, 'getSubscriptionState').mockResolvedValue(currentState())
+    vi.spyOn(billingApi, 'getAccountSnapshot').mockResolvedValue(account())
+    window.history.replaceState({}, '', `/billing/clients/${CLIENT_ID}/subscriptions`)
+    render(<App />)
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Pause subscription' }))
+    await user.type(screen.getByLabelText('Reason'), 'Private role-revocation reason')
+    const existingUser = useAuthStore.getState().user
+    if (!existingUser) throw new Error('Expected authenticated user')
+    act(() => useAuthStore.getState().setUser({ ...existingUser, role: 'Viewer' }))
+    expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByText('Private role-revocation reason')).not.toBeInTheDocument()
+    await waitFor(() => expect(queryClient.getQueryCache().findAll()).toHaveLength(0))
   })
 
   it('blocks creation when the account is missing or inactive', async () => {

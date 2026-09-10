@@ -17,6 +17,9 @@ import {
   type BillingSubscriptionImmediateContext,
   type BillingSubscriptionImmediateDebit,
   type BillingSubscriptionItem,
+  type BillingSubscriptionLifecycleAction,
+  type BillingSubscriptionLifecycleReceipt,
+  type BillingSubscriptionLifecycleRequest,
   type BillingSubscriptionPageRequest,
   type BillingSubscriptionPendingChange,
   type BillingSubscriptionProrationPolicy,
@@ -720,6 +723,14 @@ const GRANT_TYPES = new Set(['billing_cycle', 'operator_override'])
 const POSITIVE_DECIMAL_PATTERN = /^(?:0|[1-9]\d{0,13})(?:\.\d{1,4})?$/
 const UUID_V7_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const SUBSCRIPTION_INSTANT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(Z|\+00:00)$/
+const LIFECYCLE_REQUEST_KEYS = ['action', 'expectedStatus', 'lifecycleOperationId', 'reason'] as const
+const LIFECYCLE_RECEIPT_KEYS = [
+  'action', 'clientId', 'effectiveAt', 'lifecycleOperationId', 'operationAsOf',
+  'previousStatus', 'reason', 'status', 'subscriptionId',
+] as const
+const LIFECYCLE_ACTIONS = new Set<BillingSubscriptionLifecycleAction>([
+  'pause', 'reactivate', 'cancel', 'expire',
+])
 
 export class BillingSubscriptionContractError extends Error {
   constructor(reason: string) {
@@ -978,8 +989,56 @@ function parseGrant(value: unknown): BillingSubscriptionGrant {
   }
 }
 
+function assertNoDuplicateJsonObjectKeys(text: string): void {
+  const stack: Array<Set<string> | null> = []
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index]
+    if (character === '{') {
+      stack.push(new Set())
+      continue
+    }
+    if (character === '[') {
+      stack.push(null)
+      continue
+    }
+    if (character === '}' || character === ']') {
+      stack.pop()
+      continue
+    }
+    if (character !== '"') continue
+    const start = index
+    let escaped = false
+    for (index += 1; index < text.length; index += 1) {
+      const next = text[index]!
+      if (escaped) {
+        escaped = false
+      } else if (next === '\\') {
+        escaped = true
+      } else if (next === '"') {
+        break
+      }
+    }
+    let following = index + 1
+    while (following < text.length && /\s/u.test(text[following]!)) following += 1
+    const objectKeys = stack[stack.length - 1]
+    if (text[following] === ':' && objectKeys instanceof Set) {
+      let key: string
+      try {
+        key = JSON.parse(text.slice(start, index + 1)) as string
+      } catch {
+        continue
+      }
+      if (objectKeys.has(key)) {
+        throw subscriptionContractError('response contains a duplicate object property')
+      }
+      objectKeys.add(key)
+    }
+  }
+}
+
 function parseSubscriptionPayload(text: string): Record<string, unknown> {
   let payload: unknown
+  assertNoDuplicateJsonObjectKeys(text)
   try {
     payload = parse(text)
   } catch {
@@ -1355,11 +1414,165 @@ export async function createBillingSubscription(
   return receipt
 }
 
+function validateLifecycleReason(reason: unknown): asserts reason is string {
+  if (typeof reason !== 'string' || /^\p{White_Space}|\p{White_Space}$/u.test(reason)) {
+    throw subscriptionContractError('lifecycle reason is invalid')
+  }
+  let count = 0
+  for (const scalar of reason) {
+    const value = scalar.codePointAt(0)!
+    if ((value >= 0xd800 && value <= 0xdfff) || /\p{Cc}/u.test(scalar)) {
+      throw subscriptionContractError('lifecycle reason is invalid')
+    }
+    count += 1
+  }
+  if (count < 1 || count > 512) {
+    throw subscriptionContractError('lifecycle reason must contain 1 to 512 Unicode scalars')
+  }
+}
+
+function lifecycleTarget(
+  action: BillingSubscriptionLifecycleAction,
+  expectedStatus: string
+): BillingSubscriptionItem['status'] {
+  if (expectedStatus !== 'active' && expectedStatus !== 'paused') {
+    throw subscriptionContractError('lifecycle expectedStatus is unsupported')
+  }
+  if (action === 'pause' && expectedStatus === 'active') return 'paused'
+  if (action === 'reactivate' && expectedStatus === 'paused') return 'active'
+  if (action === 'cancel') return 'cancelled'
+  if (action === 'expire') return 'expired'
+  throw subscriptionContractError('lifecycle action is invalid for expectedStatus')
+}
+
+export function serializeBillingSubscriptionLifecycleRequest(
+  request: BillingSubscriptionLifecycleRequest
+): string {
+  if (!isRecord(request) || !hasExactKeys(request, LIFECYCLE_REQUEST_KEYS)) {
+    throw subscriptionContractError('lifecycle request fields do not match the closed contract')
+  }
+  const lifecycleOperationId = readSubscriptionUuidV7(
+    request.lifecycleOperationId, 'lifecycleOperationId'
+  )
+  if (typeof request.action !== 'string' ||
+      !LIFECYCLE_ACTIONS.has(request.action as BillingSubscriptionLifecycleAction)) {
+    throw subscriptionContractError('lifecycle action is unsupported')
+  }
+  lifecycleTarget(request.action as BillingSubscriptionLifecycleAction, request.expectedStatus)
+  validateLifecycleReason(request.reason)
+  const body = JSON.stringify({
+    lifecycleOperationId,
+    action: request.action,
+    expectedStatus: request.expectedStatus,
+    reason: request.reason,
+  })
+  if (new TextEncoder().encode(body).length > 16 * 1024) {
+    throw subscriptionContractError('lifecycle request body is too large')
+  }
+  return body
+}
+
+export function parseBillingSubscriptionLifecycleReceipt(
+  text: string,
+  expectedClientId: string,
+  expectedSubscriptionId: string,
+  request: BillingSubscriptionLifecycleRequest,
+  validTo: string | null = null
+): BillingSubscriptionLifecycleReceipt {
+  const payload = parseSubscriptionPayload(text)
+  if (!hasExactKeys(payload, LIFECYCLE_RECEIPT_KEYS)) {
+    throw subscriptionContractError('lifecycle receipt fields do not match the closed contract')
+  }
+  const clientId = readSubscriptionGuid(payload.clientId, 'clientId')
+  const subscriptionId = readSubscriptionGuid(payload.subscriptionId, 'subscriptionId')
+  const lifecycleOperationId = readSubscriptionUuidV7(
+    payload.lifecycleOperationId, 'lifecycleOperationId'
+  )
+  const action = typeof payload.action === 'string' &&
+    LIFECYCLE_ACTIONS.has(payload.action as BillingSubscriptionLifecycleAction)
+    ? payload.action as BillingSubscriptionLifecycleAction
+    : (() => { throw subscriptionContractError('lifecycle receipt action is unsupported') })()
+  const previousStatus = payload.previousStatus === 'active' || payload.previousStatus === 'paused'
+    ? payload.previousStatus
+    : (() => { throw subscriptionContractError('lifecycle receipt previousStatus is unsupported') })()
+  const status = typeof payload.status === 'string' && SUBSCRIPTION_STATUSES.has(payload.status)
+    ? payload.status as BillingSubscriptionItem['status']
+    : (() => { throw subscriptionContractError('lifecycle receipt status is unsupported') })()
+  validateLifecycleReason(payload.reason)
+  const effectiveAt = readSubscriptionInstant(payload.effectiveAt, 'effectiveAt')
+  const operationAsOf = readSubscriptionInstant(payload.operationAsOf, 'operationAsOf')
+  const expectedClient = canonicalizeGuid(expectedClientId)
+  const expectedSubscription = canonicalizeGuid(expectedSubscriptionId)
+  const expectedOperation = readSubscriptionUuidV7(
+    request.lifecycleOperationId, 'lifecycleOperationId'
+  )
+  if (!expectedClient || !expectedSubscription || clientId !== expectedClient ||
+      subscriptionId !== expectedSubscription ||
+      lifecycleOperationId !== expectedOperation || action !== request.action ||
+      previousStatus !== request.expectedStatus || payload.reason !== request.reason) {
+    throw subscriptionContractError('lifecycle receipt does not match the confirmed operation')
+  }
+  const target = lifecycleTarget(request.action, request.expectedStatus)
+  if (status !== target) {
+    throw subscriptionContractError('lifecycle receipt transition is invalid')
+  }
+  if (action === 'expire') {
+    if (!validTo || compareInstants(effectiveAt, readSubscriptionInstant(validTo, 'validTo')) !== 0) {
+      throw subscriptionContractError('lifecycle receipt does not match validTo')
+    }
+    if (compareInstants(effectiveAt, operationAsOf) > 0) {
+      throw subscriptionContractError('lifecycle receipt timestamp relationship is invalid')
+    }
+  } else if (compareInstants(effectiveAt, operationAsOf) !== 0) {
+    throw subscriptionContractError('lifecycle receipt timestamp relationship is invalid')
+  }
+  return {
+    lifecycleOperationId, clientId, subscriptionId, action, previousStatus, status,
+    reason: payload.reason, effectiveAt, operationAsOf,
+  }
+}
+
+export async function postBillingSubscriptionLifecycle(
+  clientId: string,
+  subscriptionId: string,
+  request: BillingSubscriptionLifecycleRequest,
+  signal?: AbortSignal,
+  retainedBody?: string,
+  validTo: string | null = null,
+  onAuthReplay?: () => void
+): Promise<BillingSubscriptionLifecycleReceipt> {
+  const canonicalClientId = canonicalizeGuid(clientId)
+  const canonicalSubscriptionId = canonicalizeGuid(subscriptionId)
+  if (!canonicalClientId || !canonicalSubscriptionId) {
+    throw subscriptionContractError('lifecycle route identifiers are invalid')
+  }
+  const canonicalBody = serializeBillingSubscriptionLifecycleRequest(request)
+  if (retainedBody !== undefined && retainedBody !== canonicalBody) {
+    throw subscriptionContractError('retained lifecycle body does not match the confirmed operation')
+  }
+  const body = retainedBody ?? canonicalBody
+  const response = await apiClient.postApiRoot<string>(
+    `/api/billing/clients/${canonicalClientId}/subscriptions/${canonicalSubscriptionId}/lifecycle`,
+    body,
+    {
+      responseType: 'text', signal, headers: { 'Content-Type': 'application/json' },
+      ...(onAuthReplay ? { onAuthReplay } : {}),
+    }
+  )
+  if (response.status !== 200 || typeof response.data !== 'string') {
+    throw subscriptionContractError('lifecycle response is invalid')
+  }
+  return parseBillingSubscriptionLifecycleReceipt(
+    response.data, canonicalClientId, canonicalSubscriptionId, request, validTo
+  )
+}
+
 export const billingApi = {
   getAccountSnapshot: getBillingAccountSnapshot,
   getLedgerPage: getBillingLedgerPage,
   getSubscriptionState: getBillingSubscriptionState,
   createSubscription: createBillingSubscription,
+  postSubscriptionLifecycle: postBillingSubscriptionLifecycle,
   requestLedgerExport: requestBillingLedgerExport,
   getLedgerExportStatus: getBillingLedgerExportStatus,
   redeemLedgerExport: redeemBillingLedgerExport,

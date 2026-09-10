@@ -58,6 +58,10 @@ export interface AuthRefreshLifecycleDetail {
   waitUntil: (promise: Promise<void>) => void
 }
 
+export interface ApiRequestConfig extends AxiosRequestConfig {
+  onAuthReplay?: () => void
+}
+
 export async function notifySuccessfulAuthRefresh(): Promise<void> {
   if (typeof window === 'undefined') return
   const pending: Promise<void>[] = []
@@ -124,6 +128,7 @@ export class ApiClient {
       async (error) => {
         const originalRequest = error.config as InternalAxiosRequestConfig & {
           _retry?: boolean
+          onAuthReplay?: () => void
         }
 
         // If 401 and we haven't retried yet, attempt refresh
@@ -133,6 +138,7 @@ export class ApiClient {
           this.shouldRetryRequest(originalRequest)
         ) {
           originalRequest._retry = true
+          originalRequest.onAuthReplay?.()
 
           try {
             const newToken = await this.refreshAccessToken()
@@ -306,7 +312,7 @@ export class ApiClient {
   }
 
   // Request helpers
-  private request<T>(config: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  private request<T>(config: ApiRequestConfig): Promise<ApiResponse<T>> {
     return this.client
       .request(config)
       .then((res) => ({
@@ -320,31 +326,31 @@ export class ApiClient {
       })
   }
 
-  get<T>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  get<T>(url: string, config?: ApiRequestConfig): Promise<ApiResponse<T>> {
     return this.request<T>({ ...config, method: 'GET', url })
   }
 
-  getApiRoot<T>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  getApiRoot<T>(url: string, config?: ApiRequestConfig): Promise<ApiResponse<T>> {
     return this.request<T>({ ...config, baseURL: API_ORIGIN, method: 'GET', url })
   }
 
-  post<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  post<T>(url: string, data?: unknown, config?: ApiRequestConfig): Promise<ApiResponse<T>> {
     return this.request<T>({ ...config, method: 'POST', url, data })
   }
 
-  postApiRoot<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  postApiRoot<T>(url: string, data?: unknown, config?: ApiRequestConfig): Promise<ApiResponse<T>> {
     return this.request<T>({ ...config, baseURL: API_ORIGIN, method: 'POST', url, data })
   }
 
-  put<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  put<T>(url: string, data?: unknown, config?: ApiRequestConfig): Promise<ApiResponse<T>> {
     return this.request<T>({ ...config, method: 'PUT', url, data })
   }
 
-  patch<T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  patch<T>(url: string, data?: unknown, config?: ApiRequestConfig): Promise<ApiResponse<T>> {
     return this.request<T>({ ...config, method: 'PATCH', url, data })
   }
 
-  delete<T>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+  delete<T>(url: string, config?: ApiRequestConfig): Promise<ApiResponse<T>> {
     return this.request<T>({ ...config, method: 'DELETE', url })
   }
 }

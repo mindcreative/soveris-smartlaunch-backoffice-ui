@@ -20,6 +20,8 @@ import type {
   BillingLedgerFilters,
   BillingLedgerPage,
   BillingSubscriptionCreationReceipt,
+  BillingSubscriptionLifecycleReceipt,
+  BillingSubscriptionLifecycleRequest,
   BillingSubscriptionState,
   CreateBillingSubscriptionRequest,
 } from '../types/billing'
@@ -44,6 +46,8 @@ export const billingSubscriptionKeys = {
   client: (clientId: string) => [...privateRoot, 'billing', 'subscriptions', clientId] as const,
   state: (clientId: string) => [...privateRoot, 'billing', 'subscriptions', clientId, 'state'] as const,
   create: (clientId: string) => [...privateRoot, 'billing', 'subscriptions', clientId, 'create'] as const,
+  lifecycle: (clientId: string, subscriptionId: string) =>
+    [...privateRoot, 'billing', 'subscriptions', clientId, subscriptionId, 'lifecycle'] as const,
 }
 
 export const billingExportKeys = {
@@ -400,6 +404,30 @@ export function useCreateBillingSubscription(clientId: string) {
     mutationKey: billingSubscriptionKeys.create(clientId),
     mutationFn: ({ request, serializedBody, signal }) =>
       billingApi.createSubscription(clientId, request, signal, serializedBody),
+    retry: false,
+  })
+}
+
+export function useBillingSubscriptionLifecycleMutation(
+  clientId: string
+) {
+  return useMutation<
+    BillingSubscriptionLifecycleReceipt,
+    Error | ApiError,
+    {
+      request: BillingSubscriptionLifecycleRequest
+      subscriptionId: string
+      serializedBody: string
+      validTo: string | null
+      signal?: AbortSignal
+      onAuthReplay?: () => void
+    }
+  >({
+    mutationKey: [...billingSubscriptionKeys.client(clientId), 'lifecycle'] as const,
+    mutationFn: ({ request, subscriptionId, serializedBody, validTo, signal, onAuthReplay }) =>
+      billingApi.postSubscriptionLifecycle(
+        clientId, subscriptionId, request, signal, serializedBody, validTo, onAuthReplay
+      ),
     retry: false,
   })
 }

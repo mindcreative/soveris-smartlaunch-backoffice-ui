@@ -6,9 +6,11 @@ import { BillingContractError, BillingSubscriptionContractError } from '../../ap
 import { BillingWorkspaceNav } from '../../components/billing/BillingWorkspaceNav'
 import { EMPTY_SUBSCRIPTION_DRAFT, SubscriptionCreationForm, type SubscriptionDraft } from '../../components/billing/SubscriptionCreationForm'
 import { SubscriptionReview } from '../../components/billing/SubscriptionReview'
+import { SubscriptionLifecycleControlsView } from '../../components/billing/SubscriptionLifecycleControls'
 import { Breadcrumbs, EmptyState, ErrorDisplay, Forbidden, LoadingSpinner } from '../../components/shared'
 import { useAuth } from '../../hooks/useAuth'
 import { useSubscriptionCreation } from '../../hooks/useSubscriptionCreation'
+import { useSubscriptionLifecycle } from '../../hooks/useSubscriptionLifecycle'
 import { canonicalizeGuid } from '../../lib/guid'
 import {
   clearPrivateBillingQueries,
@@ -147,6 +149,9 @@ function CanonicalSubscriptionPage({ clientId, canCreate, onDurableError }: {
   const creation = useSubscriptionCreation(clientId, {
     onPermissionDenied: (error) => onDurableError({ source: 'subscription', error }),
   })
+  const lifecycle = useSubscriptionLifecycle(clientId, {
+    onPermissionDenied: (error) => onDurableError({ source: 'subscription', error }),
+  })
   const [draft, setDraft] = useState<SubscriptionDraft>(EMPTY_SUBSCRIPTION_DRAFT)
   const [reconciliation, setReconciliation] = useState<'idle' | 'checking' | 'matched' | 'absent' | 'unavailable' | 'mismatch'>('idle')
   const reconciliationErrorRef = useRef<unknown>(null)
@@ -169,6 +174,11 @@ function CanonicalSubscriptionPage({ clientId, canCreate, onDurableError }: {
     return !subscriptionResult.error && !subscriptionResult.data?.current &&
       (!canViewAccount || Boolean(accountResult && !accountResult.error && accountResult.data?.status === 'active'))
   }, [accountQuery, canViewAccount, subscriptionQuery])
+
+  const lifecyclePreflight = useCallback(async () => {
+    const result = await subscriptionQuery.refetch()
+    return result.error || !result.data ? null : result.data
+  }, [subscriptionQuery])
 
   useEffect(() => { headingRef.current?.focus() }, [clientId])
 
@@ -255,7 +265,10 @@ function CanonicalSubscriptionPage({ clientId, canCreate, onDurableError }: {
   }
 
   if (subscription?.current) {
-    return <SubscriptionFrame clientId={clientId} headingRef={headingRef}><div className="space-y-4">{subscriptionError && <p role="alert" className="state-indicator rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">Refresh failed. This is the last validated subscription state for this Client and may be stale.</p>}<CreationOutcomePanel creation={creation} canViewAccount={canViewAccount} clientId={clientId} state={subscription} reconciliation={reconciliation} /><CurrentSubscription subscription={subscription.current} state={subscription} hasNextPage={subscriptionQuery.hasNextPage} isLoadingMore={subscriptionQuery.isLoadingMore} continuationError={subscriptionQuery.continuationError} onLoadMore={subscriptionQuery.loadMore} /></div></SubscriptionFrame>
+    return <SubscriptionFrame clientId={clientId} headingRef={headingRef}><div className="space-y-4"><SubscriptionLifecycleControlsView clientId={clientId} state={subscription} preflight={lifecyclePreflight} lifecycle={lifecycle} />{subscriptionError && <p role="alert" className="state-indicator rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">Refresh failed. This is the last validated subscription state for this Client and may be stale.</p>}<CreationOutcomePanel creation={creation} canViewAccount={canViewAccount} clientId={clientId} state={subscription} reconciliation={reconciliation} /><CurrentSubscription subscription={subscription.current} state={subscription} hasNextPage={subscriptionQuery.hasNextPage} isLoadingMore={subscriptionQuery.isLoadingMore} continuationError={subscriptionQuery.continuationError} onLoadMore={subscriptionQuery.loadMore} /></div></SubscriptionFrame>
+  }
+  if (lifecycle.receipt && subscription) {
+    return <SubscriptionFrame clientId={clientId} headingRef={headingRef}><div className="space-y-4"><SubscriptionLifecycleControlsView clientId={clientId} state={subscription} preflight={lifecyclePreflight} lifecycle={lifecycle} /><TerminalHistory state={subscription} hasNextPage={subscriptionQuery.hasNextPage} isLoadingMore={subscriptionQuery.isLoadingMore} continuationError={subscriptionQuery.continuationError} onLoadMore={subscriptionQuery.loadMore} /></div></SubscriptionFrame>
   }
   if (subscriptionError) {
     return <SubscriptionFrame clientId={clientId} headingRef={headingRef}><ErrorDisplay message="Fresh subscription state unavailable" detail="Creation remains disabled until a fresh subscription precheck succeeds." onRetry={() => void subscriptionQuery.refetch()} /></SubscriptionFrame>
@@ -285,6 +298,7 @@ function CanonicalSubscriptionPage({ clientId, canCreate, onDurableError }: {
   return (
     <SubscriptionFrame clientId={clientId} headingRef={headingRef}>
       <div className="space-y-4">
+        {subscription && <SubscriptionLifecycleControlsView clientId={clientId} state={subscription} preflight={lifecyclePreflight} lifecycle={lifecycle} />}
         {!canViewAccount && (
           <p role="status" className="state-indicator rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
             Credit account readiness cannot be checked with your current permission. The server will verify it when you submit.
