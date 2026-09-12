@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:soveris:smartlaunch:product-content:v1:publish",
+  "title": "Soveris Product Content v1 publishable document",
+  "allOf": [
+    { "$ref": "urn:soveris:smartlaunch:product-content:v1:draft" },
+    {
+      "type": "object",
+      "required": ["form"],
+      "properties": {
+        "form": { "$ref": "urn:soveris:smartlaunch:product-content:v1:draft#/$defs/form" }
+      }
+    }
+  ]
+}

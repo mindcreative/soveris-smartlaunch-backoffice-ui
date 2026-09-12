@@ -1,0 +1,7 @@
+{
+  "email": "person@example.com",
+  "role": "developer",
+  "tools": [
+    "ghost"
+  ]
+}

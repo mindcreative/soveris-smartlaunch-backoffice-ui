@@ -1,0 +1,200 @@
+{
+  "slug": "origin",
+  "name": "Origin",
+  "hero": {
+    "title": "Soveris Origin",
+    "subtitle": "100% local focus tracking",
+    "cta": {
+      "label": "Join the Origin waitlist",
+      "href": "javascript:alert(1)"
+    },
+    "secondaryCta": {
+      "label": "Read the principles",
+      "href": "#principles"
+    },
+    "backgroundImage": {
+      "src": "/images/origin/hero.png",
+      "alt": "Origin product dashboard"
+    },
+    "trustText": "Every insight is generated and stored exclusively on your device. No cloud. No exceptions."
+  },
+  "features": {
+    "heading": "Built on principles that matter",
+    "description": "Every promise we make is kept on your machine.",
+    "items": [
+      {
+        "title": "100% local",
+        "description": "Everything runs on your device, always",
+        "image": {
+          "src": "/images/origin/feature-local.png",
+          "alt": "Local-first architecture"
+        }
+      },
+      {
+        "title": "On-device AI",
+        "description": "Intelligence that never needs the internet",
+        "image": {
+          "src": "/images/origin/feature-on-device.png",
+          "alt": "On-device AI"
+        }
+      },
+      {
+        "title": "Zero cloud",
+        "description": "No servers. No exceptions. No compromise"
+      }
+    ]
+  },
+  "questions": {
+    "heading": "Frequently asked questions",
+    "description": "Everything you need to know before getting started.",
+    "items": [
+      {
+        "question": "Is my data really private?",
+        "answer": "Completely. Every insight Origin generates stays on your device."
+      },
+      {
+        "question": "Does Origin need internet?",
+        "answer": "No. Origin runs entirely offline on your device."
+      }
+    ]
+  },
+  "form": {
+    "title": "Join the Soveris Origin beta",
+    "description": "Tell us how you protect your focus.",
+    "submitLabel": "Join the waitlist",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "title": "Email address",
+          "order": 1,
+          "maxLength": 254
+        },
+        "role": {
+          "type": "string",
+          "title": "What best describes you?",
+          "order": 2,
+          "enum": [
+            "developer",
+            "designer",
+            "writer",
+            "student",
+            "other"
+          ],
+          "ui:widget": "radio",
+          "ui:enumLabels": {
+            "developer": "Software Developer",
+            "designer": "UX/UI Designer",
+            "writer": "Content Writer",
+            "student": "Student",
+            "other": "Other"
+          }
+        },
+        "tools": {
+          "type": "array",
+          "title": "Current focus tools",
+          "order": 3,
+          "ui:widget": "checkbox",
+          "items": {
+            "type": "string",
+            "enum": [
+              "rescuetime",
+              "toggl",
+              "freedom",
+              "forest",
+              "none"
+            ]
+          },
+          "uniqueItems": true,
+          "minItems": 0,
+          "maxItems": 3,
+          "ui:enumLabels": {
+            "rescuetime": "RescueTime",
+            "toggl": "Toggl Track",
+            "freedom": "Freedom",
+            "forest": "Forest App",
+            "none": "None yet"
+          },
+          "ui:exclusionGroups": {
+            "tracker": [
+              "rescuetime",
+              "toggl"
+            ],
+            "blocker": [
+              "freedom",
+              "forest"
+            ]
+          }
+        },
+        "nickname": {
+          "type": "string",
+          "title": "Preferred name",
+          "order": 4,
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "notes": {
+          "type": "string",
+          "title": "What should Origin solve?",
+          "order": 5,
+          "maxLength": 2000,
+          "ui:widget": "textarea"
+        },
+        "source": {
+          "type": "string",
+          "title": "How did you hear about us?",
+          "order": 6,
+          "enum": [
+            "search",
+            "friend",
+            "community"
+          ],
+          "ui:enumLabels": {
+            "search": "Search",
+            "friend": "A friend",
+            "community": "Community"
+          }
+        }
+      },
+      "required": [
+        "email",
+        "role"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "footer": [
+    {
+      "heading": "Product",
+      "links": [
+        {
+          "name": "Download",
+          "href": "/download"
+        },
+        {
+          "name": "Principles",
+          "href": "#principles"
+        }
+      ]
+    },
+    {
+      "heading": "Legal",
+      "links": [
+        {
+          "name": "Privacy",
+          "href": "/privacy"
+        },
+        {
+          "name": "Terms",
+          "href": "/terms"
+        }
+      ]
+    }
+  ],
+  "seo": {
+    "metaTitle": "Soveris Origin — private focus tracking",
+    "metaDescription": "Own your attention with private, local-first focus tracking."
+  }
+}

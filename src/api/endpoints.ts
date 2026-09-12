@@ -7,7 +7,7 @@ import type {
 } from '../types/auth'
 import type {
   PaginatedResult,
-  ProductContent,
+  LegacyProductContent,
   ProductSummary,
   Submission,
   SubmissionSummary,
@@ -117,15 +117,15 @@ export async function getContents(params?: {
 }
 
 // GET /api/backoffice/content/{productId} — Get content for a specific product
-export async function getContent(productId: string): Promise<ProductContent> {
+export async function getContent(productId: string): Promise<LegacyProductContent> {
   const response = await apiClient.get(`/content/${productId}`)
-  return response.data as ProductContent
+  return response.data as LegacyProductContent
 }
 
 // PUT /api/backoffice/content/{productId} — Update content for a specific product
-export async function updateContent(productId: string, data: Partial<ProductContent>): Promise<ProductContent> {
+export async function updateContent(productId: string, data: Partial<LegacyProductContent>): Promise<LegacyProductContent> {
   const response = await apiClient.put(`/content/${productId}`, data)
-  return response.data as ProductContent
+  return response.data as LegacyProductContent
 }
 
 // POST /api/backoffice/content/{productId}/images/{imageId}/assign
@@ -139,7 +139,7 @@ export async function removeImage(productId: string, imageId: string): Promise<v
 }
 
 // NOTE: createContent and deleteContent are not implemented in the API.
-// export async function createContent(data: Partial<ProductContent>): Promise<ProductContent> { ... }
+// export async function createContent(data: Partial<LegacyProductContent>): Promise<LegacyProductContent> { ... }
 // export async function deleteContent(id: string): Promise<void> { ... }
 
 // ==================== SUBMISSIONS ENDPOINTS ====================

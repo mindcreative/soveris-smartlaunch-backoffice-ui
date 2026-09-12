@@ -1,0 +1,34 @@
+{
+  "slug": "origin",
+  "name": "Soveris Origin",
+  "hero": {
+    "title": "Own your focus",
+    "subtitle": "Private focus tracking on your device.",
+    "cta": {
+      "label": "Get started",
+      "href": "/download"
+    },
+    "backgroundImage": {
+      "src": "/images/origin-hero.webp",
+      "alt": "Soveris Origin dashboard"
+    }
+  },
+  "form": {
+    "title": "Tell us what you need",
+    "submitLabel": "Send",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "boolean",
+          "title": "Field",
+          "order": 1
+        }
+      },
+      "required": [
+        "field"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

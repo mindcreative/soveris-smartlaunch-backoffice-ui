@@ -1,0 +1,231 @@
+{
+  "slug": "origin",
+  "name": "Origin",
+  "hero": {
+    "title": "Soveris Origin",
+    "subtitle": "100% local focus tracking",
+    "cta": {
+      "label": "Join the Origin waitlist",
+      "href": "/signup"
+    },
+    "secondaryCta": {
+      "label": "Read the principles",
+      "href": "#principles"
+    },
+    "backgroundImage": {
+      "src": "/images/origin/hero.png",
+      "alt": "Origin product dashboard"
+    },
+    "trustText": "Every insight is generated and stored exclusively on your device. No cloud. No exceptions."
+  },
+  "features": {
+    "heading": "Built on principles that matter",
+    "description": "Every promise we make is kept on your machine.",
+    "items": [
+      {
+        "title": "100% local",
+        "description": "Everything runs on your device, always",
+        "image": {
+          "src": "/images/origin/feature-local.png",
+          "alt": "Local-first architecture"
+        }
+      },
+      {
+        "title": "On-device AI",
+        "description": "Intelligence that never needs the internet",
+        "image": {
+          "src": "/images/origin/feature-on-device.png",
+          "alt": "On-device AI"
+        }
+      },
+      {
+        "title": "Zero cloud",
+        "description": "No servers. No exceptions. No compromise"
+      }
+    ]
+  },
+  "questions": {
+    "heading": "Frequently asked questions",
+    "description": "Everything you need to know before getting started.",
+    "items": [
+      {
+        "question": "Is my data really private?",
+        "answer": "Completely. Every insight Origin generates stays on your device."
+      },
+      {
+        "question": "Does Origin need internet?",
+        "answer": "No. Origin runs entirely offline on your device."
+      }
+    ]
+  },
+  "form": {
+    "title": "Join the Soveris Origin beta",
+    "description": "Tell us how you protect your focus.",
+    "submitLabel": "Join the waitlist",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "field0": {
+          "type": "string",
+          "title": "Field 0",
+          "order": 1,
+          "maxLength": 10
+        },
+        "field1": {
+          "type": "string",
+          "title": "Field 1",
+          "order": 2,
+          "maxLength": 10
+        },
+        "field2": {
+          "type": "string",
+          "title": "Field 2",
+          "order": 3,
+          "maxLength": 10
+        },
+        "field3": {
+          "type": "string",
+          "title": "Field 3",
+          "order": 4,
+          "maxLength": 10
+        },
+        "field4": {
+          "type": "string",
+          "title": "Field 4",
+          "order": 5,
+          "maxLength": 10
+        },
+        "field5": {
+          "type": "string",
+          "title": "Field 5",
+          "order": 6,
+          "maxLength": 10
+        },
+        "field6": {
+          "type": "string",
+          "title": "Field 6",
+          "order": 7,
+          "maxLength": 10
+        },
+        "field7": {
+          "type": "string",
+          "title": "Field 7",
+          "order": 8,
+          "maxLength": 10
+        },
+        "field8": {
+          "type": "string",
+          "title": "Field 8",
+          "order": 9,
+          "maxLength": 10
+        },
+        "field9": {
+          "type": "string",
+          "title": "Field 9",
+          "order": 10,
+          "maxLength": 10
+        },
+        "field10": {
+          "type": "string",
+          "title": "Field 10",
+          "order": 11,
+          "maxLength": 10
+        },
+        "field11": {
+          "type": "string",
+          "title": "Field 11",
+          "order": 12,
+          "maxLength": 10
+        },
+        "field12": {
+          "type": "string",
+          "title": "Field 12",
+          "order": 13,
+          "maxLength": 10
+        },
+        "field13": {
+          "type": "string",
+          "title": "Field 13",
+          "order": 14,
+          "maxLength": 10
+        },
+        "field14": {
+          "type": "string",
+          "title": "Field 14",
+          "order": 15,
+          "maxLength": 10
+        },
+        "field15": {
+          "type": "string",
+          "title": "Field 15",
+          "order": 16,
+          "maxLength": 10
+        },
+        "field16": {
+          "type": "string",
+          "title": "Field 16",
+          "order": 17,
+          "maxLength": 10
+        },
+        "field17": {
+          "type": "string",
+          "title": "Field 17",
+          "order": 18,
+          "maxLength": 10
+        },
+        "field18": {
+          "type": "string",
+          "title": "Field 18",
+          "order": 19,
+          "maxLength": 10
+        },
+        "field19": {
+          "type": "string",
+          "title": "Field 19",
+          "order": 20,
+          "maxLength": 10
+        },
+        "field20": {
+          "type": "string",
+          "title": "Field 20",
+          "order": 20,
+          "maxLength": 10
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "footer": [
+    {
+      "heading": "Product",
+      "links": [
+        {
+          "name": "Download",
+          "href": "/download"
+        },
+        {
+          "name": "Principles",
+          "href": "#principles"
+        }
+      ]
+    },
+    {
+      "heading": "Legal",
+      "links": [
+        {
+          "name": "Privacy",
+          "href": "/privacy"
+        },
+        {
+          "name": "Terms",
+          "href": "/terms"
+        }
+      ]
+    }
+  ],
+  "seo": {
+    "metaTitle": "Soveris Origin — private focus tracking",
+    "metaDescription": "Own your attention with private, local-first focus tracking."
+  }
+}

@@ -141,7 +141,7 @@ Domains (top-level)
 - "Create Product" button in page header opens the Create modal
 
 **Content Status Logic**:
-- Complete/Incomplete is server-derived publication completeness, independent of active/archived and draft/published. Exact Form/Footer rules are INPUT-05, owned by Product/UX/API before 10.1.
+- Complete/Incomplete is server-derived publication completeness, independent of active/archived and draft/published. The accepted INPUT-05 v1 contract requires Hero and a supported non-empty Form with exactly one required Email-profile field; its property name is configurable. Footer remains optional.
 - Renderer-required Hero fields must be valid; optional Features/FAQ absence never means Incomplete.
 
 ### Create Product Modal
@@ -215,7 +215,6 @@ Domains (top-level)
 | [SEO]                                                                |
 |   Meta Title      [___________________]                              |
 |   Meta Description [_________________]                              |
-|   Keywords        [___________________]                              |
 |                                        [Generate with AI]            |
 +----------------------------------------------------------------------+
 |                                              [Cancel]    [Save draft] [Publish]| 
@@ -252,13 +251,14 @@ Domains (top-level)
 - **AI Generate button** below section
 
 #### Form
-- Supported form-profile editor only; Product/UX/API finalize INPUT-05 before 10.1. Do not imply support for unrestricted nested JSON Schema.
+- Use the accepted INPUT-05 custom supported-profile editor only: text/email, textarea, select/radio string enums and checkbox string arrays. Do not imply support for unrestricted nested JSON Schema or silently fall back for unsupported vocabulary.
 - Renders form schema fields: name, type, label, required, options
 - **AI Generate button** below section
 
 #### Footer
 - **Add Section** button to add new footer section
 - Each section has: Heading (text), Links (dynamic list of name + href)
+- Footer is optional. When absent, the product renderer must not synthesize product links; separately configured platform/legal chrome remains outside canonical product content.
 - **AI Generate button** below section
 
 #### SEO
@@ -361,7 +361,7 @@ Domains (top-level)
 
 | Status | Condition | Badge Color |
 |--------|-----------|-------------|
-| **Complete** | Passes finalized publication completeness (INPUT-05); optional sections may be absent | Green (success) |
+| **Complete** | Valid required Hero and supported non-empty Form; optional Features/FAQ/Footer/SEO may be absent | Green (success) |
 | **Incomplete** | Publication-required content missing/invalid; safe draft still allowed | Yellow (warning) |
 
 ### Domain Status States
@@ -456,9 +456,9 @@ Client-bound domains permit internal and Basic/Brand/Brand Premium customers; pr
 6. She fills in the Form section:
    - Adds an email capture field
    - Adds a "What describes you?" select field
-7. She fills in the Footer section:
+7. She optionally fills in the Footer section:
    - Adds a "Product" section with links to Features and Pricing
-8. She saves a safe draft; optional FAQ/Features absence does not make it incomplete. Publication completeness follows the validated required fields and INPUT-05.
+8. She saves a safe draft; optional FAQ/Features/Footer/SEO absence does not make it incomplete. Publication completeness requires the validated Hero and supported non-empty Form with exactly one required, schema-discovered Email-profile field defined by INPUT-05.
 9. She returns later, clicks the product name, adds Features and FAQ
 10. The server reports completeness separately from publication/lifecycle.
 11. She notices the "Generate with AI" buttons are grayed out with tooltip: "Upgrade to a paid plan to generate content with AI"
@@ -557,9 +557,9 @@ Client-bound domains permit internal and Basic/Brand/Brand Premium customers; pr
 |----|-------|----------|-------------|
 | OQ-005 | Domain page navigation position | Important | Where in the nav should Domains appear? After Products? Before Billing? |
 | OQ-006 | Image upload mechanism | Important | How should image upload work? Direct to blob storage? Through back-office API? Accepted formats? Progress indicators? |
-| OQ-007 | Dynamic form builder architecture | Important | Form schema is JSON-based. Need a dynamic form builder component. Shared component? Which library (react-jsonschema-form, custom)? |
+| OQ-007 | Dynamic form builder architecture | Resolved 2026-09-12 | Custom bounded supported-profile editor; no generic react-jsonschema-form/RJSF editor in v1. |
 | OQ-008 | AI Generate implementation | Important | INPUT-08: document-source processing excluded from this increment until Product/API/UX define separate ingestion stories. Existing 4.9/4.10/5.11 own generation and draft/result integration. |
-| OQ-009 | Content Status computation | Important | How to compute "Complete" vs "Incomplete"? Based on mandatory sections (hero, form, footer) being non-empty? |
+| OQ-009 | Content Status computation | Resolved 2026-09-12 | Publication requires valid Hero and a supported non-empty Form with exactly one required Email-profile field whose property name is configurable. Footer, Features/FAQ and SEO are optional. |
 | OQ-010 | Delete confirmation behavior | Important | Archive vs hard delete? What happens to existing submissions linked to the product? |
 
 > **Nice-to-have** (can iterate):

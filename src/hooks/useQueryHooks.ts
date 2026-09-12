@@ -19,7 +19,7 @@ import {
   type AiGenerationRequest,
 } from '../api/endpoints'
 import type {
-  ProductContent,
+  LegacyProductContent,
   Submission,
   GetSubmissionsRequest,
   FunnelStageCount,
@@ -121,7 +121,7 @@ export function useContent(params?: {
 }
 
 export function useContentItem(id: string) {
-  return useQuery<ProductContent>({
+  return useQuery<LegacyProductContent>({
     queryKey: queryKeys.contentItem(id),
     queryFn: () => contentApi.getContent(id),
     enabled: !!id,
@@ -132,9 +132,9 @@ export function useContentItem(id: string) {
 export function useUpdateContent() {
   const queryClient = useQueryClient()
   return useMutation<
-    ProductContent,
+    LegacyProductContent,
     Error,
-    { id: string; data: Partial<ProductContent> }
+    { id: string; data: Partial<LegacyProductContent> }
   >({
     mutationFn: ({ id, data }) => contentApi.updateContent(id, data),
     onSuccess: (data) => {

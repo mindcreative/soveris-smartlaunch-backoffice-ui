@@ -1,0 +1,10 @@
+{
+  "email": "person@example.com",
+  "role": "developer",
+  "tools": [
+    "rescuetime",
+    "freedom",
+    "forest",
+    "none"
+  ]
+}

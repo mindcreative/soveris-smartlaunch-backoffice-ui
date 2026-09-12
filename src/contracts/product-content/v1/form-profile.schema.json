@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:soveris:smartlaunch:product-content:v1:form-profile",
+  "title": "Soveris Product Content v1 supported form profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "properties", "additionalProperties"],
+  "properties": {
+    "type": { "const": "object" },
+    "properties": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 20,
+      "propertyNames": { "$ref": "#/$defs/identifier" },
+      "additionalProperties": { "$ref": "#/$defs/field" }
+    },
+    "required": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/identifier" }
+    },
+    "additionalProperties": { "const": false }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "enumValues": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/identifier" }
+    },
+    "enumLabels": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 20,
+      "propertyNames": { "$ref": "#/$defs/identifier" },
+      "additionalProperties": { "$ref": "#/$defs/title" }
+    },
+    "exclusionGroups": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 20,
+      "propertyNames": { "$ref": "#/$defs/identifier" },
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 20,
+        "uniqueItems": true,
+        "items": { "$ref": "#/$defs/identifier" }
+      }
+    },
+    "text": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "title", "order", "maxLength"],
+      "properties": {
+        "type": { "const": "string" },
+        "title": { "$ref": "#/$defs/title" },
+        "order": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "minLength": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "maxLength": { "type": "integer", "minimum": 1, "maximum": 500 }
+      }
+    },
+    "email": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "format", "title", "order", "maxLength"],
+      "properties": {
+        "type": { "const": "string" },
+        "format": { "const": "email" },
+        "title": { "$ref": "#/$defs/title" },
+        "order": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "minLength": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "maxLength": { "type": "integer", "minimum": 1, "maximum": 500 }
+      }
+    },
+    "textarea": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ui:widget", "title", "order", "maxLength"],
+      "properties": {
+        "type": { "const": "string" },
+        "ui:widget": { "const": "textarea" },
+        "title": { "$ref": "#/$defs/title" },
+        "order": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "minLength": { "type": "integer", "minimum": 0, "maximum": 2000 },
+        "maxLength": { "type": "integer", "minimum": 1, "maximum": 2000 }
+      }
+    },
+    "select": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "title", "order", "enum"],
+      "properties": {
+        "type": { "const": "string" },
+        "title": { "$ref": "#/$defs/title" },
+        "order": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "enum": { "$ref": "#/$defs/enumValues" },
+        "ui:enumLabels": { "$ref": "#/$defs/enumLabels" }
+      }
+    },
+    "radio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ui:widget", "title", "order", "enum"],
+      "properties": {
+        "type": { "const": "string" },
+        "ui:widget": { "const": "radio" },
+        "title": { "$ref": "#/$defs/title" },
+        "order": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "enum": { "$ref": "#/$defs/enumValues" },
+        "ui:enumLabels": { "$ref": "#/$defs/enumLabels" }
+      }
+    },
+    "checkbox": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "ui:widget", "title", "order", "items", "uniqueItems", "maxItems"],
+      "properties": {
+        "type": { "const": "array" },
+        "ui:widget": { "const": "checkbox" },
+        "title": { "$ref": "#/$defs/title" },
+        "order": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "enum"],
+          "properties": {
+            "type": { "const": "string" },
+            "enum": { "$ref": "#/$defs/enumValues" }
+          }
+        },
+        "uniqueItems": { "const": true },
+        "minItems": { "type": "integer", "minimum": 0, "maximum": 20 },
+        "maxItems": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "ui:enumLabels": { "$ref": "#/$defs/enumLabels" },
+        "ui:exclusionGroups": { "$ref": "#/$defs/exclusionGroups" }
+      }
+    },
+    "field": {
+      "oneOf": [
+        { "$ref": "#/$defs/text" },
+        { "$ref": "#/$defs/email" },
+        { "$ref": "#/$defs/textarea" },
+        { "$ref": "#/$defs/select" },
+        { "$ref": "#/$defs/radio" },
+        { "$ref": "#/$defs/checkbox" }
+      ]
+    }
+  }
+}

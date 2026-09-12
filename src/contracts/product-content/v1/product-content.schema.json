@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:soveris:smartlaunch:product-content:v1:draft",
+  "title": "Soveris Product Content v1 draft-safe document",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["slug", "name", "hero"],
+  "properties": {
+    "slug": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "hero": { "$ref": "#/$defs/hero" },
+    "features": { "$ref": "#/$defs/features" },
+    "questions": { "$ref": "#/$defs/questions" },
+    "form": { "$ref": "#/$defs/form" },
+    "footer": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/footerSection" }
+    },
+    "seo": { "$ref": "#/$defs/seo" }
+  },
+  "$defs": {
+    "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "shortText": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "longText": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "linkUrl": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "imageUrl": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "href"],
+      "properties": {
+        "label": { "$ref": "#/$defs/title" },
+        "href": { "$ref": "#/$defs/linkUrl" }
+      }
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["src", "alt"],
+      "properties": {
+        "src": { "$ref": "#/$defs/imageUrl" },
+        "alt": { "$ref": "#/$defs/title" }
+      }
+    },
+    "hero": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "subtitle", "cta", "backgroundImage"],
+      "properties": {
+        "title": { "$ref": "#/$defs/title" },
+        "subtitle": { "$ref": "#/$defs/shortText" },
+        "cta": { "$ref": "#/$defs/link" },
+        "secondaryCta": { "$ref": "#/$defs/link" },
+        "backgroundImage": { "$ref": "#/$defs/image" },
+        "trustText": { "$ref": "#/$defs/shortText" }
+      }
+    },
+    "feature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "description"],
+      "properties": {
+        "title": { "$ref": "#/$defs/title" },
+        "description": { "$ref": "#/$defs/shortText" },
+        "image": { "$ref": "#/$defs/image" }
+      }
+    },
+    "features": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["heading", "items"],
+      "properties": {
+        "heading": { "$ref": "#/$defs/title" },
+        "description": { "$ref": "#/$defs/shortText" },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": { "$ref": "#/$defs/feature" }
+        }
+      }
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["question", "answer"],
+      "properties": {
+        "question": { "$ref": "#/$defs/title" },
+        "answer": { "$ref": "#/$defs/longText" }
+      }
+    },
+    "questions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["heading", "items"],
+      "properties": {
+        "heading": { "$ref": "#/$defs/title" },
+        "description": { "$ref": "#/$defs/shortText" },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": { "$ref": "#/$defs/question" }
+        }
+      }
+    },
+    "form": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "submitLabel", "schema"],
+      "properties": {
+        "title": { "$ref": "#/$defs/title" },
+        "description": { "$ref": "#/$defs/shortText" },
+        "submitLabel": { "$ref": "#/$defs/title" },
+        "schema": { "$ref": "urn:soveris:smartlaunch:product-content:v1:form-profile" }
+      }
+    },
+    "footerLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "href"],
+      "properties": {
+        "name": { "$ref": "#/$defs/title" },
+        "href": { "$ref": "#/$defs/linkUrl" }
+      }
+    },
+    "footerSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["heading", "links"],
+      "properties": {
+        "heading": { "$ref": "#/$defs/title" },
+        "links": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/footerLink" }
+        }
+      }
+    },
+    "seo": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "metaTitle": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "metaDescription": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    }
+  }
+}
