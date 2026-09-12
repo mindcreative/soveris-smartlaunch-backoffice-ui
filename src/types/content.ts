@@ -3,38 +3,52 @@ import type { SoverisProductContentV1DraftSafeDocument } from '../contracts/prod
 /** Canonical, lossless Product Content v1. Future product editing must use this shape. */
 export type ProductContentV1 = SoverisProductContentV1DraftSafeDocument
 
-/** Legacy DTO returned by the pre-10.3 generic content endpoints. */
-export interface LegacyProductContent {
-  id: string
-  slug: string
-  name: string
-  heroHeading: string
-  heroSubheading?: string
-  features: LegacyFeatureItem[]
-  faq: LegacyFaqItem[]
-  formSchema: LegacyFormField[]
-  seoTitle: string
-  seoDescription: string
-  clientId: string
+export type EmptyProductContent = Record<string, never>
+
+export interface ProductContentDraft {
+  schemaVersion: number
+  revision: number
+  content: ProductContentV1
 }
 
-export interface LegacyFeatureItem {
-  title: string
-  description: string
-  icon?: string
+export interface ProductContentEnvelope {
+  productId: string
+  schemaVersion: number | null
+  revision: number
+  content: ProductContentV1 | EmptyProductContent
+  draft?: ProductContentDraft
 }
 
-export interface LegacyFaqItem {
-  question: string
-  answer: string
+export interface ProductContentValidationIssue {
+  path: string
+  keyword: string
+  code: string
+  message: string
 }
 
-export interface LegacyFormField {
-  name: string
-  type: 'text' | 'email' | 'tel' | 'select'
-  label: string
-  required: boolean
-  options?: string[]
+export interface ProductContentWarning {
+  path: string
+  code: string
+  message: string
+}
+
+export interface ProductContentValidationReport {
+  schemaVersion: number
+  isValid: boolean
+  errors: ProductContentValidationIssue[]
+  warnings: ProductContentWarning[]
+}
+
+export interface ValidateProductContentRequest {
+  schemaVersion: number
+  content: ProductContentV1
+  target: 'draft' | 'publish'
+}
+
+export interface SaveProductContentDraftRequest {
+  schemaVersion: number
+  expectedRevision: number
+  content: ProductContentV1
 }
 
 export interface ProductSummary {
@@ -46,16 +60,6 @@ export interface ProductSummary {
   updatedAt?: string
   imageCount?: number
   hasContent?: boolean
-}
-
-export interface LegacyUpdateContentRequest {
-  heroHeading: string
-  heroSubheading?: string
-  features: LegacyFeatureItem[]
-  faq: LegacyFaqItem[]
-  formSchema: LegacyFormField[]
-  seoTitle: string
-  seoDescription: string
 }
 
 export interface ImageItem {

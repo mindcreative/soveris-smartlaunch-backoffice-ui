@@ -7,7 +7,10 @@ import type {
 } from '../types/auth'
 import type {
   PaginatedResult,
-  LegacyProductContent,
+  ProductContentEnvelope,
+  ProductContentValidationReport,
+  ValidateProductContentRequest,
+  SaveProductContentDraftRequest,
   ProductSummary,
   Submission,
   SubmissionSummary,
@@ -105,27 +108,32 @@ export async function getUserAuditLog(userId: string): Promise<PaginatedResult<A
 
 // ==================== CONTENT ENDPOINTS ====================
 
-// GET /api/backoffice/products — List all products (replaces flat /content list)
-export async function getContents(params?: {
-  clientId?: string
-}): Promise<ProductSummary[]> {
-  const queryParams = new URLSearchParams()
-  if (params?.clientId) queryParams.set('clientId', params.clientId)
-  const queryString = queryParams.toString()
-  const response = await apiClient.get(`/products${queryString ? `?${queryString}` : ''}`)
-  return response.data as ProductSummary[]
+// GET /api/backoffice/clients/{clientId}/products — canonical scoped product list
+export async function getContents(clientId: string): Promise<ProductSummary[]> {
+  const response = await apiClient.get(`/clients/${clientId}/products`)
+  return (response.data as { items: ProductSummary[] }).items
 }
 
 // GET /api/backoffice/content/{productId} — Get content for a specific product
-export async function getContent(productId: string): Promise<LegacyProductContent> {
+export async function getContent(productId: string): Promise<ProductContentEnvelope> {
   const response = await apiClient.get(`/content/${productId}`)
-  return response.data as LegacyProductContent
+  return response.data as ProductContentEnvelope
 }
 
-// PUT /api/backoffice/content/{productId} — Update content for a specific product
-export async function updateContent(productId: string, data: Partial<LegacyProductContent>): Promise<LegacyProductContent> {
-  const response = await apiClient.put(`/content/${productId}`, data)
-  return response.data as LegacyProductContent
+export async function validateContent(
+  productId: string,
+  data: ValidateProductContentRequest
+): Promise<ProductContentValidationReport> {
+  const response = await apiClient.post(`/content/${productId}/validate`, data)
+  return response.data as ProductContentValidationReport
+}
+
+export async function saveContentDraft(
+  productId: string,
+  data: SaveProductContentDraftRequest
+): Promise<ProductContentEnvelope> {
+  const response = await apiClient.put(`/content/${productId}/draft`, data)
+  return response.data as ProductContentEnvelope
 }
 
 // POST /api/backoffice/content/{productId}/images/{imageId}/assign
@@ -139,7 +147,7 @@ export async function removeImage(productId: string, imageId: string): Promise<v
 }
 
 // NOTE: createContent and deleteContent are not implemented in the API.
-// export async function createContent(data: Partial<LegacyProductContent>): Promise<LegacyProductContent> { ... }
+// Content creation/deletion and live publication are owned by later product stories.
 // export async function deleteContent(id: string): Promise<void> { ... }
 
 // ==================== SUBMISSIONS ENDPOINTS ====================
@@ -441,7 +449,7 @@ export async function checkLiveness(): Promise<Record<string, unknown>> {
 // Export all endpoint functions as a namespace for convenience
 export const authApi = { login, refreshToken }
 export const usersApi = { getUsers, getUser, createUser, updateUser, deactivateUser, resetUserPassword, getUserAuditLog }
-export const contentApi = { getContents, getContent, updateContent, assignImage, removeImage }
+export const contentApi = { getContents, getContent, validateContent, saveContentDraft, assignImage, removeImage }
 export const submissionsApi = { getSubmissions, getSubmission, deleteSubmission, exportSubmissions }
 export const analyticsApi = { getOverviewMetrics, getFunnelData, getGeographyData, getTrendData, getTrafficSources, getProductBreakdown }
 export const aiApi = { generateContent, generateSeo, generateHeadline, generateImagePrompt, rewriteContent }

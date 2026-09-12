@@ -7,13 +7,15 @@ import { ErrorDisplay } from '@/components/shared/ErrorDisplay'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import type { ProductSummary, Submission } from '@/types'
+import { useAuthStore } from '@/stores/authStore'
 
 type TabType = 'products' | 'submissions'
 
 const ContentPage: FC = () => {
   const [tab, setTab] = useState<TabType>('products')
+  const clientId = useAuthStore((state) => state.user?.clientId ?? '')
 
-  const { data: contentResult, isLoading: contentLoading, error: contentError } = useContent()
+  const { data: contentResult, isLoading: contentLoading, error: contentError } = useContent(clientId)
   const { data: submissionsResult, isLoading: submissionsLoading, error: submissionsError } = useSubmissions({ page: 1, pageSize: 50 })
 
   const isLoading = contentLoading || submissionsLoading

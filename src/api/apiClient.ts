@@ -10,6 +10,20 @@ export interface ApiError {
   code: string
   message: string
   status?: number
+  schemaVersion?: number
+  currentSchemaVersion?: number
+  currentRevision?: number
+  currentDraftSchemaVersion?: number
+  currentDraftRevision?: number
+  errors?: ApiProblemValidationIssue[]
+  problemDetails?: ApiErrorResponse
+}
+
+export interface ApiProblemValidationIssue {
+  path: string
+  keyword: string
+  code: string
+  message: string
 }
 
 export interface ApiErrorResponse {
@@ -24,6 +38,13 @@ export interface ApiErrorResponse {
   title?: string
   detail?: string
   status?: number
+  schemaVersion?: number
+  currentSchemaVersion?: number
+  currentRevision?: number
+  currentDraftSchemaVersion?: number
+  currentDraftRevision?: number
+  errors?: ApiProblemValidationIssue[]
+  [extension: string]: unknown
 }
 
 // Response wrapper
@@ -209,6 +230,16 @@ export class ApiClient {
               : fallbackCode,
             message: problemDetail || problemTitle,
             status,
+            ...(typeof envelope.schemaVersion === 'number' && { schemaVersion: envelope.schemaVersion }),
+            ...(typeof envelope.currentSchemaVersion === 'number' && { currentSchemaVersion: envelope.currentSchemaVersion }),
+            ...(typeof envelope.currentRevision === 'number' && { currentRevision: envelope.currentRevision }),
+            ...(typeof envelope.currentDraftSchemaVersion === 'number' && { currentDraftSchemaVersion: envelope.currentDraftSchemaVersion }),
+            ...(typeof envelope.currentDraftRevision === 'number' && { currentDraftRevision: envelope.currentDraftRevision }),
+            ...(Array.isArray(envelope.errors) && { errors: envelope.errors }),
+            ...((typeof envelope.schemaVersion === 'number' ||
+              typeof envelope.currentRevision === 'number' ||
+              typeof envelope.currentDraftRevision === 'number' ||
+              Array.isArray(envelope.errors)) && { problemDetails: envelope }),
           }
         }
       }

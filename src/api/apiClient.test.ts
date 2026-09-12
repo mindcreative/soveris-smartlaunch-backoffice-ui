@@ -90,6 +90,35 @@ describe('ApiClient error normalization', () => {
     })
   })
 
+  it('preserves content ProblemDetails revision evidence, validation issues, and extensions', () => {
+    const problem = {
+      type: 'about:blank',
+      title: 'Content validation failed',
+      status: 422,
+      code: 'content_invalid',
+      schemaVersion: 1,
+      currentSchemaVersion: 1,
+      currentRevision: 7,
+      currentDraftSchemaVersion: 1,
+      currentDraftRevision: 4,
+      errors: [{ path: '/hero/title', keyword: 'maxLength', code: 'title_too_long', message: 'Too long.' }],
+      traceId: 'trace-10-3',
+    }
+
+    expect(apiClient.normalizeError({ response: { status: 422, data: problem } })).toEqual({
+      code: 'content_invalid',
+      message: 'Content validation failed',
+      status: 422,
+      schemaVersion: 1,
+      currentSchemaVersion: 1,
+      currentRevision: 7,
+      currentDraftSchemaVersion: 1,
+      currentDraftRevision: 4,
+      errors: problem.errors,
+      problemDetails: problem,
+    })
+  })
+
   it('normalizes an Axios-shaped error before considering its transport code', () => {
     expect(apiClient.normalizeError({
       code: 'ERR_BAD_REQUEST',

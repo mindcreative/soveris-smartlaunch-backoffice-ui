@@ -28,13 +28,13 @@ export const ROLE_PERMISSIONS = {
     'submissions:delete',
     'submissions:export',
     'analytics:view',
-    'content:view',
-    'content:update'
+    'products:view',
+    'products:update'
   ],
   Viewer: [
     'submissions:view',
     'analytics:view',
-    'content:view'
+    'products:view'
   ]
 } as const
 

@@ -19,7 +19,10 @@ import {
   type AiGenerationRequest,
 } from '../api/endpoints'
 import type {
-  LegacyProductContent,
+  ProductContentEnvelope,
+  ProductContentValidationReport,
+  ValidateProductContentRequest,
+  SaveProductContentDraftRequest,
   Submission,
   GetSubmissionsRequest,
   FunnelStageCount,
@@ -110,18 +113,17 @@ export function useUpdateClient() {
 // ==================== CONTENT HOOKS ====================
 // NOTE: API has no create/delete content endpoints. Content is per-product.
 
-export function useContent(params?: {
-  clientId?: string
-}) {
+export function useContent(clientId: string) {
   return useQuery({
-    queryKey: queryKeys.content(),
-    queryFn: () => contentApi.getContents(params),
+    queryKey: [...queryKeys.content(), clientId],
+    queryFn: () => contentApi.getContents(clientId),
+    enabled: !!clientId,
     staleTime: 5 * 60 * 1000,
   })
 }
 
 export function useContentItem(id: string) {
-  return useQuery<LegacyProductContent>({
+  return useQuery<ProductContentEnvelope>({
     queryKey: queryKeys.contentItem(id),
     queryFn: () => contentApi.getContent(id),
     enabled: !!id,
@@ -129,17 +131,27 @@ export function useContentItem(id: string) {
   })
 }
 
-export function useUpdateContent() {
+export function useValidateContent() {
+  return useMutation<
+    ProductContentValidationReport,
+    Error,
+    { id: string; data: ValidateProductContentRequest }
+  >({
+    mutationFn: ({ id, data }) => contentApi.validateContent(id, data),
+  })
+}
+
+export function useSaveContentDraft() {
   const queryClient = useQueryClient()
   return useMutation<
-    LegacyProductContent,
+    ProductContentEnvelope,
     Error,
-    { id: string; data: Partial<LegacyProductContent> }
+    { id: string; data: SaveProductContentDraftRequest }
   >({
-    mutationFn: ({ id, data }) => contentApi.updateContent(id, data),
+    mutationFn: ({ id, data }) => contentApi.saveContentDraft(id, data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.content() })
-      queryClient.setQueryData(queryKeys.contentItem(data.id), data)
+      queryClient.setQueryData(queryKeys.contentItem(data.productId), data)
     },
   })
 }
