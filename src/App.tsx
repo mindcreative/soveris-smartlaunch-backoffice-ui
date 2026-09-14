@@ -8,7 +8,7 @@ import Login from './pages/login/LoginPage'
 import Dashboard from './pages/dashboard/DashboardPage'
 import Submissions from './pages/submissions/SubmissionsPage'
 import Analytics from './pages/analytics/AnalyticsPage'
-import Content from './pages/content/ContentPage'
+import Products from './pages/products/ProductsPage'
 import Users from './pages/users/UsersPage'
 import { AuditLogPage } from './pages/audit'
 import Forbidden from './pages/error/ForbiddenPage'
@@ -49,7 +49,7 @@ function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/submissions" element={<Submissions />} />
               <Route path="/analytics" element={<Analytics />} />
-              <Route path="/content" element={<Content />} />
+              <Route path="/products" element={<Products />} />
               <Route path="/users" element={<Users />} />
               <Route path="/billing" element={<BillingIndexPage />} />
               <Route path="/billing/clients/:clientId/account" element={<BillingAccountPage />} />

@@ -4,7 +4,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly string[]> = {
   Admin: [
     'dashboard:view',
     'users:view', 'users:create', 'users:edit', 'users:delete',
-    'products:view', 'products:update',
+    'products:view', 'products:create', 'products:update',
     'submissions:view', 'submissions:edit', 'submissions:delete',
     'submissions:approve', 'submissions:reject',
     'analytics:view', 'audit:view',
@@ -17,7 +17,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly string[]> = {
   ],
   Editor: [
     'dashboard:view',
-    'products:view', 'products:update',
+    'products:view', 'products:create', 'products:update',
     'submissions:view', 'submissions:edit',
     'submissions:approve', 'submissions:reject',
     'analytics:view',

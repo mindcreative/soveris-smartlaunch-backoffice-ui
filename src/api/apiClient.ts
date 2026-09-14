@@ -10,10 +10,10 @@ export interface ApiError {
   code: string
   message: string
   status?: number
-  schemaVersion?: number
-  currentSchemaVersion?: number
+  schemaVersion?: number | null
+  currentSchemaVersion?: number | null
   currentRevision?: number
-  currentDraftSchemaVersion?: number
+  currentDraftSchemaVersion?: number | null
   currentDraftRevision?: number
   errors?: ApiProblemValidationIssue[]
   problemDetails?: ApiErrorResponse
@@ -38,10 +38,10 @@ export interface ApiErrorResponse {
   title?: string
   detail?: string
   status?: number
-  schemaVersion?: number
-  currentSchemaVersion?: number
+  schemaVersion?: number | null
+  currentSchemaVersion?: number | null
   currentRevision?: number
-  currentDraftSchemaVersion?: number
+  currentDraftSchemaVersion?: number | null
   currentDraftRevision?: number
   errors?: ApiProblemValidationIssue[]
   [extension: string]: unknown
@@ -230,14 +230,16 @@ export class ApiClient {
               : fallbackCode,
             message: problemDetail || problemTitle,
             status,
-            ...(typeof envelope.schemaVersion === 'number' && { schemaVersion: envelope.schemaVersion }),
-            ...(typeof envelope.currentSchemaVersion === 'number' && { currentSchemaVersion: envelope.currentSchemaVersion }),
+            ...((typeof envelope.schemaVersion === 'number' || envelope.schemaVersion === null) && { schemaVersion: envelope.schemaVersion }),
+            ...((typeof envelope.currentSchemaVersion === 'number' || envelope.currentSchemaVersion === null) && { currentSchemaVersion: envelope.currentSchemaVersion }),
             ...(typeof envelope.currentRevision === 'number' && { currentRevision: envelope.currentRevision }),
-            ...(typeof envelope.currentDraftSchemaVersion === 'number' && { currentDraftSchemaVersion: envelope.currentDraftSchemaVersion }),
+            ...((typeof envelope.currentDraftSchemaVersion === 'number' || envelope.currentDraftSchemaVersion === null) && { currentDraftSchemaVersion: envelope.currentDraftSchemaVersion }),
             ...(typeof envelope.currentDraftRevision === 'number' && { currentDraftRevision: envelope.currentDraftRevision }),
             ...(Array.isArray(envelope.errors) && { errors: envelope.errors }),
-            ...((typeof envelope.schemaVersion === 'number' ||
+            ...((typeof envelope.schemaVersion === 'number' || envelope.schemaVersion === null ||
+              typeof envelope.currentSchemaVersion === 'number' || envelope.currentSchemaVersion === null ||
               typeof envelope.currentRevision === 'number' ||
+              typeof envelope.currentDraftSchemaVersion === 'number' || envelope.currentDraftSchemaVersion === null ||
               typeof envelope.currentDraftRevision === 'number' ||
               Array.isArray(envelope.errors)) && { problemDetails: envelope }),
           }

@@ -119,6 +119,18 @@ describe('ApiClient error normalization', () => {
     })
   })
 
+  it('preserves explicit null schema versions in conflict recovery evidence', () => {
+    const problem = {
+      title: 'Draft conflict', status: 409, code: 'stale_draft_revision',
+      currentSchemaVersion: null, currentRevision: 1,
+      currentDraftSchemaVersion: null, currentDraftRevision: 0,
+    }
+    expect(apiClient.normalizeError({ response: { status: 409, data: problem } })).toMatchObject({
+      code: 'stale_draft_revision', currentSchemaVersion: null,
+      currentDraftSchemaVersion: null, problemDetails: problem,
+    })
+  })
+
   it('normalizes an Axios-shaped error before considering its transport code', () => {
     expect(apiClient.normalizeError({
       code: 'ERR_BAD_REQUEST',

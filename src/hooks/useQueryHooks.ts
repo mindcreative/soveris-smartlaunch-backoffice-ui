@@ -5,7 +5,6 @@ import {
 } from '@tanstack/react-query'
 import {
   usersApi,
-  contentApi,
   submissionsApi,
   analyticsApi,
   aiApi,
@@ -19,10 +18,6 @@ import {
   type AiGenerationRequest,
 } from '../api/endpoints'
 import type {
-  ProductContentEnvelope,
-  ProductContentValidationReport,
-  ValidateProductContentRequest,
-  SaveProductContentDraftRequest,
   Submission,
   GetSubmissionsRequest,
   FunnelStageCount,
@@ -54,8 +49,6 @@ export const queryKeys = {
   all: ['backoffice'] as const,
   clients: () => ['backoffice', 'clients'] as const,
   client: (id: string) => ['backoffice', 'clients', id] as const,
-  content: () => ['backoffice', 'content'] as const,
-  contentItem: (id: string) => ['backoffice', 'content', id] as const,
   submissions: () => ['backoffice', 'submissions'] as const,
   submission: (id: string) => ['backoffice', 'submissions', id] as const,
   users: () => ['backoffice', 'users'] as const,
@@ -106,52 +99,6 @@ export function useUpdateClient() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clients() })
       queryClient.setQueryData(queryKeys.client(data.id), data)
-    },
-  })
-}
-
-// ==================== CONTENT HOOKS ====================
-// NOTE: API has no create/delete content endpoints. Content is per-product.
-
-export function useContent(clientId: string) {
-  return useQuery({
-    queryKey: [...queryKeys.content(), clientId],
-    queryFn: () => contentApi.getContents(clientId),
-    enabled: !!clientId,
-    staleTime: 5 * 60 * 1000,
-  })
-}
-
-export function useContentItem(id: string) {
-  return useQuery<ProductContentEnvelope>({
-    queryKey: queryKeys.contentItem(id),
-    queryFn: () => contentApi.getContent(id),
-    enabled: !!id,
-    staleTime: 5 * 60 * 1000,
-  })
-}
-
-export function useValidateContent() {
-  return useMutation<
-    ProductContentValidationReport,
-    Error,
-    { id: string; data: ValidateProductContentRequest }
-  >({
-    mutationFn: ({ id, data }) => contentApi.validateContent(id, data),
-  })
-}
-
-export function useSaveContentDraft() {
-  const queryClient = useQueryClient()
-  return useMutation<
-    ProductContentEnvelope,
-    Error,
-    { id: string; data: SaveProductContentDraftRequest }
-  >({
-    mutationFn: ({ id, data }) => contentApi.saveContentDraft(id, data),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.content() })
-      queryClient.setQueryData(queryKeys.contentItem(data.productId), data)
     },
   })
 }

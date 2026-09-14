@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { authApi } from '../api/endpoints'
 import { AuthProvider } from '../hooks/useAuth'
 import { billingAccountKeys } from '../queries/billingQueries'
+import { productKeys } from '../queries/productQueries'
 import { queryClient } from '../queryClient'
 import { useAuthStore } from './authStore'
 
@@ -34,8 +35,9 @@ describe('auth lifecycle', () => {
     })
   })
 
-  it('removes private Billing cache on logout', async () => {
+  it('removes private Billing and Product caches on logout', async () => {
     queryClient.setQueryData(billingAccountKeys.account(CLIENT_ID), { ownedBalance: '10.0000' })
+    queryClient.setQueryData(productKeys.detail(CLIENT_ID, 'product-id'), { name: 'Private product' })
     localStorage.setItem('backoffice_access_token', 'token')
     useAuthStore.setState({
       accessToken: 'token',
@@ -58,6 +60,7 @@ describe('auth lifecycle', () => {
     await useAuthStore.getState().logout()
 
     expect(queryClient.getQueryData(billingAccountKeys.account(CLIENT_ID))).toBeUndefined()
+    expect(queryClient.getQueryData(productKeys.detail(CLIENT_ID, 'product-id'))).toBeUndefined()
     expect(useAuthStore.getState().isAuthenticated).toBe(false)
     expect(localStorage.getItem('backoffice_access_token')).toBeNull()
   })
@@ -65,18 +68,21 @@ describe('auth lifecycle', () => {
   it('reacts to auth:cleared without leaving private data behind', async () => {
     useAuthStore.setState({ isInitialized: true, isLoading: false })
     queryClient.setQueryData(billingAccountKeys.account(CLIENT_ID), { ownedBalance: '10.0000' })
+    queryClient.setQueryData(productKeys.detail(CLIENT_ID, 'product-id'), { name: 'Private product' })
     render(<AuthProvider><div>child</div></AuthProvider>)
 
     window.dispatchEvent(new CustomEvent('auth:cleared'))
 
     await waitFor(() => {
       expect(queryClient.getQueryData(billingAccountKeys.account(CLIENT_ID))).toBeUndefined()
+      expect(queryClient.getQueryData(productKeys.detail(CLIENT_ID, 'product-id'))).toBeUndefined()
       expect(useAuthStore.getState().isAuthenticated).toBe(false)
     })
   })
 
-  it('clears private Billing data when token refresh fails', async () => {
+  it('clears private Billing and Product data when token refresh fails', async () => {
     queryClient.setQueryData(billingAccountKeys.account(CLIENT_ID), { ownedBalance: '10.0000' })
+    queryClient.setQueryData(productKeys.detail(CLIENT_ID, 'product-id'), { name: 'Private product' })
     localStorage.setItem('backoffice_access_token', 'expired-token')
     localStorage.setItem('backoffice_refresh_token', 'expired-refresh')
     useAuthStore.setState({
@@ -92,6 +98,7 @@ describe('auth lifecycle', () => {
     await useAuthStore.getState().doRefreshToken()
 
     expect(queryClient.getQueryData(billingAccountKeys.account(CLIENT_ID))).toBeUndefined()
+    expect(queryClient.getQueryData(productKeys.detail(CLIENT_ID, 'product-id'))).toBeUndefined()
     expect(useAuthStore.getState()).toMatchObject({
       isAuthenticated: false,
       accessToken: null,
@@ -101,8 +108,9 @@ describe('auth lifecycle', () => {
     expect(localStorage.getItem('backoffice_refresh_token')).toBeNull()
   })
 
-  it('clears private Billing data before accepting a successful store refresh', async () => {
+  it('clears private Billing and Product data before accepting a successful store refresh', async () => {
     queryClient.setQueryData(billingAccountKeys.account(CLIENT_ID), { ownedBalance: '10.0000' })
+    queryClient.setQueryData(productKeys.detail(CLIENT_ID, 'product-id'), { name: 'Private product' })
     useAuthStore.setState({ refreshTokenValue: 'refresh', isInitialized: true, isLoading: false })
     vi.spyOn(authApi, 'refreshToken').mockResolvedValue({
       accessToken: 'new-token', refreshToken: 'new-refresh', expiresIn: 3600,
@@ -111,6 +119,7 @@ describe('auth lifecycle', () => {
     await useAuthStore.getState().doRefreshToken()
 
     expect(queryClient.getQueryData(billingAccountKeys.account(CLIENT_ID))).toBeUndefined()
+    expect(queryClient.getQueryData(productKeys.detail(CLIENT_ID, 'product-id'))).toBeUndefined()
     expect(useAuthStore.getState().accessToken).toBe('new-token')
   })
 })

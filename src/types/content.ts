@@ -51,16 +51,76 @@ export interface SaveProductContentDraftRequest {
   content: ProductContentV1
 }
 
-export interface ProductSummary {
+export interface PublishProductContentRequest {
+  expectedDraftRevision: number
+  expectedRevision: number
+}
+
+export interface ProductContentPublicationResult {
+  productId: string
+  schemaVersion: number
+  revision: number
+  content: ProductContentV1
+  publicationStatus: 'published'
+  draft: ProductContentDraft
+}
+
+export interface ProductCompleteness {
+  isComplete: boolean
+  missingRequirements: string[]
+}
+
+export type ProductLifecycleStatus = 'active' | 'archived'
+export type ProductPublicationStatus = 'draft' | 'published'
+
+export interface Product {
   id: string
+  clientId: string
   slug: string
   name: string
-  status: string
-  themeLayout?: string
-  updatedAt?: string
-  imageCount?: number
-  hasContent?: boolean
+  status: ProductLifecycleStatus
+  publicationStatus: ProductPublicationStatus
+  revision: number
+  contentSchemaVersion: number | null
+  contentRevision: number
+  draftSchemaVersion: number | null
+  draftRevision: number
+  completeness: ProductCompleteness
+  canonicalUrl: string | null
+  createdAt: string
+  updatedAt: string
 }
+
+export interface ProductPage {
+  items: Product[]
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+}
+
+export interface ProductFilters {
+  page?: number
+  pageSize?: number
+  status?: ProductLifecycleStatus | 'all'
+  publication?: ProductPublicationStatus | 'all'
+  search?: string
+  sort?: 'name' | 'slug' | 'createdAt' | 'updatedAt'
+  direction?: 'asc' | 'desc'
+}
+
+export interface CreateProductRequest {
+  operationId: string
+  name: string
+  slug: string
+}
+
+export interface UpdateProductRequest extends CreateProductRequest {
+  expectedRevision: number
+  status: ProductLifecycleStatus
+}
+
+export type ProductSummary = Product
 
 export interface ImageItem {
   id: string

@@ -24,8 +24,8 @@ describe('role permissions', () => {
   })
 
   it('uses the canonical product permission vocabulary for content and images', () => {
-    expect(ROLE_PERMISSIONS.Admin).toEqual(expect.arrayContaining(['products:view', 'products:update']))
-    expect(ROLE_PERMISSIONS.Editor).toEqual(expect.arrayContaining(['products:view', 'products:update']))
+    expect(ROLE_PERMISSIONS.Admin).toEqual(expect.arrayContaining(['products:view', 'products:create', 'products:update']))
+    expect(ROLE_PERMISSIONS.Editor).toEqual(expect.arrayContaining(['products:view', 'products:create', 'products:update']))
     expect(ROLE_PERMISSIONS.Viewer).toContain('products:view')
     expect(Object.values(ROLE_PERMISSIONS).flat()).not.toEqual(
       expect.arrayContaining(['content:view', 'content:edit', 'content:update'])

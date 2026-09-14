@@ -29,6 +29,7 @@ export const ROLE_PERMISSIONS = {
     'submissions:export',
     'analytics:view',
     'products:view',
+    'products:create',
     'products:update'
   ],
   Viewer: [
@@ -43,7 +44,7 @@ export const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', path: '/dashboard' },
   { key: 'submissions', label: 'Submissions', path: '/submissions' },
   { key: 'analytics', label: 'Analytics', path: '/analytics' },
-  { key: 'content', label: 'Content', path: '/content' },
+  { key: 'products', label: 'Products', path: '/products' },
   { key: 'images', label: 'Images', path: '/images' },
   { key: 'themes', label: 'Themes', path: '/themes' },
   { key: 'ai', label: 'AI Tools', path: '/ai' },

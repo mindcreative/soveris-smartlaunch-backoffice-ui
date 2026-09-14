@@ -4,7 +4,15 @@ import type { AuthUser, UserRole } from '../types/auth'
 import { authApi } from '../api/endpoints'
 import { hasRolePermission } from '../auth/permissions'
 import { clearPrivateBillingQueries } from '../queries/billingQueries'
+import { clearPrivateProductQueries } from '../queries/productQueries'
 import { queryClient } from '../queryClient'
+
+async function clearPrivateSessionQueries(): Promise<void> {
+  await Promise.all([
+    clearPrivateBillingQueries(queryClient),
+    clearPrivateProductQueries(queryClient),
+  ])
+}
 
 interface AuthState {
   accessToken: string | null
@@ -123,7 +131,7 @@ export const useAuthStore = create<AuthStore>()(
             isInitialized: true,
           })
 
-          await clearPrivateBillingQueries(queryClient)
+          await clearPrivateSessionQueries()
 
           try {
             localStorage.removeItem('backoffice_access_token')
@@ -139,7 +147,7 @@ export const useAuthStore = create<AuthStore>()(
         },
 
         handleSuccessfulRefresh: async () => {
-          await clearPrivateBillingQueries(queryClient)
+          await clearPrivateSessionQueries()
         },
 
         doRefreshToken: async () => {
@@ -153,7 +161,7 @@ export const useAuthStore = create<AuthStore>()(
               isLoading: false,
               isInitialized: true,
             })
-            await clearPrivateBillingQueries(queryClient)
+            await clearPrivateSessionQueries()
             return
           }
 
@@ -161,7 +169,7 @@ export const useAuthStore = create<AuthStore>()(
           try {
             const result = await authApi.refreshToken({ refreshToken: state.refreshTokenValue })
 
-            await clearPrivateBillingQueries(queryClient)
+            await clearPrivateSessionQueries()
 
             set({
               accessToken: result.accessToken,
@@ -187,7 +195,7 @@ export const useAuthStore = create<AuthStore>()(
               isInitialized: true,
             })
 
-            await clearPrivateBillingQueries(queryClient)
+            await clearPrivateSessionQueries()
 
             try {
               localStorage.removeItem('backoffice_access_token')

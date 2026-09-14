@@ -8,7 +8,7 @@ export interface UsePermissionsReturn {
   canWrite: boolean
   canManageUsers: boolean
   canAccessSettings: boolean
-  canAccessContent: boolean
+  canAccessProducts: boolean
   canAccessAnalytics: boolean
   canAccessSubmissions: boolean
 }
@@ -33,7 +33,7 @@ export function usePermissions(): UsePermissionsReturn {
   const canWrite = hasRole('Editor')
   const canManageUsers = hasRole('Admin')
   const canAccessSettings = hasRole('Admin')
-  const canAccessContent = hasRole('Viewer')
+  const canAccessProducts = hasRole('Viewer')
   const canAccessAnalytics = hasRole('Viewer')
   const canAccessSubmissions = hasRole('Viewer')
 
@@ -44,7 +44,7 @@ export function usePermissions(): UsePermissionsReturn {
     canWrite,
     canManageUsers,
     canAccessSettings,
-    canAccessContent,
+    canAccessProducts,
     canAccessAnalytics,
     canAccessSubmissions,
   }

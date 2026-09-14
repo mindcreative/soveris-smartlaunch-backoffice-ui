@@ -11,7 +11,13 @@ import type {
   ProductContentValidationReport,
   ValidateProductContentRequest,
   SaveProductContentDraftRequest,
-  ProductSummary,
+  PublishProductContentRequest,
+  ProductContentPublicationResult,
+  Product,
+  ProductPage,
+  ProductFilters,
+  CreateProductRequest,
+  UpdateProductRequest,
   Submission,
   SubmissionSummary,
   GetSubmissionsRequest,
@@ -109,14 +115,44 @@ export async function getUserAuditLog(userId: string): Promise<PaginatedResult<A
 // ==================== CONTENT ENDPOINTS ====================
 
 // GET /api/backoffice/clients/{clientId}/products — canonical scoped product list
-export async function getContents(clientId: string): Promise<ProductSummary[]> {
-  const response = await apiClient.get(`/clients/${clientId}/products`)
-  return (response.data as { items: ProductSummary[] }).items
+export async function getProducts(
+  clientId: string,
+  filters: ProductFilters = {},
+  signal?: AbortSignal,
+): Promise<ProductPage> {
+  const queryParams = new URLSearchParams()
+  if (filters.page !== undefined) queryParams.set('page', String(filters.page))
+  if (filters.pageSize !== undefined) queryParams.set('pageSize', String(filters.pageSize))
+  if (filters.status) queryParams.set('status', filters.status)
+  if (filters.publication) queryParams.set('publication', filters.publication)
+  if (filters.search?.trim()) queryParams.set('search', filters.search.trim())
+  if (filters.sort) queryParams.set('sort', filters.sort)
+  if (filters.direction) queryParams.set('direction', filters.direction)
+  const query = queryParams.toString()
+  const response = await apiClient.get(`/clients/${clientId}/products${query ? `?${query}` : ''}`, { signal })
+  return response.data as ProductPage
+}
+
+export async function getProduct(productId: string, signal?: AbortSignal): Promise<Product> {
+  const response = await apiClient.get(`/products/${productId}`, { signal })
+  return response.data as Product
+}
+
+export async function createProduct(clientId: string, data: CreateProductRequest): Promise<Product> {
+  const response = await apiClient.post(`/clients/${clientId}/products`, data)
+  return response.data as Product
+}
+
+export async function updateProduct(productId: string, data: UpdateProductRequest): Promise<Product> {
+  const response = await apiClient.put(`/products/${productId}`, data)
+  return response.data as Product
 }
 
 // GET /api/backoffice/content/{productId} — Get content for a specific product
-export async function getContent(productId: string): Promise<ProductContentEnvelope> {
-  const response = await apiClient.get(`/content/${productId}`)
+export async function getContent(productId: string, signal?: AbortSignal): Promise<ProductContentEnvelope> {
+  const response = signal
+    ? await apiClient.get(`/content/${productId}`, { signal })
+    : await apiClient.get(`/content/${productId}`)
   return response.data as ProductContentEnvelope
 }
 
@@ -134,6 +170,14 @@ export async function saveContentDraft(
 ): Promise<ProductContentEnvelope> {
   const response = await apiClient.put(`/content/${productId}/draft`, data)
   return response.data as ProductContentEnvelope
+}
+
+export async function publishContent(
+  productId: string,
+  data: PublishProductContentRequest,
+): Promise<ProductContentPublicationResult> {
+  const response = await apiClient.post(`/content/${productId}/publish`, data)
+  return response.data as ProductContentPublicationResult
 }
 
 // POST /api/backoffice/content/{productId}/images/{imageId}/assign
@@ -449,7 +493,18 @@ export async function checkLiveness(): Promise<Record<string, unknown>> {
 // Export all endpoint functions as a namespace for convenience
 export const authApi = { login, refreshToken }
 export const usersApi = { getUsers, getUser, createUser, updateUser, deactivateUser, resetUserPassword, getUserAuditLog }
-export const contentApi = { getContents, getContent, validateContent, saveContentDraft, assignImage, removeImage }
+export const contentApi = {
+  getProducts,
+  getProduct,
+  createProduct,
+  updateProduct,
+  getContent,
+  validateContent,
+  saveContentDraft,
+  publishContent,
+  assignImage,
+  removeImage,
+}
 export const submissionsApi = { getSubmissions, getSubmission, deleteSubmission, exportSubmissions }
 export const analyticsApi = { getOverviewMetrics, getFunnelData, getGeographyData, getTrendData, getTrafficSources, getProductBreakdown }
 export const aiApi = { generateContent, generateSeo, generateHeadline, generateImagePrompt, rewriteContent }

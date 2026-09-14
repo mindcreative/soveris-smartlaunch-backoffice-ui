@@ -6,7 +6,7 @@ const baseNavigation = [
   { name: 'Dashboard', href: '/dashboard', icon: 'home' },
   { name: 'Submissions', href: '/submissions', icon: 'inbox' },
   { name: 'Analytics', href: '/analytics', icon: 'chart' },
-  { name: 'Content', href: '/content', icon: 'edit' },
+  { name: 'Products', href: '/products', icon: 'edit' },
   { name: 'Themes', href: '/themes', icon: 'palette' },
   { name: 'AI Tools', href: '/ai', icon: 'sparkle' },
   { name: 'Users', href: '/users', icon: 'users' },
@@ -58,6 +58,8 @@ export function Sidebar({ mobile = false, onClose, onNavigate }: SidebarProps) {
         return hasPermission('audit:view')
       case 'AI Tools':
         return hasPermission('ai:view')
+      case 'Products':
+        return hasPermission('products:view')
       default:
         return true
     }
