@@ -194,3 +194,109 @@ test('passes WCAG scan and remains operable at reflow, text-spacing and alternat
   await expect(editor).toHaveCount(0)
   await expect(edit).toBeFocused()
 })
+
+test('uploads a private hero image without saving and keeps the workflow accessible under constrained display settings', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 })
+  await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
+  const requests: Array<{ method: string; path: string; body: string | null }> = []
+  let releaseUpload: (() => void) | undefined
+  const uploadBarrier = new Promise<void>((resolve) => { releaseUpload = resolve })
+  const assetId = '0199aa11-2233-7444-8555-66778899aabb'
+  const managedUrl = `/assets/product-images/${assetId}.png`
+  const onePixelPng = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64',
+  )
+
+  await page.route('**/api/backoffice/**', async (route) => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    requests.push({ method: request.method(), path, body: request.postData() })
+    if (path === `/api/backoffice/clients/${CLIENT_ID}/products`) {
+      await json(route, { items: [product()], page: 1, pageSize: 20, totalCount: 1, totalPages: 1 })
+    } else if (path === `/api/backoffice/products/${PRODUCT_ID}`) {
+      await json(route, product())
+    } else if (path === `/api/backoffice/content/${PRODUCT_ID}`) {
+      await json(route, { productId: PRODUCT_ID, schemaVersion: null, revision: 1, content: {}, draft: { schemaVersion: 1, revision: 7, content: origin } })
+    } else if (path === `/api/backoffice/products/${PRODUCT_ID}/assets/images` && request.method() === 'POST') {
+      await uploadBarrier
+      const operationId = request.postData()?.match(/name="operationId"\r\n\r\n([^\r]+)/)?.[1]
+      await json(route, {
+        operationId,
+        status: 'completed',
+        asset: {
+          id: assetId,
+          productId: PRODUCT_ID,
+          role: 'hero',
+          url: managedUrl,
+          mediaType: 'image/png',
+          byteLength: onePixelPng.length,
+          width: 1200,
+          height: 630,
+          visibility: 'private',
+          createdAt: '2026-09-14T18:00:00Z',
+        },
+        storage: { usedBytes: onePixelPng.length, limitBytes: 67108864, remainingBytes: 67108864 - onePixelPng.length },
+      }, 201)
+    } else if (path === `/api/backoffice/products/${PRODUCT_ID}/assets/images/${assetId}/preview`) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        headers: { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' },
+        body: onePixelPng,
+      })
+    } else {
+      await route.abort()
+    }
+  })
+
+  await page.goto('/products')
+  await page.getByRole('button', { name: 'Edit Origin' }).first().click()
+  const editor = page.getByRole('dialog', { name: 'Edit Origin' })
+  const upload = editor.getByLabel('Replace hero image')
+  await upload.setInputFiles({ name: '../../unsafe-name.png', mimeType: 'image/png', buffer: onePixelPng })
+  await expect(editor.getByText('Uploading image…')).toBeVisible({ timeout: 500 })
+  await expect(editor.getByRole('progressbar', { name: 'hero image upload progress' })).toBeVisible()
+  await expectNoAxeViolations(page)
+
+  releaseUpload?.()
+  const alt = editor.getByLabel('Background image alternative text')
+  await expect(alt).toBeFocused()
+  await expect(editor.getByLabel('Background image path')).toHaveValue(managedUrl)
+  await expect(editor.getByAltText(`Private preview: ${origin.hero.backgroundImage.alt}`)).toBeVisible()
+  await expect(editor.getByText('Upload complete. Save the draft to attach it.')).toBeVisible()
+  expect(requests.some((request) => request.method === 'PUT' && request.path.endsWith('/draft'))).toBe(false)
+  expect(requests.some((request) => request.path.includes('/publish'))).toBe(false)
+
+  const uploadRequest = requests.find((request) => request.method === 'POST' && request.path.endsWith('/assets/images'))
+  expect(uploadRequest?.body).toContain('name="operationId"')
+  expect(uploadRequest?.body).toContain('name="assetRole"')
+  expect(uploadRequest?.body).toContain('hero')
+  expect(uploadRequest?.body).toContain('name="file"; filename="../../unsafe-name.png"')
+
+  await page.addStyleTag({ content: `
+    * { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; }
+    p { margin-bottom: 2em !important; }
+  ` })
+  await page.setViewportSize({ width: 320, height: 420 })
+  await editor.getByRole('button', { name: 'Clear private preview' }).scrollIntoViewIfNeeded()
+  await expect(editor.getByRole('button', { name: 'Clear private preview' })).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await expectNoAxeViolations(page)
+
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+  await editor.getByRole('button', { name: 'Clear private preview' }).scrollIntoViewIfNeeded()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+
+  const feedbackDuration = await editor.getByRole('button', { name: 'Clear private preview' }).evaluate(async (button) => {
+    const started = performance.now()
+    ;(button as HTMLButtonElement).click()
+    while (document.querySelector('[role="status"]')?.textContent?.includes('Upload complete')) {
+      await new Promise(requestAnimationFrame)
+    }
+    return performance.now() - started
+  })
+  expect(feedbackDuration).toBeLessThanOrEqual(100)
+  await expect(editor.getByText('Upload complete. Save the draft to attach it.')).toHaveCount(0)
+})

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ApiError } from '../../api/apiClient'
 import { validateProductContent, type ContractIssue, type ContractTarget } from '../../contracts/product-content/validator'
 import { createUuidV7 } from '../../lib/uuidV7'
+import { useProductImageUploads } from '../../queries/productImageQueries'
 import {
   useProduct,
   useProductContent,
@@ -15,11 +16,12 @@ import type {
   ProductContentValidationIssue,
   ProductContentV1,
 } from '../../types/content'
+import type { CompletedProductImageUpload } from '../../types/productImages'
 import { Badge } from '../shared/Badge'
 import { Modal } from '../shared/Modal'
 import { ProductContentFields } from './ProductContentFields'
 import { ProductErrorSummary } from './ProductErrorSummary'
-import { cloneProductContent, issueMessage, selectEditorContent } from './productEditorModel'
+import { cloneProductContent, issueMessage, pointerToFieldId, selectEditorContent } from './productEditorModel'
 
 interface ProductEditorModalProps {
   clientId: string
@@ -65,6 +67,25 @@ function commandError(error: unknown): string {
   return apiError?.message || 'The command could not be completed. Your edits are still here.'
 }
 
+function setImageSource(content: ProductContentV1, pointer: string, source: string): boolean {
+  if (pointer === '/hero/backgroundImage') {
+    content.hero.backgroundImage.src = source
+    return true
+  }
+  const match = /^\/features\/items\/(\d+)\/image$/.exec(pointer)
+  if (!match || !content.features) return false
+  const image = content.features.items[Number(match[1])]?.image
+  if (!image) return false
+  image.src = source
+  return true
+}
+
+function imagePointerForSource(pointer: string): string | null {
+  if (pointer === '/hero/backgroundImage/src') return '/hero/backgroundImage'
+  const match = /^(\/features\/items\/\d+\/image)\/src$/.exec(pointer)
+  return match?.[1] ?? null
+}
+
 export function ProductEditorModal({ clientId, product, onClose }: ProductEditorModalProps) {
   const productId = product?.id ?? ''
   const detailQuery = useProduct(clientId, productId)
@@ -89,6 +110,20 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
   const summaryRef = useRef<HTMLDivElement>(null)
   const identityOperationId = useRef(createUuidV7())
   const lifecycleOperationId = useRef(createUuidV7())
+
+  const onImageCompleted = useCallback((pointer: string, result: CompletedProductImageUpload) => {
+    setWorking((current) => {
+      if (!current) return current
+      const next = cloneProductContent(current)
+      return setImageSource(next, pointer, result.asset.url) ? next : current
+    })
+    setDirty(true)
+    setStatusText('Image uploaded into this working copy. Add meaningful alternative text, then save the draft when ready.')
+    setCommandErrorText('')
+    const altPointer = `${pointer}/alt`
+    requestAnimationFrame(() => document.getElementById(pointerToFieldId(altPointer))?.focus())
+  }, [])
+  const imageUploads = useProductImageUploads(clientId, productId, onImageCompleted)
 
   const editorKey = product ? `${clientId}:${product.id}` : ''
   const pending = saveDraft.isPending || publish.isPending || updateProduct.isPending
@@ -262,6 +297,7 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
         setDirty(true)
       }
       operationRef.current = createUuidV7()
+      if (kind === 'lifecycle') imageUploads.clearAll()
       setStatusText(kind === 'identity' ? 'Product identity updated. Save the synchronized content draft when ready.' : `Product ${updated.status}.`)
     } catch (error) {
       if (currentGeneration === generation.current) fail(error)
@@ -295,6 +331,7 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
     setServerCandidate(null)
     identityOperationId.current = createUuidV7()
     lifecycleOperationId.current = createUuidV7()
+    imageUploads.clearAll()
     setStatusText('Server version is now the working copy. Review it before the next command.')
   }
 
@@ -310,6 +347,8 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
   }
 
   const onContentChange = (next: ProductContentV1, pointer: string) => {
+    const editedImage = imagePointerForSource(pointer)
+    if (editedImage) imageUploads.cancel(editedImage)
     setWorking(next)
     setDirty(true)
     setStatusText('Unsaved changes.')
@@ -354,7 +393,17 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
       <ProductErrorSummary ref={summaryRef} errors={validationErrors} />
       {warningText.length > 0 && <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"><p className="font-medium">Draft guidance</p><ul className="list-disc pl-5">{warningText.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>}
       <div aria-live="polite" role="status" className="min-h-6 text-sm font-medium text-gray-700">{pending ? saveDraft.isPending ? 'Saving draft…' : publish.isPending ? 'Publishing…' : 'Updating product…' : statusText}</div>
-      <ProductContentFields value={working} errors={validationErrors} disabled={pending} onChange={onContentChange} onBlur={onFieldBlur} />
+      <ProductContentFields
+        value={working}
+        errors={validationErrors}
+        disabled={pending}
+        onChange={onContentChange}
+        onBlur={onFieldBlur}
+        imageUploads={imageUploads.uploads}
+        onImageUpload={imageUploads.start}
+        onImageRetry={(pointer) => void imageUploads.retry(pointer)}
+        onImageCancel={imageUploads.cancel}
+      />
     </div>}
   </Modal>
 }

@@ -180,16 +180,6 @@ export async function publishContent(
   return response.data as ProductContentPublicationResult
 }
 
-// POST /api/backoffice/content/{productId}/images/{imageId}/assign
-export async function assignImage(productId: string, imageId: string): Promise<void> {
-  await apiClient.post(`/content/${productId}/images/${imageId}/assign`)
-}
-
-// DELETE /api/backoffice/content/{productId}/images/{imageId}
-export async function removeImage(productId: string, imageId: string): Promise<void> {
-  await apiClient.delete(`/content/${productId}/images/${imageId}`)
-}
-
 // NOTE: createContent and deleteContent are not implemented in the API.
 // Content creation/deletion and live publication are owned by later product stories.
 // export async function deleteContent(id: string): Promise<void> { ... }
@@ -502,8 +492,6 @@ export const contentApi = {
   validateContent,
   saveContentDraft,
   publishContent,
-  assignImage,
-  removeImage,
 }
 export const submissionsApi = { getSubmissions, getSubmission, deleteSubmission, exportSubmissions }
 export const analyticsApi = { getOverviewMetrics, getFunnelData, getGeographyData, getTrendData, getTrafficSources, getProductBreakdown }
