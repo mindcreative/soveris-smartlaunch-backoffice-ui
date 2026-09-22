@@ -3,7 +3,9 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 const apiBaseUrl = process.env.VITE_API_BASE_URL || 'http://localhost:5000'
-const apiBasePath = new URL(apiBaseUrl).pathname
+const parsedApiBaseUrl = new URL(apiBaseUrl, 'http://localhost:5000')
+const apiBasePath = parsedApiBaseUrl.pathname
+const apiProxyTarget = apiBaseUrl.startsWith('/') ? 'http://localhost:5000' : parsedApiBaseUrl.origin
 
 export default defineConfig({
   plugins: [react()],
@@ -17,7 +19,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       [apiBasePath]: {
-        target: apiBaseUrl.replace(apiBasePath, ''),
+        target: apiProxyTarget,
         changeOrigin: true,
         rewritePath: '',
       },

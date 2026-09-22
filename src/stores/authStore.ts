@@ -3,15 +3,11 @@ import { devtools, persist } from 'zustand/middleware'
 import type { AuthUser, UserRole } from '../types/auth'
 import { authApi } from '../api/endpoints'
 import { hasRolePermission } from '../auth/permissions'
-import { clearPrivateBillingQueries } from '../queries/billingQueries'
-import { clearPrivateProductQueries } from '../queries/productQueries'
+import { clearPrivateClientScope } from '../queries/billingQueries'
 import { queryClient } from '../queryClient'
 
 async function clearPrivateSessionQueries(): Promise<void> {
-  await Promise.all([
-    clearPrivateBillingQueries(queryClient),
-    clearPrivateProductQueries(queryClient),
-  ])
+  await clearPrivateClientScope(queryClient)
 }
 
 interface AuthState {

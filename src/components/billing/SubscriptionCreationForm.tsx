@@ -2,13 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import type { CreateBillingSubscriptionMaterial } from '../../types/billing'
 import { Modal } from '../shared/Modal'
 
-type TierlessSubscriptionCreationMaterial = Omit<
-  CreateBillingSubscriptionMaterial,
-  'subscriptionTier'
->
-
 export interface SubscriptionDraft {
   planName: string
+  subscriptionTier: '' | 'basic' | 'brand' | 'brand_premium'
   cycleCreditAmount: string
   requestsPerMinute: string
   concurrentAiOperations: string
@@ -23,6 +19,7 @@ type DraftErrors = Partial<Record<DraftField, string>>
 
 export const EMPTY_SUBSCRIPTION_DRAFT: SubscriptionDraft = {
   planName: '',
+  subscriptionTier: '',
   cycleCreditAmount: '',
   requestsPerMinute: '',
   concurrentAiOperations: '',
@@ -34,6 +31,7 @@ export const EMPTY_SUBSCRIPTION_DRAFT: SubscriptionDraft = {
 
 const FIELD_LABELS: Record<DraftField, string> = {
   planName: 'Plan name',
+  subscriptionTier: 'Subscription tier',
   cycleCreditAmount: 'Cycle credit amount',
   requestsPerMinute: 'Requests per minute',
   concurrentAiOperations: 'Concurrent AI operations',
@@ -46,10 +44,6 @@ const FIELD_LABELS: Record<DraftField, string> = {
 
 const UTC_INPUT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,6}))?)?$/
 const UTC_INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d{6})Z$/
-
-function isTierSelectionUnavailable(): boolean {
-  return true
-}
 
 function pad(value: number, width = 2): string {
   return String(value).padStart(width, '0')
@@ -105,12 +99,15 @@ function wholeNumber(value: string, minimum: number, maximum: number): number | 
 
 export function validateSubscriptionDraft(draft: SubscriptionDraft, nowMs: number): {
   errors: DraftErrors
-  material: TierlessSubscriptionCreationMaterial | null
+  material: CreateBillingSubscriptionMaterial | null
 } {
   const errors: DraftErrors = {}
   if (draft.planName.length < 1 || draft.planName.length > 128 ||
       draft.planName.trim() !== draft.planName || draft.planName.includes('\0')) {
     errors.planName = 'Use 1–128 characters with no leading or trailing spaces.'
+  }
+  if (!['basic', 'brand', 'brand_premium'].includes(draft.subscriptionTier)) {
+    errors.subscriptionTier = 'Select a supported paid subscription tier.'
   }
   if (!/^(?:0|[1-9]\d{0,13})(?:\.\d{1,4})?$/.test(draft.cycleCreditAmount) ||
       /^0(?:\.0{1,4})?$/.test(draft.cycleCreditAmount)) {
@@ -154,6 +151,7 @@ export function validateSubscriptionDraft(draft: SubscriptionDraft, nowMs: numbe
     errors,
     material: {
       planName: draft.planName,
+      subscriptionTier: draft.subscriptionTier as 'basic' | 'brand' | 'brand_premium',
       cycleCreditAmount: draft.cycleCreditAmount,
       validFrom,
       validTo,
@@ -174,7 +172,7 @@ export function validateSubscriptionDraft(draft: SubscriptionDraft, nowMs: numbe
 
 interface SubscriptionCreationFormProps {
   clientId: string
-  onConfirm: (material: TierlessSubscriptionCreationMaterial) => void | Promise<void>
+  onConfirm: (material: CreateBillingSubscriptionMaterial) => void | Promise<void>
   now?: () => number
   disabled?: boolean
   draft?: SubscriptionDraft
@@ -190,8 +188,14 @@ export function SubscriptionCreationForm({
   const [localDraft, setLocalDraft] = useState<SubscriptionDraft>(EMPTY_SUBSCRIPTION_DRAFT)
   const draft = controlledDraft ?? localDraft
   const [errors, setErrors] = useState<DraftErrors>({})
-  const [review, setReview] = useState<TierlessSubscriptionCreationMaterial | null>(null)
+  const [review, setReview] = useState<CreateBillingSubscriptionMaterial | null>(null)
+  const [preconfirmBusy, setPreconfirmBusy] = useState(false)
   const summaryRef = useRef<HTMLDivElement>(null)
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const reviewButtonRef = useRef<HTMLButtonElement>(null)
+  const returnFocusRef = useRef<HTMLElement>(null)
+  const preconfirmGenerationRef = useRef(0)
+  const preconfirmInFlightRef = useRef(false)
   const confirmingRef = useRef(false)
   const focusSummaryRef = useRef(false)
 
@@ -208,6 +212,9 @@ export function SubscriptionCreationForm({
 
   useEffect(() => {
     const clearSensitiveForm = () => {
+      preconfirmGenerationRef.current += 1
+      preconfirmInFlightRef.current = false
+      setPreconfirmBusy(false)
       if (!controlledDraft) setLocalDraft(EMPTY_SUBSCRIPTION_DRAFT)
       onDraftChange?.(EMPTY_SUBSCRIPTION_DRAFT)
       setReview(null)
@@ -232,33 +239,45 @@ export function SubscriptionCreationForm({
   }
   const submit = (event: React.FormEvent) => {
     event.preventDefault()
+    if (preconfirmInFlightRef.current) return
     const result = validateSubscriptionDraft(draft, now())
     focusSummaryRef.current = !result.material
     setErrors(result.errors)
     if (!result.material) {
       return
     }
-    if (isTierSelectionUnavailable()) return
     if (onPreconfirm) {
-      void onPreconfirm().then((ready) => { if (ready) setReview(result.material) })
+      const generation = ++preconfirmGenerationRef.current
+      preconfirmInFlightRef.current = true
+      setPreconfirmBusy(true)
+      returnFocusRef.current = reviewButtonRef.current
+      void Promise.resolve().then(onPreconfirm).then((ready) => {
+        if (ready && generation === preconfirmGenerationRef.current) setReview(result.material)
+      }).catch(() => {
+        // The parent owns the permission and dependency error presentation.
+      }).finally(() => {
+        if (generation === preconfirmGenerationRef.current) {
+          preconfirmInFlightRef.current = false
+          setPreconfirmBusy(false)
+        }
+      })
       return
     }
+    returnFocusRef.current = reviewButtonRef.current
     setReview(result.material)
   }
   const confirm = () => {
     if (!review || confirmingRef.current) return
     confirmingRef.current = true
+    returnFocusRef.current = headingRef.current
     setReview(null)
     void Promise.resolve().then(() => onConfirm(review)).finally(() => { confirmingRef.current = false })
   }
 
   return (
     <section aria-labelledby="create-subscription-heading" className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6">
-      <h2 id="create-subscription-heading" className="text-lg font-semibold text-gray-950">Create subscription</h2>
+      <h2 id="create-subscription-heading" ref={headingRef} tabIndex={-1} className="text-lg font-semibold text-gray-950 outline-none">Create subscription</h2>
       <p className="mt-1 text-sm text-gray-600">All dates and monthly boundaries are evaluated in UTC.</p>
-      <p role="status" className="state-indicator mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-        Subscription creation is temporarily unavailable until an explicit tier can be selected.
-      </p>
       <p id="subscription-form-constraints" className="mt-1 text-sm text-gray-600">Required fields use the browser required state. Amounts allow four decimal places; select at least one feature.</p>
       {(Object.keys(errors).length > 0 || serverValidationError) && (
         <div ref={summaryRef} tabIndex={-1} role="alert" aria-label="Correct the subscription form" className="state-indicator mt-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-950 outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
@@ -274,6 +293,16 @@ export function SubscriptionCreationForm({
       )}
       <form onSubmit={submit} noValidate className="mt-4 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
         <TextField field="planName" label="Plan name" value={draft.planName} error={errors.planName} disabled={disabled} required onChange={(value) => setText('planName', value)} />
+        <div className="min-w-0">
+          <label htmlFor="subscription-subscriptionTier" className="block text-sm font-medium text-gray-800">Subscription tier</label>
+          <select id="subscription-subscriptionTier" value={draft.subscriptionTier} onChange={(event) => setText('subscriptionTier', event.target.value)} disabled={disabled} required aria-invalid={Boolean(errors.subscriptionTier)} aria-describedby={errors.subscriptionTier ? 'subscription-subscriptionTier-error' : 'subscription-form-constraints'} className="mt-1 min-h-11 w-full min-w-0 rounded-md border border-gray-300 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:bg-gray-100">
+            <option value="">Select a tier</option>
+            <option value="basic">Basic</option>
+            <option value="brand">Brand</option>
+            <option value="brand_premium">Brand Premium</option>
+          </select>
+          {errors.subscriptionTier && <p id="subscription-subscriptionTier-error" className="mt-1 text-sm text-red-700">{errors.subscriptionTier}</p>}
+        </div>
         <TextField field="cycleCreditAmount" label="Cycle credit amount" value={draft.cycleCreditAmount} error={errors.cycleCreditAmount} inputMode="decimal" disabled={disabled} required onChange={(value) => setText('cycleCreditAmount', value)} />
         <TextField field="requestsPerMinute" label="Requests per minute" value={draft.requestsPerMinute} error={errors.requestsPerMinute} inputMode="numeric" disabled={disabled} required onChange={(value) => setText('requestsPerMinute', value)} />
         <TextField field="concurrentAiOperations" label="Concurrent AI operations" value={draft.concurrentAiOperations} error={errors.concurrentAiOperations} inputMode="numeric" disabled={disabled} required onChange={(value) => setText('concurrentAiOperations', value)} />
@@ -297,11 +326,12 @@ export function SubscriptionCreationForm({
           <p className="mt-2 text-sm text-gray-700">Monthly credits renewed by UTC calendar month from the subscription start.</p>
         </div>
         <div className="sm:col-span-2">
-          <button type="submit" disabled={disabled || isTierSelectionUnavailable()} className="min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">Review subscription</button>
+          <button ref={reviewButtonRef} type="submit" disabled={disabled || preconfirmBusy} className="min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">Review subscription</button>
+          {preconfirmBusy && <p role="status" className="state-indicator mt-2 text-sm font-medium text-indigo-900">Checking fresh subscription authority before review…</p>}
         </div>
       </form>
 
-      <Modal isOpen={Boolean(review)} onClose={() => setReview(null)} title="Confirm subscription creation" size="lg" footer={review && <div className="flex flex-wrap justify-end gap-3"><button type="button" data-modal-initial-focus onClick={() => setReview(null)} className="min-h-11 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Cancel</button><button type="button" onClick={confirm} className="min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Confirm creation</button></div>}>
+      <Modal isOpen={Boolean(review)} onClose={() => setReview(null)} returnFocusRef={returnFocusRef} title="Confirm subscription creation" size="lg" footer={review && <div className="flex flex-wrap justify-end gap-3"><button type="button" data-modal-initial-focus onClick={() => setReview(null)} className="min-h-11 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Cancel</button><button type="button" onClick={confirm} className="min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Confirm creation</button></div>}>
         {review && <ReviewDetails clientId={clientId} material={review} />}
       </Modal>
     </section>
@@ -335,9 +365,11 @@ function Checkbox({ field, label, checked, onChange }: {
 
 function ReviewDetails({ clientId, material }: {
   clientId: string
-  material: TierlessSubscriptionCreationMaterial
+  material: CreateBillingSubscriptionMaterial
 }) {
-  return <div className="min-w-0 text-sm"><p className="text-gray-700">This write is immediate. Verify the immutable operation material before confirming. Unused credits remain owned and carry forward into later cycles.</p><dl className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2"><ReviewValue label="Client" value={clientId} /><ReviewValue label="Plan" value={material.planName} /><ReviewValue label="Cycle credits" value={material.cycleCreditAmount} /><ReviewValue label="Valid from" value={material.validFrom} /><ReviewValue label="Valid to" value={material.validTo ?? 'No end date'} /><ReviewValue label="Change effective policy" value="Immediate" /><ReviewValue label="Proration policy" value="Replace" /><ReviewValue label="Unused credit policy" value="Rollover" /><ReviewValue label="Cadence" value="UTC calendar month" /><ReviewValue label="Requests per minute" value={String(material.entitlements.rateLimits.requestsPerMinute)} /><ReviewValue label="Concurrent AI operations" value={String(material.entitlements.rateLimits.concurrentAiOperations)} /><ReviewValue label="Features" value={[material.entitlements.featureFlags.contentGeneration && 'Content generation', material.entitlements.featureFlags.imageGeneration && 'Image generation'].filter(Boolean).join(', ')} /></dl></div>
+  const tierLabel = material.subscriptionTier === 'brand_premium'
+    ? 'Brand Premium' : material.subscriptionTier[0]!.toUpperCase() + material.subscriptionTier.slice(1)
+  return <div className="min-w-0 text-sm"><p className="text-gray-700">This write is immediate. Verify the immutable operation material before confirming. Unused credits remain owned and carry forward into later cycles.</p><dl className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2"><ReviewValue label="Client" value={clientId} /><ReviewValue label="Plan" value={material.planName} /><ReviewValue label="Subscription tier" value={tierLabel} /><ReviewValue label="Cycle credits" value={material.cycleCreditAmount} /><ReviewValue label="Valid from" value={material.validFrom} /><ReviewValue label="Valid to" value={material.validTo ?? 'No end date'} /><ReviewValue label="Change effective policy" value="Immediate" /><ReviewValue label="Proration policy" value="Replace" /><ReviewValue label="Unused credit policy" value="Rollover" /><ReviewValue label="Cadence" value="UTC calendar month" /><ReviewValue label="Requests per minute" value={String(material.entitlements.rateLimits.requestsPerMinute)} /><ReviewValue label="Concurrent AI operations" value={String(material.entitlements.rateLimits.concurrentAiOperations)} /><ReviewValue label="Features" value={[material.entitlements.featureFlags.contentGeneration && 'Content generation', material.entitlements.featureFlags.imageGeneration && 'Image generation'].filter(Boolean).join(', ')} /></dl></div>
 }
 
 function ReviewValue({ label, value }: { label: string; value: string }) {

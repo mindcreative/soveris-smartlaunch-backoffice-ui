@@ -11,10 +11,12 @@ import {
 import {
   billingApi,
   BillingContractError,
+  ClientCapabilitiesContractError,
   BillingLedgerContractError,
   BillingSubscriptionContractError,
 } from '../api/billingApi'
 import type { ApiError } from '../api/apiClient'
+import { productKeys } from './productQueries'
 import type {
   BillingAccountSnapshot,
   BillingLedgerFilters,
@@ -23,7 +25,14 @@ import type {
   BillingSubscriptionLifecycleReceipt,
   BillingSubscriptionLifecycleRequest,
   BillingSubscriptionState,
+  BillingSubscriptionTierAction,
+  BillingSubscriptionTierChangeRequest,
+  BillingSubscriptionTierChangeResponse,
+  ClientCapabilities,
   CreateBillingSubscriptionRequest,
+  ResourceAccessConsequence,
+  ResourceAccessPreview,
+  ResourceAccessPreviewRequest,
 } from '../types/billing'
 
 const privateRoot = ['backoffice', 'private'] as const
@@ -48,7 +57,27 @@ export const billingSubscriptionKeys = {
   create: (clientId: string) => [...privateRoot, 'billing', 'subscriptions', clientId, 'create'] as const,
   lifecycle: (clientId: string, subscriptionId: string) =>
     [...privateRoot, 'billing', 'subscriptions', clientId, subscriptionId, 'lifecycle'] as const,
+  tierChange: (clientId: string, subscriptionId: string, action: BillingSubscriptionTierAction) =>
+    [...privateRoot, 'billing', 'subscriptions', clientId, subscriptionId, 'tier-change', action] as const,
 }
+
+export const clientCapabilityKeys = {
+  all: [...privateRoot, 'capabilities'] as const,
+  client: (clientId: string) => [...privateRoot, 'capabilities', clientId] as const,
+}
+
+export const resourceAccessKeys = {
+  all: [...privateRoot, 'billing', 'resource-access'] as const,
+  client: (clientId: string) => [...privateRoot, 'billing', 'resource-access', clientId] as const,
+  consequences: (clientId: string) =>
+    [...privateRoot, 'billing', 'resource-access', clientId, 'consequences'] as const,
+  preview: (clientId: string, subscriptionId: string) =>
+    [...privateRoot, 'billing', 'resource-access', clientId, subscriptionId, 'preview'] as const,
+}
+
+export const domainPrivateRoot = [...privateRoot, 'domains'] as const
+export const domainClientPrefix = (clientId: string) =>
+  [...domainPrivateRoot, clientId] as const
 
 export const billingExportKeys = {
   all: [...privateRoot, 'billing', 'exports'] as const,
@@ -71,6 +100,47 @@ export async function clearPrivateBillingQueries(queryClient: QueryClient): Prom
       queryClient.getMutationCache().remove(mutation)
     }
   }
+}
+
+export async function clearPrivateClientScope(
+  queryClient: QueryClient,
+  clientId?: string
+): Promise<void> {
+  const roots = clientId
+    ? [
+        billingSubscriptionKeys.client(clientId), billingAccountKeys.account(clientId),
+        clientCapabilityKeys.client(clientId), resourceAccessKeys.client(clientId),
+        productKeys.client(clientId), domainClientPrefix(clientId),
+      ]
+    : [
+        billingAccountKeys.billing, clientCapabilityKeys.all, resourceAccessKeys.all,
+        productKeys.all, domainPrivateRoot,
+      ]
+  const cancellations = roots.map((queryKey) => queryClient.cancelQueries({ queryKey }))
+  roots.forEach((queryKey) => queryClient.removeQueries({ queryKey }))
+  for (const mutation of queryClient.getMutationCache().getAll()) {
+    if (roots.some((root) => startsWithKey(mutation.options.mutationKey, root))) {
+      queryClient.getMutationCache().remove(mutation)
+    }
+  }
+  await Promise.all(cancellations)
+}
+
+export async function invalidateTierChangeScopes(
+  queryClient: QueryClient,
+  clientId: string
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: billingSubscriptionKeys.client(clientId) }),
+    queryClient.invalidateQueries({ queryKey: clientCapabilityKeys.client(clientId) }),
+    queryClient.invalidateQueries({ queryKey: resourceAccessKeys.consequences(clientId) }),
+    queryClient.invalidateQueries({ queryKey: productKeys.client(clientId) }),
+    queryClient.invalidateQueries({ queryKey: domainClientPrefix(clientId) }),
+  ])
+  queryClient.removeQueries({
+    predicate: (query) => startsWithKey(query.queryKey, resourceAccessKeys.client(clientId)) &&
+      query.queryKey[query.queryKey.length - 1] === 'preview',
+  })
 }
 
 export async function cancelAndRemoveBillingExport(
@@ -269,6 +339,11 @@ export function useBillingSubscriptions(clientId: string | null) {
       void cancelAndRemoveBillingSubscriptions(queryClient, clientId)
       return
     }
+    if (getErrorStatus(query.error) === 404 && clientId) {
+      setDurableError(query.error)
+      void clearPrivateClientScope(queryClient, clientId)
+      return
+    }
     if (isDurablePermissionError(query.error)) {
       setDurableError(query.error)
       void clearPrivateBillingQueries(queryClient)
@@ -393,6 +468,160 @@ export function useBillingSubscriptions(clientId: string | null) {
     isLoadingMore,
     continuationError,
   }
+}
+
+export function useClientCapabilities(clientId: string | null) {
+  const queryClient = useQueryClient()
+  const previousClientId = useRef<string | null>(null)
+  const generationRef = useRef(0)
+  const renderedClientIdRef = useRef(clientId)
+
+  if (renderedClientIdRef.current !== clientId) {
+    renderedClientIdRef.current = clientId
+    generationRef.current += 1
+  }
+
+  useEffect(() => {
+    const previous = previousClientId.current
+    previousClientId.current = clientId
+    if (previous && previous !== clientId) void clearPrivateClientScope(queryClient, previous)
+  }, [clientId, queryClient])
+
+  const query = useQuery<ClientCapabilities, Error | ApiError>({
+    queryKey: clientCapabilityKeys.client(clientId ?? 'invalid-client'),
+    enabled: Boolean(clientId),
+    queryFn: async ({ signal }) => {
+      if (!clientId) throw new Error('A valid Client is required')
+      const generation = generationRef.current
+      const result = await billingApi.getClientCapabilities(clientId, signal)
+      if (generation !== generationRef.current || result.clientId !== clientId) {
+        throw new ClientCapabilitiesContractError('late or cross-Client response was fenced')
+      }
+      return result
+    },
+    retry: (failureCount, error) => {
+      if (error instanceof ClientCapabilitiesContractError) return false
+      const status = getErrorStatus(error)
+      if (status && status >= 400 && status < 500 && status !== 429) return false
+      return failureCount < 1
+    },
+    retryDelay: 250,
+  })
+
+  useEffect(() => {
+    if (!clientId) return
+    if (query.error instanceof ClientCapabilitiesContractError) {
+      void clearPrivateClientScope(queryClient, clientId)
+      return
+    }
+    if (getErrorStatus(query.error) === 404) {
+      void clearPrivateClientScope(queryClient, clientId)
+      return
+    }
+    if (isDurablePermissionError(query.error)) {
+      void clearPrivateClientScope(queryClient, clientId)
+      if (query.error.status === 401) window.dispatchEvent(new CustomEvent('auth:cleared'))
+    }
+  }, [clientId, query.error, queryClient])
+
+  return query
+}
+
+export function useResourceAccessConsequences(clientId: string | null) {
+  const queryClient = useQueryClient()
+  const previousClientId = useRef<string | null>(null)
+  const generationRef = useRef(0)
+  const renderedClientIdRef = useRef(clientId)
+
+  if (renderedClientIdRef.current !== clientId) {
+    renderedClientIdRef.current = clientId
+    generationRef.current += 1
+  }
+
+  useEffect(() => {
+    const previous = previousClientId.current
+    previousClientId.current = clientId
+    if (previous && previous !== clientId) void clearPrivateClientScope(queryClient, previous)
+  }, [clientId, queryClient])
+
+  const query = useQuery<ResourceAccessConsequence[], Error | ApiError>({
+    queryKey: resourceAccessKeys.consequences(clientId ?? 'invalid-client'),
+    enabled: Boolean(clientId),
+    queryFn: async ({ signal }) => {
+      if (!clientId) throw new Error('A valid Client is required')
+      const generation = generationRef.current
+      const result = await billingApi.getResourceAccessConsequences(clientId, signal)
+      if (generation !== generationRef.current) {
+        throw new BillingSubscriptionContractError('late consequence response was fenced')
+      }
+      return result
+    },
+    retry: (failureCount, error) => {
+      if (error instanceof BillingSubscriptionContractError) return false
+      const status = getErrorStatus(error)
+      if (status && status >= 400 && status < 500 && status !== 429) return false
+      return failureCount < 1
+    },
+    retryDelay: 250,
+  })
+
+  useEffect(() => {
+    if (!clientId) return
+    if (query.error instanceof BillingSubscriptionContractError) {
+      void clearPrivateClientScope(queryClient, clientId)
+      return
+    }
+    if (getErrorStatus(query.error) === 404) {
+      void clearPrivateClientScope(queryClient, clientId)
+      return
+    }
+    if (isDurablePermissionError(query.error)) {
+      void clearPrivateClientScope(queryClient, clientId)
+      if (query.error.status === 401) window.dispatchEvent(new CustomEvent('auth:cleared'))
+    }
+  }, [clientId, query.error, queryClient])
+
+  return query
+}
+
+export function useResourceAccessPreviewMutation(
+  clientId: string,
+  subscriptionId: string
+) {
+  return useMutation<
+    ResourceAccessPreview,
+    Error | ApiError,
+    { request: ResourceAccessPreviewRequest; signal?: AbortSignal }
+  >({
+    mutationKey: resourceAccessKeys.preview(clientId, subscriptionId),
+    mutationFn: ({ request, signal }) =>
+      billingApi.getResourceAccessPreview(clientId, subscriptionId, request, signal),
+    retry: false,
+  })
+}
+
+export function useBillingSubscriptionTierChangeMutation(
+  clientId: string,
+  subscriptionId: string,
+  action: BillingSubscriptionTierAction
+) {
+  return useMutation<
+    BillingSubscriptionTierChangeResponse,
+    Error | ApiError,
+    {
+      request: BillingSubscriptionTierChangeRequest
+      serializedBody: string
+      signal?: AbortSignal
+      onAuthReplay?: () => void
+    }
+  >({
+    mutationKey: billingSubscriptionKeys.tierChange(clientId, subscriptionId, action),
+    mutationFn: ({ request, serializedBody, signal, onAuthReplay }) =>
+      billingApi.postSubscriptionTierChange(
+        clientId, subscriptionId, action, request, signal, serializedBody, onAuthReplay
+      ),
+    retry: false,
+  })
 }
 
 export function useCreateBillingSubscription(clientId: string) {

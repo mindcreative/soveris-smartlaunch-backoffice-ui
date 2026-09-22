@@ -49,6 +49,19 @@ export interface BillingSubscriptionPendingChange {
   scheduledAt: string
 }
 
+export interface BillingSubscriptionPendingTierChange {
+  schemaVersion: 1
+  operationId: string
+  subscriptionTier: BillingSubscriptionTier
+  expectedTierRevision: string
+  effectivePolicy: 'next_billing_cycle'
+  effectiveCycleIndex: number
+  effectiveCycleStart: string
+  effectiveCycleEnd: string
+  scheduledAt: string
+  reason: string
+}
+
 export interface BillingSubscriptionImmediateDebit {
   planChangeOperationId: string
   outstandingDebit: string
@@ -123,6 +136,7 @@ export interface BillingSubscriptionState {
   grantHistory: BillingSubscriptionGrantHistory
   pendingImmediateDebit?: BillingSubscriptionImmediateDebit | BillingSubscriptionUnsupportedView
   immediateChangeContext?: BillingSubscriptionImmediateContext | BillingSubscriptionUnsupportedView
+  pendingTierChange?: BillingSubscriptionPendingTierChange
 }
 
 export const CLIENT_CAPABILITY_KEYS = [
@@ -307,6 +321,199 @@ export interface BillingSubscriptionLifecycleReceipt {
   reason: string
   effectiveAt: string
   operationAsOf: string
+}
+
+export type BillingSubscriptionTierAction =
+  | 'apply_immediate'
+  | 'schedule'
+  | 'replace'
+  | 'cancel_pending'
+
+export interface BillingSubscriptionTierChangeMaterial {
+  action: BillingSubscriptionTierAction
+  subscriptionTier: BillingSubscriptionTier
+  expectedTierRevision: string
+  effectivePolicy: BillingSubscriptionChangePolicy
+  expectedPendingTierChangeOperationId?: string
+  reason: string
+}
+
+export interface BillingSubscriptionTierChangeRequest {
+  operationId: string
+  expectedTierRevision: string
+  subscriptionTier: BillingSubscriptionTier
+  effectivePolicy?: BillingSubscriptionChangePolicy
+  expectedPendingTierChangeOperationId?: string
+  reason: string
+  commandAuthorityHash: string
+}
+
+export interface BillingSubscriptionTierChangeAttempt {
+  clientId: string
+  subscriptionId: string
+  action: BillingSubscriptionTierAction
+  route: string
+  request: BillingSubscriptionTierChangeRequest
+  serializedBody: string
+}
+
+export type BillingSubscriptionTierChangeOutcome =
+  | 'changed'
+  | 'no_change'
+  | 'scheduled'
+  | 'replaced'
+  | 'cancelled'
+
+export interface BillingSubscriptionTierChangeReceipt {
+  schemaVersion: 1
+  operationId: string
+  clientId: string
+  subscriptionId: string
+  outcome: BillingSubscriptionTierChangeOutcome
+  effectivePolicy: BillingSubscriptionChangePolicy
+  requestedSubscriptionTier: BillingSubscriptionTier
+  previousSubscriptionTier: BillingSubscriptionTier
+  resultingSubscriptionTier: BillingSubscriptionTier
+  expectedTierRevision: string
+  previousTierRevision: string
+  resultingTierRevision: string
+  reason: string
+  operationAsOf: string
+  effectiveAt: string
+  action?: 'schedule' | 'replace' | 'cancel'
+  previousPendingTierChangeOperationId?: string | null
+  pendingTierChangeOperationId?: string | null
+  previousPendingSubscriptionTier?: BillingSubscriptionTier | null
+  pendingSubscriptionTier?: BillingSubscriptionTier | null
+}
+
+export interface BillingSubscriptionTierState {
+  subscriptionTier: BillingSubscriptionTier
+  tierRevision: string
+  status: BillingSubscriptionStatus
+  validFrom: string
+  validTo: string | null
+  pendingTierChange: BillingSubscriptionPendingTierChange | null
+  observedAt: string
+}
+
+export interface BillingSubscriptionTierChangeResponse {
+  schemaVersion: 1
+  receipt: BillingSubscriptionTierChangeReceipt
+  tierState: BillingSubscriptionTierState
+}
+
+export type ResourceAccessPreviewAction =
+  | BillingSubscriptionTierAction
+  | BillingSubscriptionLifecycleAction
+
+export interface ResourceAccessPreviewRequest {
+  action: ResourceAccessPreviewAction
+  expectedStatus: BillingSubscriptionLifecycleSourceStatus
+  expectedTierRevision: string
+  subscriptionTier: BillingSubscriptionTier | null
+  effectivePolicy: BillingSubscriptionChangePolicy | null
+}
+
+export interface ResourceAccessPreviewResource {
+  resourceType: 'product' | 'domain_binding'
+  resourceId: string
+  disposition: 'grace' | 'suspended'
+  accessUntil: string | null
+  proofExpiresAt: string | null
+}
+
+export interface ResourceAccessDeadlineGroup {
+  lossAt: string
+  accessUntil: string
+  graceCount: number
+  newlyAffectedCount: number
+}
+
+export interface ResourceAccessConsequenceResource {
+  resourceType: 'product' | 'domain_binding'
+  resourceId: string
+  state: 'eligible' | 'grace' | 'suspended'
+  accessUntil: string | null
+  proofExpiresAt: string | null
+}
+
+export interface ResourceAccessPreservationFacts {
+  contentPreserved: true
+  assetsPreserved: true
+  creditsUnchanged: true
+  acceptedAiWorkUnchanged: true
+}
+
+export interface ResourceAccessPreview {
+  clientId: string
+  subscriptionId: string
+  action: ResourceAccessPreviewAction
+  currentSubscriptionTier: BillingSubscriptionTier
+  targetSubscriptionTier: BillingSubscriptionTier | null
+  effectivePolicy: BillingSubscriptionChangePolicy | null
+  statusRevision: string
+  classificationRevision: string
+  tierRevision: string
+  pendingTierChangeOperationId: string | null
+  policyPublicationId: string
+  policyActivationRevision: string
+  policyVersion: string
+  policyHash: string
+  evaluatedAt: string
+  commandEffectiveAt: string | null
+  commandAuthorityHash: string | null
+  lossAt: string | null
+  accessUntil: string | null
+  earliestProofExpiry: string | null
+  retainedCount: number
+  totalCount: number
+  graceCount: number
+  suspendedCount: number
+  deadlineGroups: ResourceAccessDeadlineGroup[]
+  deadlineGroupsTruncated: boolean
+  unlistedGraceCount: number
+  unlistedNewlyAffectedCount: number
+  affectedResourcesTruncated: boolean
+  preservationFacts: ResourceAccessPreservationFacts
+  affectedResources: ResourceAccessPreviewResource[]
+}
+
+export interface ResourceAccessConsequence {
+  consequenceId: string
+  projectionRunId: string
+  projectionRevision: string
+  causeIdentity: string
+  consequenceKind: 'scheduled' | 'grace_started' | 'suspended' | 'restored' | 'cancelled'
+  lossAt: string | null
+  accessUntil: string | null
+  earliestProofExpiry: string | null
+  retainedCount: number
+  totalCount: number
+  graceCount: number
+  suspendedCount: number
+  affectedResources: ResourceAccessConsequenceResource[]
+  affectedResourcesTruncated: boolean
+  deadlineGroups: Array<{ accessUntil: string | null; graceCount: number }>
+  deadlineGroupsTruncated: boolean
+  unlistedGraceCount: number
+  suspensionGroups: Array<{ accessUntil: string | null; suspendedCount: number; reason:
+    'finite_limit' | 'product_inactive' | 'product_unpublished' |
+    'routing_inactive' | 'ownership_unverified' | 'tls_unavailable' |
+    'target_product_not_retained' | 'client_disabled' |
+    'policy_unavailable' | 'hard_denial' }>
+  unlistedSuspendedCount: number
+  restoredCount: number | null
+  restoredAt: string | null
+  reminders: Array<{
+    reminderKind: 'reminder_72h' | 'reminder_24h'
+    dueAt: string
+    recordedAt: string
+    graceCount: number
+    earliestProofExpiry: string | null
+  }>
+  preservationFacts: Record<string, boolean>
+  recordedAt: string
 }
 
 export const BILLING_LEDGER_TRANSACTION_TYPES = [

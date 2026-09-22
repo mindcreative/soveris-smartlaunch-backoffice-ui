@@ -198,6 +198,22 @@ describe('Client capabilities adapter', () => {
     expect(freemium.policySource).toBe('customer_freemium')
   })
 
+  it.each(['transition_pending', 'stale_capability_evidence'] as const)(
+    'accepts the closed supplemental denial condition %s',
+    (condition) => {
+      const base = JSON.parse(capabilitiesJson()
+        .replace('9223372036854775807', '5')
+        .replace('9007199254740993', '7')) as Record<string, unknown>
+      base.operations = (base.operations as Array<Record<string, unknown>>).map((operation) =>
+        operation.key === 'analytics'
+          ? { ...operation, outcome: 'denied', denialConditions: [condition] }
+          : operation)
+      const parsed = parseClientCapabilities(JSON.stringify(base), CLIENT_ID)
+      expect(parsed.operations.find((operation) => operation.key === 'analytics')?.denialConditions)
+        .toEqual([condition])
+    }
+  )
+
   it.each([
     capabilitiesJson({ extra: true }),
     capabilitiesJson({ classificationSource: 'jwt' }),

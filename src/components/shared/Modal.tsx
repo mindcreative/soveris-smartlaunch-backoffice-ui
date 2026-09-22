@@ -13,6 +13,7 @@ interface ModalProps {
   closeLabel?: string
   descriptionId?: string
   initialFocusRef?: React.RefObject<HTMLElement | null>
+  returnFocusRef?: React.RefObject<HTMLElement | null>
 }
 
 const sizeMap: Record<string, string> = {
@@ -27,7 +28,7 @@ function focusableElements(container: HTMLElement): HTMLElement[] {
 
 export function Modal({
   isOpen, onClose, title, children, size = 'md', footer, closeOnBackdropClick = true,
-  closeDisabled = false, closeLabel = 'Close dialog', descriptionId, initialFocusRef,
+  closeDisabled = false, closeLabel = 'Close dialog', descriptionId, initialFocusRef, returnFocusRef,
 }: ModalProps) {
   const titleId = useId()
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -69,10 +70,10 @@ export function Modal({
         else state.element.setAttribute('aria-hidden', state.ariaHidden)
       }
       portal.remove()
-      const trigger = triggerRef.current
+      const trigger = returnFocusRef?.current ?? triggerRef.current
       requestAnimationFrame(() => { if (trigger?.isConnected) trigger.focus() })
     }
-  }, [initialFocusRef, isOpen])
+  }, [initialFocusRef, isOpen, returnFocusRef])
 
   useEffect(() => {
     if (!isOpen) return
@@ -119,7 +120,7 @@ export function Modal({
             </svg>
           </button>
         </div>
-        <div className="min-w-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">{children}</div>
+        <div className="min-w-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6" tabIndex={0}>{children}</div>
         {footer && <div className="border-t border-gray-200 px-4 py-4 sm:px-6">{footer}</div>}
       </div>
     </div>, portalRef.current

@@ -208,16 +208,21 @@ describe('Billing subscription route and page state', () => {
     expect(accountRequest).toHaveBeenCalledTimes(3)
   })
 
-  it('disables the obsolete tierless submission without adding or inferring a tier', async () => {
+  it('requires explicit supported paid tier selection without exposing stored freemium', async () => {
     vi.spyOn(billingApi, 'getSubscriptionState').mockResolvedValue(emptyState())
     vi.spyOn(billingApi, 'getAccountSnapshot').mockResolvedValue(account())
     const create = vi.spyOn(billingApi, 'createSubscription')
     window.history.replaceState({}, '', `/billing/clients/${CLIENT_ID}/subscriptions`)
     render(<App />)
     await screen.findByRole('heading', { name: 'Create subscription' })
-    expect(screen.getByRole('status')).toHaveTextContent(/unavailable.*explicit tier/i)
-    expect(screen.getByRole('button', { name: 'Review subscription' })).toBeDisabled()
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review subscription' })).toBeEnabled()
+    const tier = screen.getByRole('combobox', { name: 'Subscription tier' })
+    expect(tier).toBeRequired()
+    expect(tier).toHaveValue('')
+    expect(within(tier).queryByRole('option', { name: /freemium/i })).not.toBeInTheDocument()
+    expect(within(tier).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Select a tier', 'Basic', 'Brand', 'Brand Premium',
+    ])
     expect(create).not.toHaveBeenCalled()
   })
 })

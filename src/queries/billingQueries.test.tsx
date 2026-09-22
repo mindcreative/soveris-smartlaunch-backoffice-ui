@@ -7,17 +7,32 @@ import {
   BillingContractError,
   BillingLedgerContractError,
   BillingSubscriptionContractError,
+  ClientCapabilitiesContractError,
 } from '../api/billingApi'
-import type { BillingAccountSnapshot, BillingLedgerPage, BillingSubscriptionState } from '../types/billing'
+import type {
+  BillingAccountSnapshot,
+  BillingLedgerPage,
+  BillingSubscriptionState,
+  ClientCapabilities,
+} from '../types/billing'
+import { productKeys } from './productQueries'
 import {
   billingAccountKeys,
   billingExportKeys,
   billingLedgerKeys,
   billingSubscriptionKeys,
+  clearPrivateClientScope,
   clearPrivateBillingQueries,
+  clientCapabilityKeys,
+  domainClientPrefix,
+  domainPrivateRoot,
+  invalidateTierChangeScopes,
+  resourceAccessKeys,
   useBillingAccount,
   useBillingLedger,
   useBillingSubscriptions,
+  useClientCapabilities,
+  useResourceAccessConsequences,
 } from './billingQueries'
 
 const CLIENT_A = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
@@ -40,6 +55,21 @@ function snapshot(clientId: string): BillingAccountSnapshot {
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: PropsWithChildren) {
     return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  }
+}
+
+function capabilities(clientId: string): ClientCapabilities {
+  return {
+    clientId,
+    classificationSource: 'back_office.clients',
+    classification: 'customer',
+    classificationRevision: '5',
+    policySource: 'customer_freemium',
+    policyVersion: 'input-04-v1',
+    subscription: null,
+    flags: [], limits: [], usage: [], operations: [],
+    evaluatedAt: '2026-09-20T12:00:00.000000Z',
+    nextBoundary: null,
   }
 }
 
@@ -68,6 +98,147 @@ describe('private Billing queries', () => {
       'backoffice', 'private', 'billing', 'subscriptions', CLIENT_A,
       'subscription-id', 'lifecycle',
     ])
+    expect(clientCapabilityKeys.client(CLIENT_A)).toEqual([
+      'backoffice', 'private', 'capabilities', CLIENT_A,
+    ])
+    expect(resourceAccessKeys.consequences(CLIENT_A)).toEqual([
+      'backoffice', 'private', 'billing', 'resource-access', CLIENT_A, 'consequences',
+    ])
+    expect(domainClientPrefix(CLIENT_A)).toEqual([
+      'backoffice', 'private', 'domains', CLIENT_A,
+    ])
+  })
+
+  it('purges every former-Client private owner and leaves another Client intact', async () => {
+    const queryClient = new QueryClient()
+    const roots = [
+      billingSubscriptionKeys.state(CLIENT_A), billingAccountKeys.account(CLIENT_A),
+      clientCapabilityKeys.client(CLIENT_A), resourceAccessKeys.consequences(CLIENT_A),
+      productKeys.client(CLIENT_A), [...domainClientPrefix(CLIENT_A), 'future-detail'],
+    ] as const
+    roots.forEach((key) => queryClient.setQueryData(key, { private: true }))
+    queryClient.setQueryData(clientCapabilityKeys.client(CLIENT_B), { clientId: CLIENT_B })
+    queryClient.getMutationCache().build(queryClient, {
+      mutationKey: billingSubscriptionKeys.tierChange(CLIENT_A, 'subscription', 'schedule'),
+      mutationFn: async () => undefined,
+    })
+
+    await clearPrivateClientScope(queryClient, CLIENT_A)
+
+    roots.forEach((key) => expect(queryClient.getQueryData(key)).toBeUndefined())
+    expect(queryClient.getQueryData(clientCapabilityKeys.client(CLIENT_B))).toEqual({ clientId: CLIENT_B })
+    expect(queryClient.getMutationCache().getAll()).toHaveLength(0)
+  })
+
+  it('purges every private owner, including the reserved domain root, on auth teardown', async () => {
+    const queryClient = new QueryClient()
+    queryClient.setQueryData(clientCapabilityKeys.client(CLIENT_A), { private: true })
+    queryClient.setQueryData(resourceAccessKeys.consequences(CLIENT_A), { private: true })
+    queryClient.setQueryData([...domainPrivateRoot, CLIENT_A, 'future-detail'], { private: true })
+    queryClient.setQueryData(['backoffice', 'public'], 'preserve')
+
+    await clearPrivateClientScope(queryClient)
+
+    expect(queryClient.getQueryCache().findAll({ queryKey: ['backoffice', 'private'] })).toHaveLength(0)
+    expect(queryClient.getQueryData(['backoffice', 'public'])).toBe('preserve')
+  })
+
+  it('invalidates all authoritative tier consumers and removes previews', async () => {
+    const queryClient = new QueryClient()
+    const invalidated = [
+      billingSubscriptionKeys.state(CLIENT_A), clientCapabilityKeys.client(CLIENT_A),
+      resourceAccessKeys.consequences(CLIENT_A), productKeys.client(CLIENT_A),
+      [...domainClientPrefix(CLIENT_A), 'future-detail'],
+    ] as const
+    invalidated.forEach((key) => queryClient.setQueryData(key, { evidence: true }))
+    const preview = resourceAccessKeys.preview(CLIENT_A, 'subscription')
+    queryClient.setQueryData(preview, { preview: true })
+
+    await invalidateTierChangeScopes(queryClient, CLIENT_A)
+
+    invalidated.forEach((key) => expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true))
+    expect(queryClient.getQueryData(preview)).toBeUndefined()
+  })
+
+  it('cancels and fences late capability and consequence reads on Client change', async () => {
+    const capabilityClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const consequenceClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    let resolveCapabilities: ((value: ClientCapabilities) => void) | undefined
+    let capabilitySignal: AbortSignal | undefined
+    let resolveConsequences: ((value: []) => void) | undefined
+    let consequenceSignal: AbortSignal | undefined
+    const capabilityRequest = vi.spyOn(billingApi, 'getClientCapabilities').mockImplementation((clientId, signal) => {
+      if (clientId === CLIENT_A) {
+        capabilitySignal = signal
+        return new Promise((resolve) => { resolveCapabilities = resolve })
+      }
+      return Promise.resolve(capabilities(CLIENT_B))
+    })
+    const consequenceRequest = vi.spyOn(billingApi, 'getResourceAccessConsequences').mockImplementation((clientId, signal) => {
+      if (clientId === CLIENT_A) {
+        consequenceSignal = signal
+        return new Promise((resolve) => { resolveConsequences = resolve })
+      }
+      return Promise.resolve([])
+    })
+    const capabilityHook = renderHook(
+      ({ clientId }) => useClientCapabilities(clientId),
+      { initialProps: { clientId: CLIENT_A }, wrapper: createWrapper(capabilityClient) }
+    )
+    const consequenceHook = renderHook(
+      ({ clientId }) => useResourceAccessConsequences(clientId),
+      { initialProps: { clientId: CLIENT_A }, wrapper: createWrapper(consequenceClient) }
+    )
+    await waitFor(() => {
+      expect(capabilitySignal).toBeDefined()
+      expect(consequenceSignal).toBeDefined()
+    })
+
+    capabilityHook.rerender({ clientId: CLIENT_B })
+    consequenceHook.rerender({ clientId: CLIENT_B })
+
+    await waitFor(() => expect(capabilityRequest).toHaveBeenCalledWith(CLIENT_B, expect.any(AbortSignal)))
+    await waitFor(() => expect(consequenceRequest).toHaveBeenCalledWith(CLIENT_B, expect.any(AbortSignal)))
+    await waitFor(() => expect(capabilityClient.getQueryState(
+      clientCapabilityKeys.client(CLIENT_B)
+    )?.status).toBe('success'))
+    await waitFor(() => expect(consequenceClient.getQueryState(
+      resourceAccessKeys.consequences(CLIENT_B)
+    )?.status).toBe('success'))
+    expect(capabilityClient.getQueryData(clientCapabilityKeys.client(CLIENT_B)))
+      .toEqual(capabilities(CLIENT_B))
+    expect(consequenceClient.getQueryData(resourceAccessKeys.consequences(CLIENT_B))).toEqual([])
+    expect(capabilitySignal?.aborted).toBe(true)
+    expect(consequenceSignal?.aborted).toBe(true)
+    resolveCapabilities?.(capabilities(CLIENT_A))
+    resolveConsequences?.([])
+    await Promise.resolve()
+    expect(capabilityClient.getQueryData(clientCapabilityKeys.client(CLIENT_A))).toBeUndefined()
+    expect(consequenceClient.getQueryData(resourceAccessKeys.consequences(CLIENT_A))).toBeUndefined()
+  })
+
+  it('purges malformed capability and consequence cache entries', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    queryClient.setQueryData(clientCapabilityKeys.client(CLIENT_A), capabilities(CLIENT_A))
+    queryClient.setQueryData(resourceAccessKeys.consequences(CLIENT_A), [{ private: true }])
+    vi.spyOn(billingApi, 'getClientCapabilities').mockRejectedValue(
+      new ClientCapabilitiesContractError('malformed capability evidence')
+    )
+    vi.spyOn(billingApi, 'getResourceAccessConsequences').mockRejectedValue(
+      new BillingSubscriptionContractError('malformed consequence evidence')
+    )
+    const capabilityHook = renderHook(() => useClientCapabilities(CLIENT_A), {
+      wrapper: createWrapper(queryClient),
+    })
+    const consequenceHook = renderHook(() => useResourceAccessConsequences(CLIENT_A), {
+      wrapper: createWrapper(queryClient),
+    })
+    await waitFor(() => expect(capabilityHook.result.current.isError).toBe(true))
+    await waitFor(() => expect(consequenceHook.result.current.isError).toBe(true))
+    await waitFor(() => {
+      expect(queryClient.getQueryData(clientCapabilityKeys.client(CLIENT_A))).toBeUndefined()
+      expect(queryClient.getQueryData(resourceAccessKeys.consequences(CLIENT_A))).toBeUndefined()
+    })
   })
 
   it('cancels and removes all private Billing data', async () => {

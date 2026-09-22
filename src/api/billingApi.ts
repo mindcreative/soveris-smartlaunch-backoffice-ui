@@ -22,11 +22,22 @@ import {
   type BillingSubscriptionLifecycleRequest,
   type BillingSubscriptionPageRequest,
   type BillingSubscriptionPendingChange,
+  type BillingSubscriptionPendingTierChange,
   type BillingSubscriptionProrationPolicy,
   type BillingSubscriptionState,
   type BillingSubscriptionTier,
   type BillingSubscriptionUnsupportedView,
   type CreateBillingSubscriptionRequest,
+  type BillingSubscriptionTierAction,
+  type BillingSubscriptionTierChangeRequest,
+  type BillingSubscriptionTierChangeResponse,
+  type BillingSubscriptionTierState,
+  type ResourceAccessConsequence,
+  type ResourceAccessConsequenceResource,
+  type ResourceAccessPreview,
+  type ResourceAccessPreviewAction,
+  type ResourceAccessPreviewRequest,
+  type ResourceAccessPreviewResource,
   type BillingLedgerExportAccepted,
   type BillingLedgerExportAttempt,
   type BillingLedgerExportFailureCode,
@@ -442,9 +453,11 @@ function parseCapabilityOperation(
   if (funding === 'wallet_missing') expected.push('wallet_missing')
   if (funding === 'wallet_ineligible') expected.push('wallet_ineligible')
   if (funding === 'zero_available' || funding === 'insufficient_credits') expected.push('insufficient_credits')
-  if (expected.length !== denialConditions.length ||
-      expected.some((condition, index) => denialConditions[index] !== condition) ||
-      (value.outcome === 'eligible') !== (expected.length === 0)) {
+  const evidenceDenials = denialConditions.filter((condition) =>
+    condition !== 'transition_pending' && condition !== 'stale_capability_evidence')
+  if (expected.length !== evidenceDenials.length ||
+      expected.some((condition, index) => evidenceDenials[index] !== condition) ||
+      (value.outcome === 'eligible') !== (denialConditions.length === 0)) {
     throw capabilityError('operation outcome and denial conditions are inconsistent')
   }
   return {
@@ -1037,11 +1050,18 @@ const GRANT_HISTORY_KEYS = ['historyAsOf', 'items', 'nextCursor'] as const
 const STATE_REQUIRED_KEYS = [
   'clientId', 'current', 'grantHistory', 'pendingChange', 'stateAsOf', 'subscriptionHistory',
 ] as const
-const STATE_OPTIONAL_KEYS = ['immediateChangeContext', 'pendingImmediateDebit'] as const
+const STATE_OPTIONAL_KEYS = [
+  'immediateChangeContext', 'pendingImmediateDebit', 'pendingTierChange',
+] as const
 const PENDING_CHANGE_KEYS = [
   'changeEffectivePolicy', 'cycleCreditAmount', 'effectiveCycleEnd', 'effectiveCycleIndex',
   'effectiveCycleStart', 'entitlements', 'planChangeOperationId', 'planName',
   'prorationPolicy', 'scheduledAt', 'schemaVersion', 'unusedCreditPolicy',
+] as const
+const PENDING_TIER_CHANGE_KEYS = [
+  'effectiveCycleEnd', 'effectiveCycleIndex', 'effectiveCycleStart', 'effectivePolicy',
+  'expectedTierRevision', 'operationId', 'reason', 'scheduledAt', 'schemaVersion',
+  'subscriptionTier',
 ] as const
 const IMMEDIATE_DEBIT_REQUIRED_KEYS = [
   'appliedDebit', 'createdAt', 'originalDebit', 'outstandingDebit',
@@ -1188,6 +1208,13 @@ function readTierRevision(value: unknown, field = 'tierRevision'): string {
   return lexeme
 }
 
+function validateTierRevisionString(value: unknown, field = 'tierRevision'): string {
+  if (typeof value !== 'string' || !/^\d+$/.test(value) || BigInt(value) > INT64_MAX) {
+    throw subscriptionContractError(`${field} must be a non-negative Int64 string`)
+  }
+  return value
+}
+
 function parseEntitlements(value: unknown): BillingEntitlementsV1 {
   if (!isRecord(value) || !hasExactKeys(value, ENTITLEMENT_KEYS) ||
       !isRecord(value.rateLimits) || !hasExactKeys(value.rateLimits, RATE_LIMIT_KEYS) ||
@@ -1258,6 +1285,51 @@ function parsePendingChange(
     effectiveCycleStart: readSubscriptionInstant(value.effectiveCycleStart, 'effectiveCycleStart'),
     effectiveCycleEnd: readSubscriptionInstant(value.effectiveCycleEnd, 'effectiveCycleEnd'),
     scheduledAt: readSubscriptionInstant(value.scheduledAt, 'scheduledAt'),
+  }
+}
+
+function readTierChangeReason(value: unknown): string {
+  if (typeof value !== 'string' || /^\p{White_Space}|\p{White_Space}$/u.test(value)) {
+    throw subscriptionContractError('tier-change reason is invalid')
+  }
+  let count = 0
+  for (const scalar of value) {
+    if (/\p{Cc}/u.test(scalar)) throw subscriptionContractError('tier-change reason is invalid')
+    count += 1
+  }
+  if (count < 1 || count > 512) throw subscriptionContractError('tier-change reason is invalid')
+  return value
+}
+
+function parsePendingTierChange(value: unknown): BillingSubscriptionPendingTierChange {
+  if (!isRecord(value) || !hasExactKeys(value, PENDING_TIER_CHANGE_KEYS)) {
+    throw subscriptionContractError('pendingTierChange fields do not match the closed contract')
+  }
+  const effectiveCycleStart = readSubscriptionInstant(
+    value.effectiveCycleStart, 'pending tier effectiveCycleStart'
+  )
+  const effectiveCycleEnd = readSubscriptionInstant(
+    value.effectiveCycleEnd, 'pending tier effectiveCycleEnd'
+  )
+  const scheduledAt = readSubscriptionInstant(value.scheduledAt, 'pending tier scheduledAt')
+  if (value.effectivePolicy !== 'next_billing_cycle' ||
+      compareInstants(scheduledAt, effectiveCycleStart) >= 0 ||
+      compareInstants(effectiveCycleStart, effectiveCycleEnd) >= 0) {
+    throw subscriptionContractError('pendingTierChange timing is inconsistent')
+  }
+  return {
+    schemaVersion: readSubscriptionInteger(value.schemaVersion, 'pending tier schemaVersion', 1, 1) as 1,
+    operationId: readSubscriptionUuidV7(value.operationId, 'pending tier operationId'),
+    subscriptionTier: readSubscriptionTier(value.subscriptionTier, 'pending subscriptionTier'),
+    expectedTierRevision: readTierRevision(value.expectedTierRevision, 'expectedTierRevision'),
+    effectivePolicy: 'next_billing_cycle',
+    effectiveCycleIndex: readSubscriptionInteger(
+      value.effectiveCycleIndex, 'pending tier effectiveCycleIndex', 1, 2_147_483_647
+    ),
+    effectiveCycleStart,
+    effectiveCycleEnd,
+    scheduledAt,
+    reason: readTierChangeReason(value.reason),
   }
 }
 
@@ -1521,6 +1593,14 @@ export function parseBillingSubscriptionState(
   }
   if ('pendingImmediateDebit' in payload) result.pendingImmediateDebit = parseImmediateDebit(payload.pendingImmediateDebit)
   if ('immediateChangeContext' in payload) result.immediateChangeContext = parseImmediateContext(payload.immediateChangeContext)
+  if ('pendingTierChange' in payload) {
+    if (!current) throw subscriptionContractError('pendingTierChange requires a current subscription')
+    const pendingTierChange = parsePendingTierChange(payload.pendingTierChange)
+    if (pendingTierChange.expectedTierRevision !== current.tierRevision) {
+      throw subscriptionContractError('pendingTierChange revision does not match current subscription')
+    }
+    result.pendingTierChange = pendingTierChange
+  }
   return result
 }
 
@@ -1975,12 +2055,680 @@ export async function postBillingSubscriptionLifecycle(
   )
 }
 
+const PREVIEW_REQUEST_KEYS = [
+  'action', 'effectivePolicy', 'expectedStatus', 'expectedTierRevision', 'subscriptionTier',
+] as const
+const PREVIEW_KEYS = [
+  'accessUntil', 'action', 'affectedResources', 'affectedResourcesTruncated',
+  'classificationRevision', 'clientId', 'commandAuthorityHash',
+  'commandEffectiveAt', 'currentSubscriptionTier', 'deadlineGroups',
+  'deadlineGroupsTruncated',
+  'earliestProofExpiry', 'effectivePolicy', 'evaluatedAt', 'graceCount', 'lossAt', 'pendingTierChangeOperationId',
+  'policyActivationRevision', 'policyHash', 'policyPublicationId', 'policyVersion',
+  'preservationFacts', 'retainedCount', 'statusRevision', 'subscriptionId',
+  'suspendedCount', 'targetSubscriptionTier', 'tierRevision', 'totalCount',
+  'unlistedGraceCount', 'unlistedNewlyAffectedCount',
+] as const
+const PREVIEW_RESOURCE_KEYS = ['accessUntil', 'disposition', 'proofExpiresAt', 'resourceId', 'resourceType'] as const
+const PREVIEW_PRESERVATION_KEYS = [
+  'acceptedAiWorkUnchanged', 'assetsPreserved', 'contentPreserved', 'creditsUnchanged',
+] as const
+const CONSEQUENCE_PRESERVATION_KEYS = [
+  'assetsPreserved', 'contentPreserved', 'financialEffectsPreserved',
+  'ownershipPreserved', 'tlsEvidencePreserved',
+] as const
+const PREVIEW_ACTIONS = new Set<ResourceAccessPreviewAction>([
+  'apply_immediate', 'schedule', 'replace', 'cancel_pending',
+  'pause', 'reactivate', 'cancel', 'expire',
+])
+const TIER_RESPONSE_KEYS = ['receipt', 'schemaVersion', 'tierState'] as const
+const TIER_RECEIPT_REQUIRED_KEYS = [
+  'effectiveAt', 'effectivePolicy', 'expectedTierRevision', 'operationAsOf', 'operationId',
+  'outcome', 'previousSubscriptionTier', 'previousTierRevision', 'reason',
+  'requestedSubscriptionTier', 'resultingSubscriptionTier', 'resultingTierRevision',
+  'schemaVersion', 'subscriptionId', 'clientId',
+] as const
+const TIER_RECEIPT_OPTIONAL_KEYS = [
+  'action', 'pendingSubscriptionTier', 'pendingTierChangeOperationId',
+  'previousPendingSubscriptionTier', 'previousPendingTierChangeOperationId',
+] as const
+const TIER_STATE_KEYS = [
+  'observedAt', 'pendingTierChange', 'status', 'subscriptionTier', 'tierRevision',
+  'validFrom', 'validTo',
+] as const
+
+function nullableSubscriptionInstant(value: unknown, field: string): string | null {
+  return value === null ? null : readSubscriptionInstant(value, field)
+}
+
+function nullableUuidV7(value: unknown, field: string): string | null {
+  return value === null ? null : readSubscriptionUuidV7(value, field)
+}
+
+function parsePreviewResource(value: unknown): ResourceAccessPreviewResource {
+  if (!isRecord(value) || !hasExactKeys(value, PREVIEW_RESOURCE_KEYS) ||
+      (value.resourceType !== 'product' && value.resourceType !== 'domain_binding') ||
+      (value.disposition !== 'grace' && value.disposition !== 'suspended')) {
+    throw subscriptionContractError('preview resource fields are invalid')
+  }
+  const accessUntil = nullableSubscriptionInstant(value.accessUntil, 'preview resource accessUntil')
+  const proofExpiresAt = nullableSubscriptionInstant(value.proofExpiresAt, 'preview resource proofExpiresAt')
+  if (proofExpiresAt && (value.resourceType !== 'domain_binding' ||
+      value.disposition !== 'grace' || !accessUntil ||
+      compareInstants(proofExpiresAt, accessUntil) >= 0))
+    throw subscriptionContractError('preview proof expiry is inconsistent')
+  return {
+    resourceType: value.resourceType,
+    resourceId: readSubscriptionGuid(value.resourceId, 'preview resourceId'),
+    disposition: value.disposition,
+    accessUntil, proofExpiresAt,
+  }
+}
+
+export function serializeResourceAccessPreviewRequest(
+  request: ResourceAccessPreviewRequest
+): string {
+  if (!isRecord(request) || !hasExactKeys(request, PREVIEW_REQUEST_KEYS) ||
+      !PREVIEW_ACTIONS.has(request.action) ||
+      (request.expectedStatus !== 'active' && request.expectedStatus !== 'paused')) {
+    throw subscriptionContractError('preview request fields are invalid')
+  }
+  const expectedTierRevision = validateTierRevisionString(
+    request.expectedTierRevision, 'expectedTierRevision'
+  )
+  const subscriptionTier = request.subscriptionTier === null
+    ? null : readSubscriptionTier(request.subscriptionTier)
+  const effectivePolicy = request.effectivePolicy
+  const tierAction = request.action === 'apply_immediate' || request.action === 'schedule' ||
+    request.action === 'replace' || request.action === 'cancel_pending'
+  if ((tierAction && (subscriptionTier === null || effectivePolicy === null)) ||
+      (!tierAction && (subscriptionTier !== null || effectivePolicy !== null)) ||
+      (request.action === 'apply_immediate' && effectivePolicy !== 'immediate') ||
+      (request.action !== 'apply_immediate' && tierAction && effectivePolicy !== 'next_billing_cycle') ||
+      (!tierAction && effectivePolicy !== null)) {
+    throw subscriptionContractError('preview action material is inconsistent')
+  }
+  return stringify({
+    action: request.action,
+    expectedStatus: request.expectedStatus,
+    expectedTierRevision: new LosslessNumber(expectedTierRevision),
+    subscriptionTier,
+    effectivePolicy,
+  }) as string
+}
+
+export function parseResourceAccessPreview(
+  text: string,
+  expectedClientId: string,
+  expectedSubscriptionId: string,
+  request: ResourceAccessPreviewRequest
+): ResourceAccessPreview {
+  const payload = parseSubscriptionPayload(text)
+  if (!hasExactKeys(payload, PREVIEW_KEYS) || !Array.isArray(payload.affectedResources) ||
+      !Array.isArray(payload.deadlineGroups) ||
+      !isRecord(payload.preservationFacts) ||
+      !hasExactKeys(payload.preservationFacts, PREVIEW_PRESERVATION_KEYS)) {
+    throw subscriptionContractError('preview response fields do not match the closed contract')
+  }
+  const clientId = readSubscriptionGuid(payload.clientId, 'preview clientId')
+  const subscriptionId = readSubscriptionGuid(payload.subscriptionId, 'preview subscriptionId')
+  if (clientId !== canonicalizeGuid(expectedClientId) ||
+      subscriptionId !== canonicalizeGuid(expectedSubscriptionId) ||
+      payload.action !== request.action ||
+      readTierRevision(payload.tierRevision) !== request.expectedTierRevision ||
+      payload.effectivePolicy !== request.effectivePolicy ||
+      payload.targetSubscriptionTier !== request.subscriptionTier) {
+    throw subscriptionContractError('preview response does not match the requested authority')
+  }
+  const facts = payload.preservationFacts
+  if (facts.contentPreserved !== true || facts.assetsPreserved !== true ||
+      facts.creditsUnchanged !== true || facts.acceptedAiWorkUnchanged !== true) {
+    throw subscriptionContractError('preview preservation facts are invalid')
+  }
+  const resources = payload.affectedResources.map(parsePreviewResource)
+  const totalCount = readSubscriptionInteger(payload.totalCount, 'totalCount', 0, 2_147_483_647)
+  const retainedCount = readSubscriptionInteger(payload.retainedCount, 'retainedCount', 0, 2_147_483_647)
+  const graceCount = readSubscriptionInteger(payload.graceCount, 'graceCount', 0, 2_147_483_647)
+  const suspendedCount = readSubscriptionInteger(payload.suspendedCount, 'suspendedCount', 0, 2_147_483_647)
+  const unlistedGraceCount = readSubscriptionInteger(payload.unlistedGraceCount,
+    'unlistedGraceCount', 0, graceCount)
+  const unlistedNewlyAffectedCount = readSubscriptionInteger(payload.unlistedNewlyAffectedCount,
+    'unlistedNewlyAffectedCount', 0, unlistedGraceCount)
+  if (retainedCount + graceCount + suspendedCount !== totalCount || resources.length > 200 ||
+      typeof payload.affectedResourcesTruncated !== 'boolean' ||
+      typeof payload.deadlineGroupsTruncated !== 'boolean') {
+    throw subscriptionContractError('preview consequence counts are inconsistent')
+  }
+  const policyVersion = typeof payload.policyVersion === 'string' && payload.policyVersion.length > 0
+    ? payload.policyVersion : (() => { throw subscriptionContractError('policyVersion is invalid') })()
+  const policyHash = typeof payload.policyHash === 'string' && payload.policyHash.length > 0 &&
+    payload.policyHash.length <= 256 ? payload.policyHash
+    : (() => { throw subscriptionContractError('policyHash is invalid') })()
+  const action = payload.action as ResourceAccessPreviewAction
+  const commandEffectiveAt = nullableSubscriptionInstant(payload.commandEffectiveAt,
+    'commandEffectiveAt')
+  const commandAuthorityHash = payload.commandAuthorityHash
+  const tierAction = action === 'apply_immediate' || action === 'schedule' ||
+    action === 'replace' || action === 'cancel_pending'
+  if ((tierAction && (typeof commandAuthorityHash !== 'string' ||
+        !/^[0-9a-f]{64}$/.test(commandAuthorityHash))) ||
+      (!tierAction && commandAuthorityHash !== null) ||
+      (action === 'schedule' || action === 'replace' || action === 'cancel_pending') !==
+        (commandEffectiveAt !== null))
+    throw subscriptionContractError('preview command authority is invalid')
+  const lossAt = nullableSubscriptionInstant(payload.lossAt, 'lossAt')
+  const accessUntil = nullableSubscriptionInstant(payload.accessUntil, 'accessUntil')
+  const earliestProofExpiry = nullableSubscriptionInstant(payload.earliestProofExpiry,
+    'earliestProofExpiry')
+  const deadlineGroups = payload.deadlineGroups.map((group) => {
+    if (!isRecord(group) || !hasExactKeys(group, [
+      'accessUntil', 'graceCount', 'lossAt', 'newlyAffectedCount',
+    ])) throw subscriptionContractError('preview deadline group is invalid')
+    const groupLossAt = readSubscriptionInstant(group.lossAt, 'deadline group lossAt')
+    const groupAccessUntil = readSubscriptionInstant(group.accessUntil, 'deadline group accessUntil')
+    const groupGraceCount = readSubscriptionInteger(group.graceCount, 'deadline group graceCount', 1, 2_147_483_647)
+    const newlyAffectedCount = readSubscriptionInteger(group.newlyAffectedCount, 'newlyAffectedCount', 0, groupGraceCount)
+    if (compareInstants(groupLossAt, groupAccessUntil) >= 0)
+      throw subscriptionContractError('preview deadline group timing is invalid')
+    return { lossAt: groupLossAt, accessUntil: groupAccessUntil,
+      graceCount: groupGraceCount, newlyAffectedCount }
+  })
+  if ((graceCount > 0) !== Boolean(lossAt && accessUntil) ||
+      (lossAt && accessUntil && compareInstants(lossAt, accessUntil) >= 0) ||
+      deadlineGroups.length > 200 ||
+      deadlineGroups.reduce((sum, group) => sum + group.graceCount, 0) +
+        unlistedGraceCount !== graceCount ||
+      payload.deadlineGroupsTruncated !== (unlistedGraceCount > 0) ||
+      (deadlineGroups.length > 0 && (deadlineGroups[0]!.lossAt !== lossAt ||
+        deadlineGroups[0]!.accessUntil !== accessUntil)) ||
+      deadlineGroups.some((group, index) => index > 0 &&
+        compareInstants(deadlineGroups[index - 1]!.accessUntil, group.accessUntil) > 0) ||
+      (earliestProofExpiry !== null && (graceCount === 0 ||
+        !deadlineGroups.some(group => compareInstants(earliestProofExpiry, group.lossAt) > 0 &&
+          compareInstants(earliestProofExpiry, group.accessUntil) < 0))) ||
+      (!payload.affectedResourcesTruncated &&
+        (resources.map(resource => resource.proofExpiresAt).filter((value): value is string => value !== null)
+          .sort(compareInstants)[0] ?? null) !== earliestProofExpiry)) {
+    throw subscriptionContractError('preview consequence timing is inconsistent')
+  }
+  return {
+    clientId, subscriptionId, action,
+    currentSubscriptionTier: readSubscriptionTier(payload.currentSubscriptionTier),
+    targetSubscriptionTier: payload.targetSubscriptionTier === null
+      ? null : readSubscriptionTier(payload.targetSubscriptionTier),
+    effectivePolicy: payload.effectivePolicy === null ? null : readChangePolicy(payload.effectivePolicy),
+    statusRevision: readTierRevision(payload.statusRevision, 'statusRevision'),
+    classificationRevision: readTierRevision(payload.classificationRevision, 'classificationRevision'),
+    tierRevision: readTierRevision(payload.tierRevision),
+    pendingTierChangeOperationId: nullableUuidV7(
+      payload.pendingTierChangeOperationId, 'pendingTierChangeOperationId'
+    ),
+    policyPublicationId: readSubscriptionGuid(payload.policyPublicationId, 'policyPublicationId'),
+    policyActivationRevision: readTierRevision(payload.policyActivationRevision, 'policyActivationRevision'),
+    policyVersion, policyHash,
+    evaluatedAt: readSubscriptionInstant(payload.evaluatedAt, 'evaluatedAt'),
+    commandEffectiveAt, commandAuthorityHash: commandAuthorityHash as string | null,
+    lossAt, accessUntil, earliestProofExpiry, retainedCount, totalCount, graceCount, suspendedCount,
+    deadlineGroups, deadlineGroupsTruncated: payload.deadlineGroupsTruncated,
+    unlistedGraceCount, unlistedNewlyAffectedCount,
+    affectedResourcesTruncated: payload.affectedResourcesTruncated,
+    preservationFacts: {
+      contentPreserved: true, assetsPreserved: true,
+      creditsUnchanged: true, acceptedAiWorkUnchanged: true,
+    },
+    affectedResources: resources,
+  }
+}
+
+export async function getResourceAccessPreview(
+  clientId: string,
+  subscriptionId: string,
+  request: ResourceAccessPreviewRequest,
+  signal?: AbortSignal
+): Promise<ResourceAccessPreview> {
+  const canonicalClientId = canonicalizeGuid(clientId)
+  const canonicalSubscriptionId = canonicalizeGuid(subscriptionId)
+  if (!canonicalClientId || !canonicalSubscriptionId) {
+    throw subscriptionContractError('preview route identifiers are invalid')
+  }
+  const body = serializeResourceAccessPreviewRequest(request)
+  const response = await apiClient.postApiRoot<string>(
+    `/api/billing/clients/${canonicalClientId}/subscriptions/${canonicalSubscriptionId}/resource-access-preview`,
+    body,
+    { responseType: 'text', signal, headers: { 'Content-Type': 'application/json' } }
+  )
+  if (response.status !== 200 || typeof response.data !== 'string') {
+    throw subscriptionContractError('preview response is invalid')
+  }
+  return parseResourceAccessPreview(
+    response.data, canonicalClientId, canonicalSubscriptionId, request
+  )
+}
+
+export function serializeBillingSubscriptionTierChangeRequest(
+  action: BillingSubscriptionTierAction,
+  request: BillingSubscriptionTierChangeRequest
+): string {
+  const pending = action === 'replace' || action === 'cancel_pending'
+  const allowed = pending
+    ? ['commandAuthorityHash', 'expectedPendingTierChangeOperationId', 'expectedTierRevision', 'operationId', 'reason', 'subscriptionTier']
+    : ['commandAuthorityHash', 'effectivePolicy', 'expectedTierRevision', 'operationId', 'reason', 'subscriptionTier']
+  if (!isRecord(request) || !hasExactKeys(request, allowed) ||
+      !UUID_V7_PATTERN.test(request.operationId) ||
+      typeof request.commandAuthorityHash !== 'string' ||
+      !/^[0-9a-f]{64}$/.test(request.commandAuthorityHash)) {
+    throw subscriptionContractError('tier-change request fields are invalid')
+  }
+  const expectedTierRevision = validateTierRevisionString(
+    request.expectedTierRevision, 'expectedTierRevision'
+  )
+  const subscriptionTier = readSubscriptionTier(request.subscriptionTier)
+  const reason = readTierChangeReason(request.reason)
+  if (pending) {
+    const expectedPending = readSubscriptionUuidV7(
+      request.expectedPendingTierChangeOperationId, 'expectedPendingTierChangeOperationId'
+    )
+    return stringify({
+      operationId: request.operationId,
+      expectedTierRevision: new LosslessNumber(expectedTierRevision),
+      expectedPendingTierChangeOperationId: expectedPending,
+      subscriptionTier,
+      reason,
+      commandAuthorityHash: request.commandAuthorityHash,
+    }) as string
+  }
+  const expectedPolicy = action === 'apply_immediate' ? 'immediate' : 'next_billing_cycle'
+  if (request.effectivePolicy !== expectedPolicy) {
+    throw subscriptionContractError('tier-change effectivePolicy is invalid')
+  }
+  return stringify({
+    operationId: request.operationId,
+    expectedTierRevision: new LosslessNumber(expectedTierRevision),
+    subscriptionTier,
+    effectivePolicy: expectedPolicy,
+    reason,
+    commandAuthorityHash: request.commandAuthorityHash,
+  }) as string
+}
+
+export function parseBillingSubscriptionTierChangeResponse(
+  text: string,
+  expectedClientId: string,
+  expectedSubscriptionId: string,
+  action: BillingSubscriptionTierAction,
+  request: BillingSubscriptionTierChangeRequest
+): BillingSubscriptionTierChangeResponse {
+  const payload = parseSubscriptionPayload(text)
+  const carriesPendingAction = action !== 'apply_immediate'
+  const receiptKeys = (carriesPendingAction
+    ? [...TIER_RECEIPT_REQUIRED_KEYS, ...TIER_RECEIPT_OPTIONAL_KEYS]
+    : [...TIER_RECEIPT_REQUIRED_KEYS]).sort()
+  if (!hasExactKeys(payload, TIER_RESPONSE_KEYS) || payload.schemaVersion?.toString() !== '1' ||
+      !isRecord(payload.receipt) ||
+      !hasExactKeys(payload.receipt, receiptKeys) ||
+      !isRecord(payload.tierState) || !hasExactKeys(payload.tierState, TIER_STATE_KEYS)) {
+    throw subscriptionContractError('tier-change response fields are invalid')
+  }
+  const receipt = payload.receipt
+  const tierState = payload.tierState
+  const clientId = readSubscriptionGuid(receipt.clientId, 'receipt clientId')
+  const subscriptionId = readSubscriptionGuid(receipt.subscriptionId, 'receipt subscriptionId')
+  const operationId = readSubscriptionUuidV7(receipt.operationId, 'operationId')
+  const receiptAction = action === 'schedule' ? 'schedule'
+    : action === 'replace' ? 'replace' : action === 'cancel_pending' ? 'cancel' : undefined
+  if (clientId !== canonicalizeGuid(expectedClientId) ||
+      subscriptionId !== canonicalizeGuid(expectedSubscriptionId) ||
+      operationId !== request.operationId ||
+      readTierRevision(receipt.expectedTierRevision, 'expectedTierRevision') !== request.expectedTierRevision ||
+      receipt.requestedSubscriptionTier !== request.subscriptionTier ||
+      receipt.reason !== request.reason || receipt.effectivePolicy !== (request.effectivePolicy ?? 'next_billing_cycle') ||
+      (receiptAction === undefined ? 'action' in receipt : receipt.action !== receiptAction)) {
+    throw subscriptionContractError('tier-change receipt does not match the retained command')
+  }
+  const outcome = receipt.outcome
+  if (outcome !== 'changed' && outcome !== 'no_change' && outcome !== 'scheduled' &&
+      outcome !== 'replaced' && outcome !== 'cancelled') {
+    throw subscriptionContractError('tier-change outcome is unsupported')
+  }
+  const status = tierState.status
+  if (typeof status !== 'string' || !SUBSCRIPTION_STATUSES.has(status)) {
+    throw subscriptionContractError('tier state status is unsupported')
+  }
+  const result: BillingSubscriptionTierChangeResponse = {
+    schemaVersion: 1,
+    receipt: {
+      schemaVersion: readSubscriptionInteger(receipt.schemaVersion, 'receipt schemaVersion', 1, 1) as 1,
+      operationId, clientId, subscriptionId, outcome,
+      effectivePolicy: readChangePolicy(receipt.effectivePolicy),
+      requestedSubscriptionTier: readSubscriptionTier(receipt.requestedSubscriptionTier),
+      previousSubscriptionTier: readSubscriptionTier(receipt.previousSubscriptionTier),
+      resultingSubscriptionTier: readSubscriptionTier(receipt.resultingSubscriptionTier),
+      expectedTierRevision: readTierRevision(receipt.expectedTierRevision, 'expectedTierRevision'),
+      previousTierRevision: readTierRevision(receipt.previousTierRevision, 'previousTierRevision'),
+      resultingTierRevision: readTierRevision(receipt.resultingTierRevision, 'resultingTierRevision'),
+      reason: readTierChangeReason(receipt.reason),
+      operationAsOf: readSubscriptionInstant(receipt.operationAsOf, 'operationAsOf'),
+      effectiveAt: readSubscriptionInstant(receipt.effectiveAt, 'effectiveAt'),
+    },
+    tierState: {
+      subscriptionTier: readSubscriptionTier(tierState.subscriptionTier),
+      tierRevision: readTierRevision(tierState.tierRevision),
+      status: status as BillingSubscriptionTierState['status'],
+      validFrom: readSubscriptionInstant(tierState.validFrom, 'tier state validFrom'),
+      validTo: nullableSubscriptionInstant(tierState.validTo, 'tier state validTo'),
+      pendingTierChange: tierState.pendingTierChange === null
+        ? null : parsePendingTierChange(tierState.pendingTierChange),
+      observedAt: readSubscriptionInstant(tierState.observedAt, 'observedAt'),
+    },
+  }
+  if (receiptAction) result.receipt.action = receiptAction
+  for (const [field, parser] of [
+    ['previousPendingTierChangeOperationId', readSubscriptionUuidV7],
+    ['pendingTierChangeOperationId', readSubscriptionUuidV7],
+  ] as const) {
+    if (field in receipt) {
+      result.receipt[field] = receipt[field] === null ? null : parser(receipt[field], field)
+    }
+  }
+  if ('previousPendingSubscriptionTier' in receipt) {
+    result.receipt.previousPendingSubscriptionTier = receipt.previousPendingSubscriptionTier === null
+      ? null : readSubscriptionTier(receipt.previousPendingSubscriptionTier, 'previousPendingSubscriptionTier')
+  }
+  if ('pendingSubscriptionTier' in receipt) {
+    result.receipt.pendingSubscriptionTier = receipt.pendingSubscriptionTier === null
+      ? null : readSubscriptionTier(receipt.pendingSubscriptionTier, 'pendingSubscriptionTier')
+  }
+  validateTierChangeResult(action, request, result)
+  return result
+}
+
+function validateTierChangeResult(
+  action: BillingSubscriptionTierAction,
+  request: BillingSubscriptionTierChangeRequest,
+  result: BillingSubscriptionTierChangeResponse
+): void {
+  const receipt = result.receipt
+  const state = result.tierState
+  const sameInstant = (left: string, right: string) => Date.parse(left) === Date.parse(right)
+  const base = receipt.expectedTierRevision === receipt.previousTierRevision &&
+    state.subscriptionTier === receipt.resultingSubscriptionTier &&
+    state.tierRevision === receipt.resultingTierRevision
+  let valid = base
+  if (receipt.outcome === 'changed') {
+    valid &&= action === 'apply_immediate' && receipt.effectivePolicy === 'immediate' &&
+      sameInstant(receipt.effectiveAt, receipt.operationAsOf) &&
+      receipt.requestedSubscriptionTier !== receipt.previousSubscriptionTier &&
+      receipt.resultingSubscriptionTier === receipt.requestedSubscriptionTier &&
+      BigInt(receipt.previousTierRevision) < INT64_MAX &&
+      BigInt(receipt.resultingTierRevision) === BigInt(receipt.previousTierRevision) + 1n &&
+      state.pendingTierChange === null
+  } else if (receipt.outcome === 'no_change') {
+    valid &&= (action === 'apply_immediate' || action === 'schedule') &&
+      sameInstant(receipt.effectiveAt, receipt.operationAsOf) &&
+      receipt.requestedSubscriptionTier === receipt.previousSubscriptionTier &&
+      receipt.resultingSubscriptionTier === receipt.previousSubscriptionTier &&
+      receipt.resultingTierRevision === receipt.previousTierRevision &&
+      state.pendingTierChange === null &&
+      (action === 'apply_immediate' ? receipt.effectivePolicy === 'immediate' :
+        receipt.effectivePolicy === 'next_billing_cycle')
+  } else if (receipt.outcome === 'scheduled' || receipt.outcome === 'replaced') {
+    const expectedAction = receipt.outcome === 'scheduled' ? 'schedule' : 'replace'
+    valid &&= action === expectedAction && receipt.action === expectedAction &&
+      receipt.effectivePolicy === 'next_billing_cycle' &&
+      Date.parse(receipt.effectiveAt) > Date.parse(receipt.operationAsOf) &&
+      receipt.resultingTierRevision === receipt.previousTierRevision &&
+      receipt.resultingSubscriptionTier === receipt.previousSubscriptionTier &&
+      receipt.requestedSubscriptionTier !== receipt.previousSubscriptionTier &&
+      receipt.pendingTierChangeOperationId === receipt.operationId &&
+      receipt.pendingSubscriptionTier === receipt.requestedSubscriptionTier &&
+      (receipt.outcome === 'scheduled'
+        ? receipt.previousPendingTierChangeOperationId === null &&
+          receipt.previousPendingSubscriptionTier === null
+        : receipt.previousPendingTierChangeOperationId === request.expectedPendingTierChangeOperationId &&
+          receipt.previousPendingSubscriptionTier !== null &&
+          receipt.previousPendingSubscriptionTier !== receipt.requestedSubscriptionTier) &&
+      state.pendingTierChange?.operationId === receipt.operationId &&
+      state.pendingTierChange.subscriptionTier === receipt.requestedSubscriptionTier &&
+      state.pendingTierChange.expectedTierRevision === receipt.resultingTierRevision &&
+      sameInstant(state.pendingTierChange.effectiveCycleStart, receipt.effectiveAt) &&
+      state.pendingTierChange.reason === receipt.reason
+  } else if (receipt.outcome === 'cancelled') {
+    valid &&= action === 'cancel_pending' && receipt.action === 'cancel' &&
+      receipt.effectivePolicy === 'next_billing_cycle' &&
+      Date.parse(receipt.effectiveAt) >= Date.parse(receipt.operationAsOf) &&
+      receipt.resultingTierRevision === receipt.previousTierRevision &&
+      receipt.resultingSubscriptionTier === receipt.previousSubscriptionTier &&
+      receipt.previousPendingTierChangeOperationId === request.expectedPendingTierChangeOperationId &&
+      receipt.previousPendingSubscriptionTier === receipt.requestedSubscriptionTier &&
+      receipt.pendingTierChangeOperationId === null && receipt.pendingSubscriptionTier === null &&
+      state.pendingTierChange === null
+  }
+  if (!valid) throw subscriptionContractError('tier-change result evidence is inconsistent')
+}
+
+export async function postBillingSubscriptionTierChange(
+  clientId: string,
+  subscriptionId: string,
+  action: BillingSubscriptionTierAction,
+  request: BillingSubscriptionTierChangeRequest,
+  signal?: AbortSignal,
+  retainedBody?: string,
+  onAuthReplay?: () => void
+): Promise<BillingSubscriptionTierChangeResponse> {
+  const canonicalClientId = canonicalizeGuid(clientId)
+  const canonicalSubscriptionId = canonicalizeGuid(subscriptionId)
+  if (!canonicalClientId || !canonicalSubscriptionId) {
+    throw subscriptionContractError('tier-change route identifiers are invalid')
+  }
+  const canonicalBody = serializeBillingSubscriptionTierChangeRequest(action, request)
+  if (retainedBody !== undefined && retainedBody !== canonicalBody) {
+    throw subscriptionContractError('retained tier-change body does not match the confirmed command')
+  }
+  const suffix = action === 'replace' ? '/pending/replace'
+    : action === 'cancel_pending' ? '/pending/cancel' : ''
+  const response = await apiClient.postApiRoot<string>(
+    `/api/billing/clients/${canonicalClientId}/subscriptions/${canonicalSubscriptionId}/tier-changes${suffix}`,
+    retainedBody ?? canonicalBody,
+    {
+      responseType: 'text', signal, headers: { 'Content-Type': 'application/json' },
+      ...(onAuthReplay ? { onAuthReplay } : {}),
+    }
+  )
+  if (response.status !== 200 || typeof response.data !== 'string') {
+    throw subscriptionContractError('tier-change response is invalid')
+  }
+  return parseBillingSubscriptionTierChangeResponse(
+    response.data, canonicalClientId, canonicalSubscriptionId, action, request
+  )
+}
+
+export function parseResourceAccessConsequences(text: string): ResourceAccessConsequence[] {
+  let raw: unknown
+  try {
+    assertNoDuplicateJsonObjectKeys(text)
+    raw = parse(text)
+  } catch {
+    throw subscriptionContractError('consequence response is invalid')
+  }
+  if (!Array.isArray(raw) || raw.length > 50) {
+    throw subscriptionContractError('consequence response is not a bounded array')
+  }
+  const keys = [
+    'accessUntil', 'affectedResources', 'affectedResourcesTruncated', 'causeIdentity',
+    'consequenceId', 'consequenceKind', 'deadlineGroups', 'deadlineGroupsTruncated',
+    'earliestProofExpiry', 'graceCount', 'lossAt', 'preservationFacts',
+    'projectionRevision', 'projectionRunId', 'recordedAt', 'reminders',
+    'restoredAt', 'restoredCount', 'retainedCount',
+    'suspendedCount', 'suspensionGroups', 'totalCount', 'unlistedGraceCount',
+    'unlistedSuspendedCount',
+  ] as const
+  return raw.map((item): ResourceAccessConsequence => {
+    if (!isRecord(item) || !hasExactKeys(item, keys) || !Array.isArray(item.affectedResources) ||
+        !Array.isArray(item.reminders) || item.reminders.length > 2 ||
+        !Array.isArray(item.deadlineGroups) || item.deadlineGroups.length > 200 ||
+        !Array.isArray(item.suspensionGroups) || item.suspensionGroups.length > 200 ||
+        !isRecord(item.preservationFacts)) {
+      throw subscriptionContractError('consequence item fields are invalid')
+    }
+    const kind = item.consequenceKind
+    if (kind !== 'scheduled' && kind !== 'grace_started' && kind !== 'suspended' &&
+        kind !== 'restored' && kind !== 'cancelled') {
+      throw subscriptionContractError('consequence kind is invalid')
+    }
+    const affectedResources = item.affectedResources.map((resource): ResourceAccessConsequenceResource => {
+      if (!isRecord(resource) || !hasExactKeys(resource,
+        ['accessUntil', 'proofExpiresAt', 'resourceId', 'resourceType', 'state']) ||
+          (resource.resourceType !== 'product' && resource.resourceType !== 'domain_binding') ||
+          (resource.state !== 'eligible' && resource.state !== 'grace' &&
+            resource.state !== 'suspended')) {
+        throw subscriptionContractError('consequence resource is invalid')
+      }
+      const accessUntil = nullableSubscriptionInstant(resource.accessUntil, 'consequence accessUntil')
+      const proofExpiresAt = nullableSubscriptionInstant(resource.proofExpiresAt,
+        'consequence proofExpiresAt')
+      if (proofExpiresAt && (resource.resourceType !== 'domain_binding' ||
+          resource.state !== 'grace' || !accessUntil ||
+          compareInstants(proofExpiresAt, accessUntil) >= 0))
+        throw subscriptionContractError('consequence proof expiry is inconsistent')
+      return {
+        resourceType: resource.resourceType,
+        resourceId: readSubscriptionGuid(resource.resourceId, 'consequence resourceId'),
+        state: resource.state,
+        accessUntil, proofExpiresAt,
+      }
+    })
+    const rawPreservationFacts = item.preservationFacts
+    if (!isRecord(rawPreservationFacts) ||
+        !hasExactKeys(rawPreservationFacts, CONSEQUENCE_PRESERVATION_KEYS) ||
+        CONSEQUENCE_PRESERVATION_KEYS.some((key) => rawPreservationFacts[key] !== true)) {
+      throw subscriptionContractError('consequence preservation facts are invalid')
+    }
+    const retainedCount = readSubscriptionInteger(item.retainedCount, 'retainedCount', 0, 2_147_483_647)
+    const totalCount = readSubscriptionInteger(item.totalCount, 'totalCount', 0, 2_147_483_647)
+    const graceCount = readSubscriptionInteger(item.graceCount, 'graceCount', 0, 2_147_483_647)
+    const suspendedCount = readSubscriptionInteger(item.suspendedCount, 'suspendedCount', 0, 2_147_483_647)
+    const unlistedGraceCount = readSubscriptionInteger(item.unlistedGraceCount,
+      'unlistedGraceCount', 0, graceCount)
+    const unlistedSuspendedCount = readSubscriptionInteger(item.unlistedSuspendedCount,
+      'unlistedSuspendedCount', 0, suspendedCount)
+    const deadlineGroups = item.deadlineGroups.map((group) => {
+      if (!isRecord(group) || !hasExactKeys(group, ['accessUntil', 'graceCount']))
+        throw subscriptionContractError('consequence deadline group is invalid')
+      return { accessUntil: nullableSubscriptionInstant(group.accessUntil,
+        'consequence deadline group accessUntil'),
+      graceCount: readSubscriptionInteger(group.graceCount,
+        'consequence deadline group graceCount', 1, 2_147_483_647) }
+    })
+    const suspensionGroups = item.suspensionGroups.map((group):
+      ResourceAccessConsequence['suspensionGroups'][number] => {
+      if (!isRecord(group) || !hasExactKeys(group, ['accessUntil', 'reason', 'suspendedCount']))
+        throw subscriptionContractError('consequence suspension group is invalid')
+      const reason = group.reason
+      if (reason !== 'finite_limit' && reason !== 'product_inactive' &&
+          reason !== 'product_unpublished' && reason !== 'routing_inactive' &&
+          reason !== 'ownership_unverified' && reason !== 'tls_unavailable' &&
+          reason !== 'target_product_not_retained' && reason !== 'client_disabled' &&
+          reason !== 'policy_unavailable' && reason !== 'hard_denial')
+        throw subscriptionContractError('consequence suspension reason is invalid')
+      return { accessUntil: nullableSubscriptionInstant(group.accessUntil,
+        'consequence suspension group accessUntil'),
+      suspendedCount: readSubscriptionInteger(group.suspendedCount,
+        'consequence suspension group suspendedCount', 1, 2_147_483_647), reason }
+    })
+    const restoredCount = item.restoredCount === null ? null :
+      readSubscriptionInteger(item.restoredCount, 'restoredCount', 1, totalCount)
+    const restoredAt = nullableSubscriptionInstant(item.restoredAt, 'restoredAt')
+    if (retainedCount + graceCount + suspendedCount !== totalCount ||
+        affectedResources.length > 200 || typeof item.affectedResourcesTruncated !== 'boolean' ||
+        typeof item.deadlineGroupsTruncated !== 'boolean' ||
+        item.deadlineGroupsTruncated !== (unlistedGraceCount > 0) ||
+        deadlineGroups.reduce((sum, group) => sum + group.graceCount, 0) +
+          unlistedGraceCount !== graceCount ||
+        suspensionGroups.reduce((sum, group) => sum + group.suspendedCount, 0) +
+          unlistedSuspendedCount > suspendedCount ||
+        (restoredCount === null) !== (restoredAt === null) ||
+        (kind !== 'restored' && restoredCount !== null)) {
+      throw subscriptionContractError('consequence counts are inconsistent')
+    }
+    const accessUntil = nullableSubscriptionInstant(item.accessUntil, 'consequence accessUntil')
+    const earliestProofExpiry = nullableSubscriptionInstant(item.earliestProofExpiry,
+      'consequence earliestProofExpiry')
+    if (earliestProofExpiry && (graceCount === 0 ||
+        (!item.affectedResourcesTruncated &&
+          (affectedResources.map(resource => resource.proofExpiresAt)
+            .filter((value): value is string => value !== null)
+            .sort(compareInstants)[0] ?? null) !== earliestProofExpiry)))
+      throw subscriptionContractError('consequence proof expiry is inconsistent')
+    const reminders = item.reminders.map((reminder) => {
+      if (!isRecord(reminder) || !hasExactKeys(reminder,
+        ['dueAt', 'earliestProofExpiry', 'graceCount', 'recordedAt', 'reminderKind']) ||
+          (reminder.reminderKind !== 'reminder_72h' && reminder.reminderKind !== 'reminder_24h'))
+        throw subscriptionContractError('consequence reminder is invalid')
+      const dueAt = readSubscriptionInstant(reminder.dueAt, 'reminder dueAt')
+      const reminderCount = readSubscriptionInteger(reminder.graceCount,
+        'reminder graceCount', 0, 2_147_483_647)
+      const reminderProofExpiry = nullableSubscriptionInstant(reminder.earliestProofExpiry,
+        'reminder earliestProofExpiry')
+      if (!accessUntil || compareInstants(dueAt, accessUntil) >= 0 ||
+          (reminderProofExpiry && (reminderCount === 0 ||
+            compareInstants(reminderProofExpiry, accessUntil) >= 0)))
+        throw subscriptionContractError('consequence reminder deadline is invalid')
+      return { reminderKind: reminder.reminderKind as 'reminder_72h' | 'reminder_24h', dueAt,
+        recordedAt: readSubscriptionInstant(reminder.recordedAt, 'reminder recordedAt'),
+        graceCount: reminderCount, earliestProofExpiry: reminderProofExpiry }
+    })
+    return {
+      consequenceId: readSubscriptionGuid(item.consequenceId, 'consequenceId'),
+      projectionRunId: readSubscriptionGuid(item.projectionRunId, 'projectionRunId'),
+      projectionRevision: readTierRevision(item.projectionRevision, 'projectionRevision'),
+      causeIdentity: typeof item.causeIdentity === 'string' && item.causeIdentity.length > 0
+        ? item.causeIdentity : (() => { throw subscriptionContractError('causeIdentity is invalid') })(),
+      consequenceKind: kind,
+      lossAt: nullableSubscriptionInstant(item.lossAt, 'consequence lossAt'),
+      accessUntil, earliestProofExpiry,
+      retainedCount, totalCount, graceCount, suspendedCount,
+      affectedResources, affectedResourcesTruncated: item.affectedResourcesTruncated,
+      deadlineGroups, deadlineGroupsTruncated: item.deadlineGroupsTruncated,
+      unlistedGraceCount, suspensionGroups, unlistedSuspendedCount,
+      restoredCount, restoredAt,
+      reminders,
+      preservationFacts: {
+        contentPreserved: true,
+        assetsPreserved: true,
+        ownershipPreserved: true,
+        tlsEvidencePreserved: true,
+        financialEffectsPreserved: true,
+      },
+      recordedAt: readSubscriptionInstant(item.recordedAt, 'recordedAt'),
+    }
+  })
+}
+
+export async function getResourceAccessConsequences(
+  clientId: string,
+  signal?: AbortSignal
+): Promise<ResourceAccessConsequence[]> {
+  const canonicalClientId = canonicalizeGuid(clientId)
+  if (!canonicalClientId) throw subscriptionContractError('requested Client ID is invalid')
+  const response = await apiClient.getApiRoot<string>(
+    `/api/billing/clients/${canonicalClientId}/resource-access-consequences`,
+    { responseType: 'text', signal }
+  )
+  if (response.status !== 200 || typeof response.data !== 'string') {
+    throw subscriptionContractError('consequence response is invalid')
+  }
+  return parseResourceAccessConsequences(response.data)
+}
+
 export const billingApi = {
   getAccountSnapshot: getBillingAccountSnapshot,
   getLedgerPage: getBillingLedgerPage,
   getSubscriptionState: getBillingSubscriptionState,
   createSubscription: createBillingSubscription,
   postSubscriptionLifecycle: postBillingSubscriptionLifecycle,
+  getResourceAccessPreview,
+  getResourceAccessConsequences,
+  postSubscriptionTierChange: postBillingSubscriptionTierChange,
   requestLedgerExport: requestBillingLedgerExport,
   getLedgerExportStatus: getBillingLedgerExportStatus,
   redeemLedgerExport: redeemBillingLedgerExport,

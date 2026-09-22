@@ -30,13 +30,14 @@ describe('UTC subscription calendar helpers', () => {
 
   it('requires exact amount/rates/features and an aligned optional end boundary', () => {
     const result = validateSubscriptionDraft({
-      planName: ' Pro ', cycleCreditAmount: '100000000000000.0000',
+      planName: ' Pro ', subscriptionTier: '', cycleCreditAmount: '100000000000000.0000',
       requestsPerMinute: '0', concurrentAiOperations: '1001',
       contentGeneration: false, imageGeneration: false,
       validFrom: '2026-02-15T12:00', validTo: '2026-03-16T12:00',
     }, NOW)
     expect(result.errors).toMatchObject({
       planName: expect.any(String), cycleCreditAmount: expect.any(String),
+      subscriptionTier: expect.any(String),
       requestsPerMinute: expect.any(String), concurrentAiOperations: expect.any(String),
       features: expect.any(String), validTo: expect.any(String),
     })
@@ -45,6 +46,29 @@ describe('UTC subscription calendar helpers', () => {
 })
 
 describe('SubscriptionCreationForm', () => {
+  it('shows fresh preconfirm progress, blocks duplicate review, and restores focus after confirmation', async () => {
+    let release!: (ready: boolean) => void
+    const onPreconfirm = vi.fn(() => new Promise<boolean>((resolve) => { release = resolve }))
+    const onConfirm = vi.fn()
+    render(<SubscriptionCreationForm clientId={CLIENT_ID} onConfirm={onConfirm}
+      onPreconfirm={onPreconfirm} now={() => NOW} draft={{
+        planName: 'Pro', subscriptionTier: 'brand', cycleCreditAmount: '100.0000',
+        requestsPerMinute: '60', concurrentAiOperations: '4', contentGeneration: true,
+        imageGeneration: false, validFrom: '2026-02-15T12:00', validTo: '',
+      }} />)
+    const user = userEvent.setup()
+    const review = screen.getByRole('button', { name: 'Review subscription' })
+    await user.click(review)
+    expect(screen.getByRole('status')).toHaveTextContent('Checking fresh subscription authority')
+    expect(review).toBeDisabled()
+    expect(onPreconfirm).toHaveBeenCalledTimes(1)
+    release(true)
+    await screen.findByRole('dialog')
+    await user.click(screen.getByRole('button', { name: 'Confirm creation' }))
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Create subscription' })).toHaveFocus())
+  })
+
   it('focuses a linked error summary and preserves entered values', async () => {
     const user = userEvent.setup()
     render(<SubscriptionCreationForm clientId={CLIENT_ID} onConfirm={vi.fn()} now={() => NOW} />)
@@ -60,11 +84,12 @@ describe('SubscriptionCreationForm', () => {
     expect(screen.getByLabelText('Plan name')).toHaveFocus()
   })
 
-  it('keeps the obsolete tierless submission unavailable without inferring a tier', async () => {
+  it('requires an explicit supported paid tier and freezes it into confirmation', async () => {
     const user = userEvent.setup()
     const onConfirm = vi.fn()
     render(<SubscriptionCreationForm clientId={CLIENT_ID} onConfirm={onConfirm} now={() => NOW} />)
     await user.type(screen.getByLabelText('Plan name'), 'Pro')
+    expect(screen.getByRole('combobox', { name: 'Subscription tier' })).toBeRequired()
     await user.type(screen.getByLabelText('Cycle credit amount'), '1250.0000')
     await user.type(screen.getByLabelText('Requests per minute'), '60')
     await user.type(screen.getByLabelText('Concurrent AI operations'), '4')
@@ -73,12 +98,16 @@ describe('SubscriptionCreationForm', () => {
     await user.type(screen.getByLabelText('Valid to (UTC, optional)'), '2026-03-15T12:00')
 
     const review = screen.getByRole('button', { name: 'Review subscription' })
-    expect(review).toBeDisabled()
-    expect(screen.getByRole('status')).toHaveTextContent(/unavailable.*explicit tier/i)
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
     await user.click(review)
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(onConfirm).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert', { name: 'Correct the subscription form' })).toHaveTextContent(/tier/i)
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Subscription tier' }), 'brand')
+    await user.click(review)
+    expect(screen.getByRole('dialog')).toHaveTextContent('Brand')
+    await user.click(screen.getByRole('button', { name: 'Confirm creation' }))
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({ subscriptionTier: 'brand' })
+    ))
   })
 
   it('clears private draft material on auth refresh', async () => {
