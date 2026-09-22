@@ -9,6 +9,8 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { Modal } from '@/components/shared/Modal'
 import type { BackOfficeUser, UserRole } from '@/types'
+import { timeZoneOptions } from '@/timezone/preference'
+import { LocalInstant, parseLocalInstant } from '@/timezone/LocalInstant'
 
 const roleColors: Record<UserRole, 'info' | 'warning' | 'neutral'> = {
   Admin: 'info',
@@ -21,6 +23,7 @@ const initialUserState = {
   password: '',
   displayName: '',
   role: 'Viewer' as UserRole,
+  timeZoneId: '',
 }
 
 const UsersPage: FC = () => {
@@ -42,6 +45,7 @@ const UsersPage: FC = () => {
       email: user.email,
       name: user.displayName,
       role: user.role,
+      timeZoneId: user.timeZoneId,
       isActive: user.isActive,
       createdAt: user.createdAt,
     }))
@@ -71,6 +75,11 @@ const UsersPage: FC = () => {
         ),
       },
       {
+        key: 'timeZoneId',
+        label: 'Timezone',
+        render: (value: unknown) => <span>{String(value)}</span>,
+      },
+      {
         key: 'isActive',
         label: 'Status',
         render: (value: unknown) => (
@@ -83,19 +92,20 @@ const UsersPage: FC = () => {
         key: 'createdAt',
         label: 'Created',
         render: (value: unknown) =>
-          value ? new Date(String(value)).toLocaleDateString() : '—',
+          value ? <LocalInstant value={parseLocalInstant(value)} /> : '—',
       },
     ],
     []
   )
 
   const handleCreateUser = async () => {
-    if (formData.email && formData.password && formData.displayName) {
+    if (formData.email && formData.password && formData.displayName && formData.timeZoneId) {
       await createUserMutation.mutateAsync({
         email: formData.email,
         password: formData.password,
         displayName: formData.displayName,
         role: formData.role,
+        timeZoneId: formData.timeZoneId,
       })
       setShowCreateModal(false)
       setFormData(initialUserState)
@@ -124,7 +134,7 @@ const UsersPage: FC = () => {
         <h1 className="text-xl font-semibold text-gray-900">Users</h1>
         <button
           onClick={() => setShowCreateModal(true)}
-          disabled={!createUserMutation.isPending}
+          disabled={createUserMutation.isPending}
           className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50"
         >
           {createUserMutation.isPending ? 'Creating...' : 'Create User'}
@@ -169,7 +179,7 @@ const UsersPage: FC = () => {
             </button>
             <button
               onClick={handleCreateUser}
-              disabled={!formData.email || !formData.password || !formData.displayName || createUserMutation.isPending}
+              disabled={!formData.email || !formData.password || !formData.displayName || !formData.timeZoneId || createUserMutation.isPending}
               className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50"
             >
               {createUserMutation.isPending ? 'Creating...' : 'Create User'}
@@ -218,6 +228,15 @@ const UsersPage: FC = () => {
               <option value="Viewer">Viewer</option>
               <option value="Editor">Editor</option>
               <option value="Admin">Admin</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="new-user-time-zone" className="block text-sm font-medium text-gray-700 mb-1">IANA timezone *</label>
+            <select id="new-user-time-zone" required value={formData.timeZoneId}
+              onChange={(event) => setFormData({ ...formData, timeZoneId: event.target.value })}
+              className="block w-full min-h-11 rounded-md border border-gray-300 p-2 focus-visible:outline-indigo-600">
+              <option value="">Select a timezone</option>
+              {timeZoneOptions().map((id) => <option key={id} value={id}>{id}</option>)}
             </select>
           </div>
         </div>

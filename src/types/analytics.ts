@@ -1,9 +1,11 @@
 export interface OverviewMetrics {
   totalSubmissions: number
-  totalVerified: number
+  verifiedSubmissions: number
   verificationRate: number
   conversionRate: number
-  dateRange: { start: string; end: string }
+  totalPageViews: number
+  fromDate: string | null
+  toDate: string | null
 }
 
 export interface FunnelStageCount {

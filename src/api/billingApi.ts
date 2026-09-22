@@ -1,6 +1,8 @@
 import { isLosslessNumber, LosslessNumber, parse, stringify } from 'lossless-json'
 import { apiClient } from './apiClient'
 import { canonicalizeGuid } from '../lib/guid'
+import { localInstantDateTime, normalizeLocalWallInput, parseLocalInstant } from '../timezone/LocalInstant'
+import { useAuthStore } from '../stores/authStore'
 import {
   BILLING_LEDGER_TRANSACTION_TYPES,
   type BillingAccountSnapshot,
@@ -167,18 +169,6 @@ function readWalletVersion(value: unknown): string {
   return lexeme
 }
 
-function readUtcInstant(value: unknown): string {
-  if (
-    typeof value !== 'string' ||
-    !UTC_OFFSET_PATTERN.test(value) ||
-    Number.isNaN(Date.parse(value))
-  ) {
-    throw contractError('asOf must be a UTC DateTimeOffset')
-  }
-
-  return value
-}
-
 export function parseBillingAccountSnapshot(
   text: string,
   expectedClientId: string
@@ -237,7 +227,7 @@ export function parseBillingAccountSnapshot(
     availableBalance: readExactDecimal(payload.availableBalance, 'availableBalance'),
     activeReservationCount: readReservationCount(payload.activeReservationCount),
     status: payload.status as BillingAccountStatus,
-    asOf: readUtcInstant(payload.asOf),
+    asOf: parseLocalInstant(payload.asOf),
     walletVersion: readWalletVersion(payload.walletVersion),
   }
 }
@@ -250,16 +240,29 @@ export async function getBillingAccountSnapshot(
   if (!canonicalClientId) {
     throw contractError('requested Client ID is invalid')
   }
+  const { actorId } = await currentPresentationPreference(signal)
 
   const response = await apiClient.getApiRoot<string>(
-    `/api/billing/clients/${canonicalClientId}/account`,
+    `/api/backoffice/clients/${canonicalClientId}/billing/account`,
     { responseType: 'text', signal }
   )
   if (typeof response.data !== 'string') {
     throw contractError('response must be JSON text')
   }
+  requireCurrentActor(actorId)
+  const snapshot = parseBillingAccountSnapshot(response.data, canonicalClientId)
+  return snapshot
+}
 
-  return parseBillingAccountSnapshot(response.data, canonicalClientId)
+async function currentPresentationPreference(_signal?: AbortSignal): Promise<{ actorId: string }> {
+  const actorId = useAuthStore.getState().user?.id
+  if (!actorId) throw new Error('Authenticated user is unavailable')
+  return { actorId }
+}
+
+function requireCurrentActor(actorId: string): void {
+  if (useAuthStore.getState().user?.id !== actorId)
+    throw new Error('Authenticated user changed during response load')
 }
 
 const CAPABILITY_TOP_KEYS = [
@@ -344,6 +347,9 @@ function readCapabilityInt64(value: unknown, field: string, positive = false): s
 }
 
 function readCapabilityInstant(value: unknown, field: string): string {
+  if (typeof value === 'string') {
+    try { return parseLocalInstant(value) } catch { /* legacy canonical parser below */ }
+  }
   const instant = typeof value === 'string' ? value : ''
   const match = SUBSCRIPTION_INSTANT_PATTERN.exec(instant)
   if (!match || Number.isNaN(Date.parse(instant))) {
@@ -381,7 +387,7 @@ function parseCapabilitySubscription(value: unknown): ClientCapabilitySubscripti
   }
   const validFrom = readCapabilityInstant(value.validFrom, 'validFrom')
   const validTo = value.validTo === null ? null : readCapabilityInstant(value.validTo, 'validTo')
-  if (validTo !== null && Date.parse(validTo) <= Date.parse(validFrom)) {
+  if (validTo !== null && !isLocalWall(validTo) && Date.parse(validTo) <= Date.parse(validFrom)) {
     throw capabilityError('subscription validity is inconsistent')
   }
   return {
@@ -497,20 +503,21 @@ export function parseClientCapabilities(text: string, expectedClientId: string):
   const evaluatedAt = readCapabilityInstant(payload.evaluatedAt, 'evaluatedAt')
   const nextBoundary = payload.nextBoundary === null
     ? null : readCapabilityInstant(payload.nextBoundary, 'nextBoundary')
-  if (nextBoundary !== null && Date.parse(nextBoundary) <= Date.parse(evaluatedAt)) {
+  if (nextBoundary !== null && !isLocalWall(nextBoundary) && Date.parse(nextBoundary) <= Date.parse(evaluatedAt)) {
     throw capabilityError('nextBoundary must be later than evaluatedAt')
   }
   const subscription = parseCapabilitySubscription(payload.subscription)
   const effective = subscription?.effectiveTier !== null && subscription?.effectiveTier !== undefined
-  const activeInWindow = subscription?.status === 'active' &&
+  const activeInWindow = subscription?.status === 'active' && !isLocalWall(evaluatedAt) &&
     Date.parse(subscription.validFrom) <= Date.parse(evaluatedAt) &&
     (subscription.validTo === null || Date.parse(evaluatedAt) < Date.parse(subscription.validTo))
   if ((classification === 'soveris_internal' && (policySource !== 'internal' || effective)) ||
       (classification === 'customer' && policySource === 'internal') ||
       (policySource === 'customer_subscription' &&
         (!subscription || !effective || subscription.effectiveTier !== subscription.storedTier ||
-         subscription.status !== 'active' || Date.parse(subscription.validFrom) > Date.parse(evaluatedAt) ||
-         (subscription.validTo !== null && Date.parse(evaluatedAt) >= Date.parse(subscription.validTo)))) ||
+         subscription.status !== 'active' || (!isLocalWall(evaluatedAt) &&
+           (Date.parse(subscription.validFrom) > Date.parse(evaluatedAt) ||
+            (subscription.validTo !== null && Date.parse(evaluatedAt) >= Date.parse(subscription.validTo)))))) ||
       (policySource === 'customer_freemium' && (effective || activeInWindow)) ||
       (!subscription && policySource === 'customer_subscription')) {
     throw capabilityError('classification, policy source, and subscription are inconsistent')
@@ -544,7 +551,8 @@ export function parseClientCapabilities(text: string, expectedClientId: string):
     const base = { key, unit, value: readCapabilityInt64(value.value, measured ? 'usage.value' : 'limit.value', !measured) }
     if (!measured) return base
     const measuredAt = readCapabilityInstant(value.measuredAt, 'measuredAt')
-    if (Date.parse(measuredAt) > Date.parse(evaluatedAt)) throw capabilityError('usage occurs after evaluation')
+    if (!isLocalWall(measuredAt) && Date.parse(measuredAt) > Date.parse(evaluatedAt))
+      throw capabilityError('usage occurs after evaluation')
     return { ...base, measuredAt }
   }
   const limits = payload.limits.map((value) => parseLimit(value, false) as ClientCapabilityLimit)
@@ -589,6 +597,7 @@ export async function getClientCapabilities(
 ): Promise<ClientCapabilities> {
   const canonicalClientId = canonicalizeGuid(clientId)
   if (!canonicalClientId) throw capabilityError('requested Client ID is invalid')
+  const { actorId } = await currentPresentationPreference(signal)
   const response = await apiClient.getApiRoot<string>(
     `/api/backoffice/clients/${canonicalClientId}/capabilities`,
     { responseType: 'text', signal }
@@ -596,6 +605,8 @@ export async function getClientCapabilities(
   if (response.status !== 200 || typeof response.data !== 'string') {
     throw capabilityError('response is not valid capability JSON text')
   }
+  requireCurrentActor(actorId)
+  requireLocalDateWire(response.data)
   return parseClientCapabilities(response.data, canonicalClientId)
 }
 
@@ -641,11 +652,9 @@ function validateAmountSign(type: BillingLedgerTransactionType, amount: string):
   }
 }
 
-function readLedgerInstant(value: unknown, field: string): string {
-  if (typeof value !== 'string' || !UTC_OFFSET_PATTERN.test(value) || Number.isNaN(Date.parse(value))) {
-    throw ledgerContractError(`${field} must be a UTC DateTimeOffset`)
-  }
-  return value
+function readLedgerInstant(value: unknown, field: string) {
+  try { return parseLocalInstant(value) }
+  catch { throw ledgerContractError(`${field} must be a saved-zone local instant`) }
 }
 
 function parseLedgerItem(value: unknown, expectedCreditAccountId?: string): BillingLedgerItem {
@@ -710,19 +719,8 @@ export function parseBillingLedgerPage(text: string, expectedCreditAccountId?: s
     throw ledgerContractError('page contains a duplicate ledger row')
   }
 
-  for (let index = 0; index < items.length; index += 1) {
-    const item = items[index]
-    if (!item || Date.parse(item.createdAt) > Date.parse(asOf)) {
-      throw ledgerContractError('item occurs after the page watermark')
-    }
-    const previous = items[index - 1]
-    if (previous) {
-      const timeOrder = Date.parse(previous.createdAt) - Date.parse(item.createdAt)
-      if (timeOrder < 0 || (timeOrder === 0 && previous.ledgerId.localeCompare(item.ledgerId) < 0)) {
-        throw ledgerContractError('items are not in server order')
-      }
-    }
-  }
+  // The server orders UTC instants. Local wall strings cannot prove ordering
+  // across an autumn overlap, so the browser only checks row identity here.
   return { items, asOf, nextCursor }
 }
 
@@ -747,6 +745,7 @@ export async function getBillingLedgerPage(
 ): Promise<BillingLedgerPage> {
   const canonicalClientId = canonicalizeGuid(clientId)
   if (!canonicalClientId) throw ledgerContractError('requested Client ID is invalid')
+  const { actorId } = await currentPresentationPreference(signal)
   const params = new URLSearchParams()
   let expectedAccount: string | undefined
   if (typeof request.cursor === 'string') {
@@ -758,11 +757,13 @@ export async function getBillingLedgerPage(
   }
   const query = params.toString()
   const response = await apiClient.getApiRoot<string>(
-    `/api/billing/clients/${canonicalClientId}/ledger${query ? `?${query}` : ''}`,
+    `/api/backoffice/clients/${canonicalClientId}/billing/ledger${query ? `?${query}` : ''}`,
     { responseType: 'text', signal }
   )
   if (typeof response.data !== 'string') throw ledgerContractError('response must be JSON text')
-  return parseBillingLedgerPage(response.data, expectedAccount)
+  requireCurrentActor(actorId)
+  const page = parseBillingLedgerPage(response.data, expectedAccount)
+  return page
 }
 
 const EXPORT_FILTER_KEYS = [
@@ -788,6 +789,9 @@ function readExportInstant(value: unknown, nullable: false): string
 function readExportInstant(value: unknown, nullable: true): string | null
 function readExportInstant(value: unknown, nullable: boolean): string | null {
   if (nullable && value === null) return null
+  if (typeof value === 'string') {
+    try { return parseLocalInstant(value) } catch { /* canonical parser below */ }
+  }
   if (typeof value !== 'string' || !UTC_OFFSET_PATTERN.test(value) || Number.isNaN(Date.parse(value))) {
     throw exportContractError('a timestamp is invalid')
   }
@@ -823,7 +827,7 @@ function parseExportFilters(value: unknown): BillingLedgerExportFilters {
       : (() => { throw exportContractError('the transaction type is invalid') })()
   const from = readExportInstant(value.from, true)
   const to = readExportInstant(value.to, true)
-  if (from && to && Date.parse(from) >= Date.parse(to)) {
+  if (from && to && from >= to && !UTC_OFFSET_PATTERN.test(from)) {
     throw exportContractError('the filter interval is invalid')
   }
   return {
@@ -838,15 +842,23 @@ function parseExportFilters(value: unknown): BillingLedgerExportFilters {
 }
 
 export function normalizeLedgerExportFilters(filters: BillingLedgerFilters): BillingLedgerExportFilters {
-  return parseExportFilters({
-    creditAccountId: filters.creditAccountId ?? null,
+  for (const bound of ['from', 'to'] as const) {
+    const wall = filters[bound]
+    if (wall && normalizeLocalWallInput(wall) !== wall)
+      throw exportContractError('local export date filter is invalid')
+  }
+  const guid = (value?: string) => value === undefined ? null :
+    canonicalizeGuid(value) ?? (() => { throw exportContractError('filter identifier is invalid') })()
+  if (filters.transactionType && !LEDGER_TRANSACTION_TYPES.has(filters.transactionType))
+    throw exportContractError('transaction type is invalid')
+  return {
+    creditAccountId: guid(filters.creditAccountId),
     from: filters.from ?? null,
     to: filters.to ?? null,
     transactionType: filters.transactionType ?? null,
-    actorUserId: filters.actorUserId ?? null,
-    jobId: filters.jobId ?? null,
-    reservationId: filters.reservationId ?? null,
-  })
+    actorUserId: guid(filters.actorUserId), jobId: guid(filters.jobId),
+    reservationId: guid(filters.reservationId),
+  }
 }
 
 function exportFiltersMatch(left: BillingLedgerExportFilters, right: BillingLedgerExportFilters): boolean {
@@ -864,10 +876,32 @@ function parseExportJson(text: string): Record<string, unknown> {
   return payload
 }
 
+function requireLocalExportWire(text: string, status: boolean): void {
+  const payload = parseExportJson(text)
+  const requiredInstants = status
+    ? ['requestedAt', 'asOf', 'artifactExpiresAt', 'referenceExpiresAt']
+    : ['requestedAt', 'asOf']
+  for (const key of requiredInstants) {
+    const value = payload[key]
+    if (value !== null) {
+      try { parseLocalInstant(value) }
+      catch { throw exportContractError('local export timestamp is invalid') }
+    }
+  }
+  if (!isRecord(payload.filters)) throw exportContractError('local export filters are invalid')
+  for (const key of ['from', 'to']) {
+    const value = payload.filters[key]
+    if (value !== null) {
+      try { parseLocalInstant(value) }
+      catch { throw exportContractError('local export filter is invalid') }
+    }
+  }
+}
+
 export function parseBillingLedgerExportAccepted(
   text: string,
   expectedClientId: string,
-  expectedFilters: BillingLedgerExportFilters
+  expectedFilters?: BillingLedgerExportFilters
 ): BillingLedgerExportAccepted {
   const payload = parseExportJson(text)
   if (!hasExactKeys(payload, EXPORT_ACCEPTED_KEYS)) {
@@ -879,7 +913,7 @@ export function parseBillingLedgerExportAccepted(
   const requestedAt = readExportInstant(payload.requestedAt, false)
   const asOf = readExportInstant(payload.asOf, false)
   if (!canonicalExpectedClient || clientId !== canonicalExpectedClient ||
-      !exportFiltersMatch(filters, expectedFilters)) {
+      (expectedFilters && !exportFiltersMatch(filters, expectedFilters))) {
     throw exportContractError('accepted scope does not match the request')
   }
   if (payload.status !== 'pending' || requestedAt !== asOf) {
@@ -959,20 +993,7 @@ export function parseBillingLedgerExportStatus(
     reference = { value: payload.reference, expiresAt: readExportInstant(payload.referenceExpiresAt, false) }
   }
   validateStatusLifecycle(metadata, reference)
-  if (reference && metadata.artifactExpiresAt &&
-      Date.parse(reference.expiresAt) > Date.parse(metadata.artifactExpiresAt)) {
-    throw exportContractError('reference eligibility is invalid')
-  }
   return { metadata, reference }
-}
-
-function requestFilterObject(filters: BillingLedgerExportFilters): Record<string, string> {
-  const body: Record<string, string> = {}
-  for (const key of EXPORT_FILTER_KEYS) {
-    const value = filters[key]
-    if (value !== null) body[key] = value
-  }
-  return body
 }
 
 export async function requestBillingLedgerExport(
@@ -983,26 +1004,45 @@ export async function requestBillingLedgerExport(
   const canonicalClientId = canonicalizeGuid(clientId)
   if (!canonicalClientId) throw exportContractError('requested Client ID is invalid')
   const normalizedFilters = normalizeLedgerExportFilters(filters)
-  const response = await apiClient.postApiRoot<string>('/api/audit/exports', {
+  const { actorId } = await currentPresentationPreference(signal)
+  const response = await apiClient.postApiRoot<string>('/api/backoffice/billing/ledger/exports', {
     clientId: canonicalClientId,
-    filters: requestFilterObject(normalizedFilters),
+    filters: {
+      creditAccountId: filters.creditAccountId ?? null,
+      from: filters.from ?? null, to: filters.to ?? null,
+      transactionType: filters.transactionType ?? null,
+      actorUserId: filters.actorUserId ?? null, jobId: filters.jobId ?? null,
+      reservationId: filters.reservationId ?? null,
+    },
   }, { responseType: 'text', signal })
   if (response.status !== 202 || typeof response.data !== 'string') {
     throw exportContractError('accepted response is invalid')
   }
-  return parseBillingLedgerExportAccepted(response.data, canonicalClientId, normalizedFilters)
+  requireCurrentActor(actorId)
+  requireLocalExportWire(response.data, false)
+  const accepted = parseBillingLedgerExportAccepted(response.data, canonicalClientId)
+  for (const bound of ['from', 'to'] as const)
+    if (accepted.filters[bound] !== normalizedFilters[bound])
+      throw exportContractError('accepted local filter differs from the request')
+  for (const key of ['creditAccountId', 'transactionType', 'actorUserId', 'jobId', 'reservationId'] as const)
+    if (accepted.filters[key] !== normalizedFilters[key])
+      throw exportContractError('accepted scope differs from the request')
+  return accepted
 }
 
 export async function getBillingLedgerExportStatus(
   attempt: BillingLedgerExportAttempt,
   signal?: AbortSignal
 ): Promise<BillingLedgerExportStatusResult> {
-  const response = await apiClient.getApiRoot<string>(`/api/audit/exports/${attempt.exportId}`, {
+  const { actorId } = await currentPresentationPreference(signal)
+  const response = await apiClient.getApiRoot<string>(`/api/backoffice/billing/ledger/exports/${attempt.exportId}`, {
     responseType: 'text', signal,
   })
   if (response.status !== 200 || typeof response.data !== 'string') {
     throw exportContractError('status response is invalid')
   }
+  requireCurrentActor(actorId)
+  requireLocalExportWire(response.data, true)
   return parseBillingLedgerExportStatus(response.data, attempt)
 }
 
@@ -1011,11 +1051,12 @@ export async function redeemBillingLedgerExport(
   reference: BillingLedgerExportReference,
   signal?: AbortSignal
 ): Promise<Blob> {
-  if (!reference.value.trim() || reference.value.length > 4096 || Date.parse(reference.expiresAt) <= Date.now()) {
+  if (!reference.value.trim() || reference.value.length > 4096) {
     throw exportContractError('reference eligibility is invalid')
   }
+  const { actorId } = await currentPresentationPreference(signal)
   const response = await apiClient.postApiRoot<Blob>(
-    `/api/audit/exports/${attempt.exportId}/redemptions`,
+    `/api/backoffice/billing/ledger/exports/${attempt.exportId}/redemptions`,
     { reference: reference.value },
     { responseType: 'blob', signal }
   )
@@ -1023,11 +1064,12 @@ export async function redeemBillingLedgerExport(
   const contentType = String(response.headers?.['content-type'] ?? (isBlob ? response.data.type : '')).toLowerCase()
   const mediaType = contentType.split(';', 1)[0]?.trim()
   const disposition = String(response.headers?.['content-disposition'] ?? '')
-  const expectedFilename = `ledger-export-${attempt.exportId}.csv`
+  const expectedFilename = `ledger-export-${attempt.exportId}-local.csv`
   if (response.status !== 200 || !isBlob || mediaType !== 'text/csv' ||
       (disposition && !disposition.includes(expectedFilename))) {
     throw exportContractError('download response is invalid')
   }
+  requireCurrentActor(actorId)
   return response.data
 }
 
@@ -1101,7 +1143,7 @@ const PRORATION_POLICIES = new Set<BillingSubscriptionProrationPolicy>(['none', 
 const GRANT_TYPES = new Set(['billing_cycle', 'operator_override'])
 const POSITIVE_DECIMAL_PATTERN = /^(?:0|[1-9]\d{0,13})(?:\.\d{1,4})?$/
 const UUID_V7_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-const SUBSCRIPTION_INSTANT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(Z|\+00:00)$/
+const SUBSCRIPTION_INSTANT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(Z|[+-](?:0\d|1[0-4]):[0-5]\d)$/
 const LIFECYCLE_REQUEST_KEYS = ['action', 'expectedStatus', 'lifecycleOperationId', 'reason'] as const
 const LIFECYCLE_RECEIPT_KEYS = [
   'action', 'clientId', 'effectiveAt', 'lifecycleOperationId', 'operationAsOf',
@@ -1145,6 +1187,9 @@ function readSubscriptionUuidV7(value: unknown, field: string): string {
 }
 
 function readSubscriptionInstant(value: unknown, field: string): string {
+  if (typeof value === 'string') {
+    try { return parseLocalInstant(value) } catch { /* legacy canonical parser below */ }
+  }
   const match = typeof value === 'string' ? SUBSCRIPTION_INSTANT_PATTERN.exec(value) : null
   if (!match || Number.isNaN(Date.parse(value as string))) {
     throw subscriptionContractError(`${field} must be a UTC instant`)
@@ -1604,6 +1649,58 @@ export function parseBillingSubscriptionState(
   return result
 }
 
+const LOCAL_SUBSCRIPTION_INSTANT_FIELDS = new Set([
+  'stateAsOf', 'historyAsOf', 'billingCycleAnchor', 'validFrom', 'validTo',
+  'createdAt', 'updatedAt', 'cycleStart', 'cycleEnd', 'effectiveCycleStart',
+  'effectiveCycleEnd', 'scheduledAt', 'lastAppliedAt', 'lastAppliedCycleStart',
+])
+
+const PRESENTATION_INSTANT_FIELDS = new Set([
+  ...LOCAL_SUBSCRIPTION_INSTANT_FIELDS,
+  'asOf', 'effectiveAt', 'operationAsOf', 'evaluatedAt', 'measuredAt',
+  'nextBoundary', 'lossAt', 'accessUntil', 'earliestProofExpiry',
+  'proofExpiresAt', 'dueAt', 'recordedAt', 'restoredAt',
+  'commandEffectiveAt', 'observedAt', 'referenceExpiresAt',
+  'artifactExpiresAt',
+])
+
+function requireLocalDateWire(text: string): void {
+  let payload: unknown
+  try { payload = parse(text) }
+  catch { throw new Error('Local presentation response is invalid') }
+  const visit = (value: unknown): void => {
+    if (Array.isArray(value)) { value.forEach(visit); return }
+    if (!isRecord(value) || isLosslessNumber(value)) return
+    for (const [key, child] of Object.entries(value)) {
+      if (PRESENTATION_INSTANT_FIELDS.has(key) && child !== null) {
+        parseLocalInstant(child)
+      } else if (key !== 'entitlements' && key !== 'entitlementsSnapshot') visit(child)
+    }
+  }
+  visit(payload)
+}
+
+function localSubscriptionStateToValidatedText(text: string): string {
+  const payload = parseSubscriptionPayload(text)
+  const visit = (value: unknown): unknown => {
+    if (isLosslessNumber(value)) return value
+    if (Array.isArray(value)) return value.map(visit)
+    if (!isRecord(value)) return value
+    const copy: Record<string, unknown> = {}
+    for (const [key, child] of Object.entries(value)) {
+      if (LOCAL_SUBSCRIPTION_INSTANT_FIELDS.has(key) && child !== null) {
+        copy[key] = localInstantDateTime(parseLocalInstant(child))
+      } else if (key === 'entitlements' || key === 'entitlementsSnapshot') {
+        copy[key] = child
+      } else copy[key] = visit(child)
+    }
+    return copy
+  }
+  const result = stringify(visit(payload))
+  if (typeof result !== 'string') throw subscriptionContractError('state response is invalid')
+  return result
+}
+
 export async function getBillingSubscriptionState(
   clientId: string,
   request: BillingSubscriptionPageRequest = { pageSize: 20 },
@@ -1611,6 +1708,7 @@ export async function getBillingSubscriptionState(
 ): Promise<BillingSubscriptionState> {
   const canonicalClientId = canonicalizeGuid(clientId)
   if (!canonicalClientId) throw subscriptionContractError('requested Client ID is invalid')
+  const { actorId } = await currentPresentationPreference(signal)
   const params = new URLSearchParams()
   if (typeof request.cursor === 'string') {
     if (!request.cursor.trim()) throw subscriptionContractError('cursor is invalid')
@@ -1622,13 +1720,15 @@ export async function getBillingSubscriptionState(
     params.set('pageSize', String(request.pageSize))
   }
   const response = await apiClient.getApiRoot<string>(
-    `/api/billing/clients/${canonicalClientId}/subscriptions?${params.toString()}`,
+    `/api/backoffice/clients/${canonicalClientId}/billing/subscriptions?${params.toString()}`,
     { responseType: 'text', signal }
   )
   if (response.status !== 200 || typeof response.data !== 'string') {
     throw subscriptionContractError('state response is invalid')
   }
-  return parseBillingSubscriptionState(response.data, canonicalClientId)
+  requireCurrentActor(actorId)
+  return parseBillingSubscriptionState(
+    localSubscriptionStateToValidatedText(response.data), canonicalClientId)
 }
 
 function decimalsEqual(left: string, right: string): boolean {
@@ -1648,17 +1748,28 @@ function entitlementsEqual(left: BillingEntitlementsV1, right: BillingEntitlemen
 function nullableInstantsEqual(left: string | null, right: string | null): boolean {
   return left === null || right === null
     ? left === right
-    : Date.parse(left) === Date.parse(right)
+    : left === right
 }
 
-function instantKey(value: string): string {
+function instantKey(value: string): bigint {
   const match = SUBSCRIPTION_INSTANT_PATTERN.exec(value)
   if (!match) throw subscriptionContractError('instant is invalid')
-  return `${match.slice(1, 7).join('')}${(match[7] ?? '').padEnd(6, '0')}`
+  return BigInt(Date.parse(value)) * 1000n + BigInt((match[7] ?? '').padEnd(6, '0').slice(3))
 }
 
 function compareInstants(left: string, right: string): number {
-  return instantKey(left).localeCompare(instantKey(right))
+  if (isLocalWall(left) && isLocalWall(right)) {
+    // Equal wall values may still identify different UTC instants in an overlap.
+    // The API owns ordering; the UI only checks exact projected equality.
+    return left === right ? 0 : Number.NaN
+  }
+  const a = instantKey(left)
+  const b = instantKey(right)
+  return a < b ? -1 : a > b ? 1 : 0
+}
+
+function isLocalWall(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}$/.test(value)
 }
 
 function firstCalendarBoundary(value: string): string {
@@ -2039,8 +2150,9 @@ export async function postBillingSubscriptionLifecycle(
     throw subscriptionContractError('retained lifecycle body does not match the confirmed operation')
   }
   const body = retainedBody ?? canonicalBody
+  const { actorId } = await currentPresentationPreference(signal)
   const response = await apiClient.postApiRoot<string>(
-    `/api/billing/clients/${canonicalClientId}/subscriptions/${canonicalSubscriptionId}/lifecycle`,
+    `/api/backoffice/clients/${canonicalClientId}/billing/subscriptions/${canonicalSubscriptionId}/lifecycle`,
     body,
     {
       responseType: 'text', signal, headers: { 'Content-Type': 'application/json' },
@@ -2050,6 +2162,8 @@ export async function postBillingSubscriptionLifecycle(
   if (response.status !== 200 || typeof response.data !== 'string') {
     throw subscriptionContractError('lifecycle response is invalid')
   }
+  requireCurrentActor(actorId)
+  requireLocalDateWire(response.data)
   return parseBillingSubscriptionLifecycleReceipt(
     response.data, canonicalClientId, canonicalSubscriptionId, request, validTo
   )
@@ -2244,8 +2358,9 @@ export function parseResourceAccessPreview(
       deadlineGroups.some((group, index) => index > 0 &&
         compareInstants(deadlineGroups[index - 1]!.accessUntil, group.accessUntil) > 0) ||
       (earliestProofExpiry !== null && (graceCount === 0 ||
-        !deadlineGroups.some(group => compareInstants(earliestProofExpiry, group.lossAt) > 0 &&
-          compareInstants(earliestProofExpiry, group.accessUntil) < 0))) ||
+        (!isLocalWall(earliestProofExpiry) &&
+          !deadlineGroups.some(group => compareInstants(earliestProofExpiry, group.lossAt) > 0 &&
+            compareInstants(earliestProofExpiry, group.accessUntil) < 0)))) ||
       (!payload.affectedResourcesTruncated &&
         (resources.map(resource => resource.proofExpiresAt).filter((value): value is string => value !== null)
           .sort(compareInstants)[0] ?? null) !== earliestProofExpiry)) {
@@ -2292,14 +2407,17 @@ export async function getResourceAccessPreview(
     throw subscriptionContractError('preview route identifiers are invalid')
   }
   const body = serializeResourceAccessPreviewRequest(request)
+  const { actorId } = await currentPresentationPreference(signal)
   const response = await apiClient.postApiRoot<string>(
-    `/api/billing/clients/${canonicalClientId}/subscriptions/${canonicalSubscriptionId}/resource-access-preview`,
+    `/api/backoffice/clients/${canonicalClientId}/billing/subscriptions/${canonicalSubscriptionId}/resource-access-preview`,
     body,
     { responseType: 'text', signal, headers: { 'Content-Type': 'application/json' } }
   )
   if (response.status !== 200 || typeof response.data !== 'string') {
     throw subscriptionContractError('preview response is invalid')
   }
+  requireCurrentActor(actorId)
+  requireLocalDateWire(response.data)
   return parseResourceAccessPreview(
     response.data, canonicalClientId, canonicalSubscriptionId, request
   )
@@ -2449,7 +2567,7 @@ function validateTierChangeResult(
 ): void {
   const receipt = result.receipt
   const state = result.tierState
-  const sameInstant = (left: string, right: string) => Date.parse(left) === Date.parse(right)
+  const sameInstant = (left: string, right: string) => left === right
   const base = receipt.expectedTierRevision === receipt.previousTierRevision &&
     state.subscriptionTier === receipt.resultingSubscriptionTier &&
     state.tierRevision === receipt.resultingTierRevision
@@ -2475,7 +2593,7 @@ function validateTierChangeResult(
     const expectedAction = receipt.outcome === 'scheduled' ? 'schedule' : 'replace'
     valid &&= action === expectedAction && receipt.action === expectedAction &&
       receipt.effectivePolicy === 'next_billing_cycle' &&
-      Date.parse(receipt.effectiveAt) > Date.parse(receipt.operationAsOf) &&
+      (isLocalWall(receipt.effectiveAt) || Date.parse(receipt.effectiveAt) > Date.parse(receipt.operationAsOf)) &&
       receipt.resultingTierRevision === receipt.previousTierRevision &&
       receipt.resultingSubscriptionTier === receipt.previousSubscriptionTier &&
       receipt.requestedSubscriptionTier !== receipt.previousSubscriptionTier &&
@@ -2495,7 +2613,7 @@ function validateTierChangeResult(
   } else if (receipt.outcome === 'cancelled') {
     valid &&= action === 'cancel_pending' && receipt.action === 'cancel' &&
       receipt.effectivePolicy === 'next_billing_cycle' &&
-      Date.parse(receipt.effectiveAt) >= Date.parse(receipt.operationAsOf) &&
+      (isLocalWall(receipt.effectiveAt) || Date.parse(receipt.effectiveAt) >= Date.parse(receipt.operationAsOf)) &&
       receipt.resultingTierRevision === receipt.previousTierRevision &&
       receipt.resultingSubscriptionTier === receipt.previousSubscriptionTier &&
       receipt.previousPendingTierChangeOperationId === request.expectedPendingTierChangeOperationId &&
@@ -2526,8 +2644,9 @@ export async function postBillingSubscriptionTierChange(
   }
   const suffix = action === 'replace' ? '/pending/replace'
     : action === 'cancel_pending' ? '/pending/cancel' : ''
+  const { actorId } = await currentPresentationPreference(signal)
   const response = await apiClient.postApiRoot<string>(
-    `/api/billing/clients/${canonicalClientId}/subscriptions/${canonicalSubscriptionId}/tier-changes${suffix}`,
+    `/api/backoffice/clients/${canonicalClientId}/billing/subscriptions/${canonicalSubscriptionId}/tier-changes${suffix}`,
     retainedBody ?? canonicalBody,
     {
       responseType: 'text', signal, headers: { 'Content-Type': 'application/json' },
@@ -2537,6 +2656,8 @@ export async function postBillingSubscriptionTierChange(
   if (response.status !== 200 || typeof response.data !== 'string') {
     throw subscriptionContractError('tier-change response is invalid')
   }
+  requireCurrentActor(actorId)
+  requireLocalDateWire(response.data)
   return parseBillingSubscriptionTierChangeResponse(
     response.data, canonicalClientId, canonicalSubscriptionId, action, request
   )
@@ -2710,13 +2831,16 @@ export async function getResourceAccessConsequences(
 ): Promise<ResourceAccessConsequence[]> {
   const canonicalClientId = canonicalizeGuid(clientId)
   if (!canonicalClientId) throw subscriptionContractError('requested Client ID is invalid')
+  const { actorId } = await currentPresentationPreference(signal)
   const response = await apiClient.getApiRoot<string>(
-    `/api/billing/clients/${canonicalClientId}/resource-access-consequences`,
+    `/api/backoffice/clients/${canonicalClientId}/billing/resource-access-consequences`,
     { responseType: 'text', signal }
   )
   if (response.status !== 200 || typeof response.data !== 'string') {
     throw subscriptionContractError('consequence response is invalid')
   }
+  requireCurrentActor(actorId)
+  requireLocalDateWire(response.data)
   return parseResourceAccessConsequences(response.data)
 }
 
@@ -2724,7 +2848,6 @@ export const billingApi = {
   getAccountSnapshot: getBillingAccountSnapshot,
   getLedgerPage: getBillingLedgerPage,
   getSubscriptionState: getBillingSubscriptionState,
-  createSubscription: createBillingSubscription,
   postSubscriptionLifecycle: postBillingSubscriptionLifecycle,
   getResourceAccessPreview,
   getResourceAccessConsequences,

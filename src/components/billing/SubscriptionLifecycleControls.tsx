@@ -234,9 +234,6 @@ export function SubscriptionLifecycleControlsView({
     lifecycle.clear()
   }
 
-  const isAdvisoryDue = Boolean(current?.validTo &&
-    Date.now() >= Date.parse(current.validTo) && Date.parse(state.stateAsOf) < Date.parse(current.validTo))
-
   if (!current && lifecycle.outcome === 'idle') return null
 
   return (
@@ -245,7 +242,6 @@ export function SubscriptionLifecycleControlsView({
       {lifecycle.outcome === 'idle' && current && (
         <>
           <p className="mt-2 text-sm text-gray-700">Actions use authoritative state as of <span className="break-all font-mono">{state.stateAsOf}</span>. The server database clock remains final.</p>
-          {isAdvisoryDue && <p role="status" className="state-indicator mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">Browser time suggests the validity boundary may have passed. Refresh before choosing an action.</p>}
           <div className="mt-4 flex flex-wrap gap-3">
             {actions.map((action) => (
               <button key={action} type="button" onClick={() => open(action)} aria-label={`${ACTION_LABEL[action]} subscription`} className="min-h-11 min-w-11 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">

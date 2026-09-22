@@ -1,3 +1,5 @@
+import type { LocalInstantValue } from '../timezone/LocalInstant'
+
 export type BillingAccountStatus = 'active' | 'suspended' | 'closed'
 
 export interface BillingAccountSnapshot {
@@ -8,7 +10,7 @@ export interface BillingAccountSnapshot {
   availableBalance: string
   activeReservationCount: number
   status: BillingAccountStatus
-  asOf: string
+  asOf: LocalInstantValue
   walletVersion: string
 }
 
@@ -555,12 +557,12 @@ export interface BillingLedgerItem {
   ruleVersion: string | null
   actorUserId: string | null
   reason: string | null
-  createdAt: string
+  createdAt: LocalInstantValue
 }
 
 export interface BillingLedgerPage {
   items: BillingLedgerItem[]
-  asOf: string
+  asOf: LocalInstantValue
   nextCursor: string | null
 }
 

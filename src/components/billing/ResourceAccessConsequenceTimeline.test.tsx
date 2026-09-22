@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { ResourceAccessConsequence } from '../../types/billing'
 import { ResourceAccessConsequenceTimeline } from './ResourceAccessConsequenceTimeline'
 
-const AT = '2026-09-20T12:00:00.000000Z'
+const AT = '2026-09-20T12:00:00.000000'
 
 function consequence(
   consequenceKind: ResourceAccessConsequence['consequenceKind'],
@@ -16,7 +16,7 @@ function consequence(
     causeIdentity: `cause-${index}`,
     consequenceKind,
     lossAt: AT,
-    accessUntil: '2026-09-27T12:00:00.000000Z',
+    accessUntil: '2026-09-27T12:00:00.000000',
     earliestProofExpiry: null,
     retainedCount: 1,
     totalCount: 3,
@@ -25,11 +25,11 @@ function consequence(
     affectedResources: [],
     affectedResourcesTruncated: false,
     deadlineGroups: consequenceKind === 'suspended' ? [] : [{
-      accessUntil: '2026-09-27T12:00:00.000000Z', graceCount: 2,
+      accessUntil: '2026-09-27T12:00:00.000000', graceCount: 2,
     }],
     deadlineGroupsTruncated: false, unlistedGraceCount: 0,
     suspensionGroups: consequenceKind === 'suspended' ? [{
-      accessUntil: '2026-09-27T12:00:00.000000Z', suspendedCount: 2,
+      accessUntil: '2026-09-27T12:00:00.000000', suspendedCount: 2,
       reason: 'finite_limit',
     }] : [], unlistedSuspendedCount: 0,
     restoredCount: null, restoredAt: null,
@@ -50,8 +50,8 @@ describe('ResourceAccessConsequenceTimeline', () => {
     render(<ResourceAccessConsequenceTimeline consequences={[{
       ...consequence('grace_started', 0),
       deadlineGroups: [
-        { accessUntil: '2026-09-22T12:00:00.000000Z', graceCount: 1 },
-        { accessUntil: '2026-09-27T12:00:00.000000Z', graceCount: 1 },
+        { accessUntil: '2026-09-22T12:00:00.000000', graceCount: 1 },
+        { accessUntil: '2026-09-27T12:00:00.000000', graceCount: 1 },
       ],
     }]} isLoading={false} error={null} onRetry={vi.fn()} />)
     expect(screen.getByText(/policy grace deadline for 1 affected resource is 2026-09-22.*policy grace deadline for 1 affected resource is 2026-09-27/)).toBeInTheDocument()
@@ -61,7 +61,7 @@ describe('ResourceAccessConsequenceTimeline', () => {
     render(<ResourceAccessConsequenceTimeline consequences={[
       { ...consequence('restored', 0), restoredCount: 1, restoredAt: AT },
       { ...consequence('suspended', 1), suspensionGroups: [{
-        accessUntil: '2026-09-27T12:00:00.000000Z', suspendedCount: 1,
+        accessUntil: '2026-09-27T12:00:00.000000', suspendedCount: 1,
         reason: 'routing_inactive',
       }] },
     ]} isLoading={false} error={null} onRetry={vi.fn()} />)
@@ -74,36 +74,36 @@ describe('ResourceAccessConsequenceTimeline', () => {
     render(<ResourceAccessConsequenceTimeline consequences={[{
       ...consequence('grace_started', 0),
       reminders: [{ reminderKind: 'reminder_24h',
-        dueAt: '2026-09-26T12:00:00.000000Z',
-        recordedAt: '2026-09-26T12:00:00.000000Z', graceCount: 1,
+        dueAt: '2026-09-26T12:00:00.000000',
+        recordedAt: '2026-09-26T12:00:00.000000', graceCount: 1,
         earliestProofExpiry: null }],
     }]} isLoading={false} error={null} onRetry={vi.fn()} />)
-    expect(screen.getByText(/24 hours remain before the policy grace deadline for 1 over-limit affected resource/)).toBeInTheDocument()
+    expect(screen.getByText(/The policy grace deadline is 2026-09-27T12:00:00.000000 for 1 over-limit affected resource/)).toBeInTheDocument()
   })
 
   it('uses the actual recorded time when a reminder worker runs late', () => {
     render(<ResourceAccessConsequenceTimeline consequences={[{
       ...consequence('grace_started', 0),
       reminders: [{ reminderKind: 'reminder_72h',
-        dueAt: '2026-09-24T12:00:00.000000Z',
-        recordedAt: '2026-09-25T12:00:00.000000Z', graceCount: 1,
+        dueAt: '2026-09-24T12:00:00.000000',
+        recordedAt: '2026-09-25T12:00:00.000000', graceCount: 1,
         earliestProofExpiry: null }],
     }]} isLoading={false} error={null} onRetry={vi.fn()} />)
-    expect(screen.getByText(/48 hours remain before the policy grace deadline/)).toBeInTheDocument()
+    expect(screen.getByText(/The policy grace deadline is 2026-09-27T12:00:00.000000/)).toBeInTheDocument()
   })
 
   it('keeps persisted policy and proof deadlines distinct in history and reminder copy', () => {
-    const proofExpiresAt = '2026-09-26T18:00:00.000000Z'
+    const proofExpiresAt = '2026-09-26T18:00:00.000000'
     render(<ResourceAccessConsequenceTimeline consequences={[{
       ...consequence('grace_started', 0), earliestProofExpiry: proofExpiresAt,
       reminders: [{ reminderKind: 'reminder_24h',
-        dueAt: '2026-09-26T12:00:00.000000Z',
-        recordedAt: '2026-09-26T12:00:00.000000Z', graceCount: 1,
+        dueAt: '2026-09-26T12:00:00.000000',
+        recordedAt: '2026-09-26T12:00:00.000000', graceCount: 1,
         earliestProofExpiry: proofExpiresAt }],
     }]} isLoading={false} error={null} onRetry={vi.fn()} />)
     expect(screen.getByText(/policy grace deadline for 2 affected resources is 2026-09-27/)).toBeInTheDocument()
     expect(screen.getAllByText(/Earliest known ownership or TLS proof expiry.*2026-09-26T18:00:00/)).toHaveLength(2)
-    expect(screen.getByText(/24 hours remain before the policy grace deadline.*may stop serving earlier.*2026-09-26T18:00:00/)).toBeInTheDocument()
+    expect(screen.getByText(/The policy grace deadline is 2026-09-27.*may stop serving earlier.*2026-09-26T18:00:00/)).toBeInTheDocument()
     expect(screen.queryByText(/routes/)).not.toBeInTheDocument()
   })
 

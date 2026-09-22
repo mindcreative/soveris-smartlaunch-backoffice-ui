@@ -44,7 +44,7 @@ const AnalyticsPage: FC = () => {
     if (!overview) return []
 
     const totalSubmissions = overview.totalSubmissions ?? 0
-    const verifiedCount = overview.totalVerified ?? 0
+    const verifiedCount = overview.verifiedSubmissions ?? 0
     const verificationRate = overview.verificationRate ?? 0
     const conversionRate = overview.conversionRate ?? 0
 

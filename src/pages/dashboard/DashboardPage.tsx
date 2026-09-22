@@ -64,7 +64,7 @@ const DashboardPage: FC = () => {
           />
           <StatCard
             title="Verified"
-            value={metrics.totalVerified}
+            value={metrics.verifiedSubmissions}
             change={{ value: 8, isPositive: true }}
           />
           <StatCard

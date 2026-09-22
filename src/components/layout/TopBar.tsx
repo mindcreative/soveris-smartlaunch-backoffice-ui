@@ -11,7 +11,7 @@ export function TopBar({ onOpenMobileNavigation, menuButtonRef }: TopBarProps) {
 
   return (
     <header className="sticky top-0 z-40 border-b border-gray-200 bg-white">
-      <div className="flex h-16 min-w-0 items-center justify-between gap-2 px-3 sm:px-6">
+      <div className="flex min-h-16 min-w-0 flex-wrap items-center justify-between gap-2 px-3 py-2 sm:flex-nowrap sm:px-6">
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
           <button
             ref={menuButtonRef}
@@ -27,9 +27,9 @@ export function TopBar({ onOpenMobileNavigation, menuButtonRef }: TopBarProps) {
           </span>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:shrink-0 sm:gap-4">
           {user && (
-            <div className="hidden min-w-0 items-center gap-3 sm:flex">
+            <div className="hidden min-w-0 items-center gap-3 2xl:flex">
               <div className="min-w-0 text-right">
                 <p className="truncate text-sm font-medium text-gray-900">{user.displayName}</p>
                 <p className="hidden truncate text-xs text-gray-500 md:block">{user.email}</p>
@@ -47,7 +47,7 @@ export function TopBar({ onOpenMobileNavigation, menuButtonRef }: TopBarProps) {
           <button
             type="button"
             onClick={() => void logout()}
-            className="min-h-11 rounded-md px-3 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+            className="min-h-11 max-w-full rounded-md px-3 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
           >
             Logout
           </button>

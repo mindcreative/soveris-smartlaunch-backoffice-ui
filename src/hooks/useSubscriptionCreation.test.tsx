@@ -2,7 +2,7 @@ import type { PropsWithChildren } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { billingApi } from '../api/billingApi'
+import { legacyBillingApi } from '../api/legacySubscriptionApi'
 import type {
   BillingSubscriptionCreationReceipt,
   CreateBillingSubscriptionMaterial,
@@ -36,7 +36,7 @@ describe('useSubscriptionCreation', () => {
   it('coalesces synchronous duplicate confirmation into one immutable UUIDv7 attempt', async () => {
     const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
     let resolve: ((receipt: BillingSubscriptionCreationReceipt) => void) | undefined
-    const create = vi.spyOn(billingApi, 'createSubscription').mockImplementation(
+    const create = vi.spyOn(legacyBillingApi, 'createSubscription').mockImplementation(
       () => new Promise((next) => { resolve = next })
     )
     const uuidFactory = vi.fn(() => OPERATION_ID)
@@ -61,7 +61,7 @@ describe('useSubscriptionCreation', () => {
 
   it('retains exact identity and serialized body after ambiguity and explicit retry', async () => {
     const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
-    const create = vi.spyOn(billingApi, 'createSubscription')
+    const create = vi.spyOn(legacyBillingApi, 'createSubscription')
       .mockRejectedValueOnce({ code: 'NETWORK_ERROR', message: 'disconnected' })
       .mockResolvedValueOnce({ ...RECEIPT, created: false })
     const { result } = renderHook(
@@ -86,7 +86,7 @@ describe('useSubscriptionCreation', () => {
   it('detaches and aborts an in-flight attempt when the route Client changes', async () => {
     const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
     let signal: AbortSignal | undefined
-    vi.spyOn(billingApi, 'createSubscription').mockImplementation(
+    vi.spyOn(legacyBillingApi, 'createSubscription').mockImplementation(
       (_clientId, _request, requestSignal) => {
         signal = requestSignal
         return new Promise(() => undefined)
@@ -110,7 +110,7 @@ describe('useSubscriptionCreation', () => {
     const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
     let resolve: ((receipt: BillingSubscriptionCreationReceipt) => void) | undefined
     let signal: AbortSignal | undefined
-    vi.spyOn(billingApi, 'createSubscription').mockImplementation((_clientId, _request, requestSignal) => {
+    vi.spyOn(legacyBillingApi, 'createSubscription').mockImplementation((_clientId, _request, requestSignal) => {
       signal = requestSignal
       return new Promise((next) => { resolve = next })
     })

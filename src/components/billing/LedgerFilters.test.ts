@@ -23,14 +23,14 @@ describe('normalizeLedgerFilterDraft', () => {
     })
   })
 
-  it('converts local date-time values into explicit UTC instants', () => {
+  it('keeps plain local walls for backend resolution', () => {
     const result = normalizeLedgerFilterDraft(draft({
       from: '2026-08-24T08:00',
       to: '2026-08-24T09:00',
     }))
     expect(result.errors).toEqual({})
-    expect(result.filters?.from).toMatch(/^2026-08-24T\d{2}:00:00\.000Z$/)
-    expect(result.filters?.to).toMatch(/^2026-08-24T\d{2}:00:00\.000Z$/)
+    expect(result.filters?.from).toBe('2026-08-24T08:00:00.000000')
+    expect(result.filters?.to).toBe('2026-08-24T09:00:00.000000')
   })
 
   it('rejects invalid GUIDs, page bounds, and a non-increasing range without losing draft data', () => {

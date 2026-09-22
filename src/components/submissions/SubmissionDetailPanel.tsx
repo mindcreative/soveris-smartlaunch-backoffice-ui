@@ -3,6 +3,8 @@ import { LoadingSpinner } from '../shared/LoadingSpinner'
 import { ErrorDisplay } from '../shared/ErrorDisplay'
 import { Badge } from '../shared/Badge'
 import type { Submission } from '@/types'
+import { LocalInstant } from '@/timezone/LocalInstant'
+import type { LocalInstantValue } from '@/timezone/LocalInstant'
 
 interface SubmissionDetailPanelProps {
   submission: Submission | null
@@ -63,20 +65,8 @@ export function SubmissionDetailPanel({
 
   const statusInfo = getStatusInfo()
 
-  const formatDate = (value: string | undefined | null) => {
-    if (!value) return '\u2014'
-    try {
-      return new Date(value).toLocaleString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    } catch {
-      return value
-    }
-  }
+  const formatDate = (value: LocalInstantValue | undefined | null) =>
+    value ? <LocalInstant value={value} /> : '\u2014'
 
   if (!isOpen) return null
 

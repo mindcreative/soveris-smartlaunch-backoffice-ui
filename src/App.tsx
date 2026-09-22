@@ -18,7 +18,6 @@ import { queryClient } from './queryClient'
 import { BillingAccountPage, BillingIndexPage } from './pages/billing/BillingAccountPage'
 import { BillingLedgerBoundaryPage } from './pages/billing/BillingLedgerBoundaryPage'
 import { BillingSubscriptionPage } from './pages/billing/BillingSubscriptionPage'
-
 // Protected route wrapper with role-based access
 function ProtectedRoute({
   children,

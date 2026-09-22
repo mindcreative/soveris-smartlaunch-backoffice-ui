@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { LoadingSpinner } from '@/components/shared/LoadingSpinner'
 import { SubmissionDetailPanel } from '@/components/submissions/SubmissionDetailPanel'
 import type { SubmissionSummary, SubmissionStatus as SubmissionStatusType } from '@/types'
+import { LocalInstant, parseLocalInstant } from '@/timezone/LocalInstant'
 
 const statusColors: Record<SubmissionStatusType, 'success' | 'warning' | 'error' | 'info' | 'neutral'> = {
   pending: 'warning',
@@ -59,12 +60,12 @@ const SubmissionsPage: FC = () => {
       {
         key: 'submittedDate',
         label: 'Submitted',
-        sortable: true,
+        sortable: false,
         render: (_value: unknown, row: Record<string, unknown>) => {
-          const updated = (row.updatedAt as string) || (row.updated_at as string)
-          const created = (row.createdAt as string) || (row.created_at as string)
-          const dateStr = updated || created
-          return dateStr ? new Date(dateStr).toLocaleDateString() : '-'
+          const updated = row.updatedAt ?? row.updated_at
+          const created = row.createdAt ?? row.created_at
+          const instant = updated || created
+          return instant ? <LocalInstant value={parseLocalInstant(instant)} /> : '-'
         },
       },
       {

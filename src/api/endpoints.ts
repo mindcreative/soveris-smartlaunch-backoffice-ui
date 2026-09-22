@@ -1,4 +1,6 @@
 import { apiClient } from './apiClient'
+import { localInstantDateTime, parseLocalInstant, type LocalInstantValue } from '../timezone/LocalInstant'
+import { localResponseBinding } from '../timezone/responseGuard'
 import type {
   AuthUser,
   LoginCredentials,
@@ -28,6 +30,9 @@ import type {
   TrafficSource,
   ProductBreakdown,
   BackOfficeUser,
+  BackOfficeUserDetail,
+  CreatedBackOfficeUser,
+  UpdatedBackOfficeUser,
   CreateUserRequest,
   UpdateUserRequest,
 } from '../types'
@@ -65,6 +70,16 @@ export async function refreshToken(request: RefreshTokenRequest): Promise<AuthRe
 
 // ==================== USERS ENDPOINTS ====================
 
+function parseBackOfficeUser<T extends Partial<BackOfficeUser>>(value: T,
+  instant: (value: unknown) => LocalInstantValue, requireBoth = false): T {
+  if (!value || typeof value !== 'object') throw new Error('Invalid user response')
+  if (requireBoth && (value.createdAt === undefined || value.updatedAt === undefined))
+    throw new Error('Missing user timestamps')
+  return { ...value,
+    ...(value.createdAt !== undefined && { createdAt: instant(value.createdAt) }),
+    ...(value.updatedAt !== undefined && { updatedAt: instant(value.updatedAt) }) } as T
+}
+
 export async function getUsers(params?: {
   page?: number
   pageSize?: number
@@ -78,23 +93,33 @@ export async function getUsers(params?: {
   if (params?.role) queryParams.set('role', params.role)
 
   const queryString = queryParams.toString()
+  const binding = await localResponseBinding()
   const response = await apiClient.get(`/users${queryString ? `?${queryString}` : ''}`)
-  return response.data as PaginatedResult<BackOfficeUser>
+  binding.verify(response.headers)
+  const page = response.data as PaginatedResult<BackOfficeUser>
+  if (!page || !Array.isArray(page.data)) throw new Error('Invalid user page')
+  return { ...page, data: page.data.map((user) => parseBackOfficeUser(user, binding.instant, true)) }
 }
 
-export async function getUser(userId: string): Promise<BackOfficeUser> {
+export async function getUser(userId: string): Promise<BackOfficeUserDetail> {
+  const binding = await localResponseBinding()
   const response = await apiClient.get(`/users/${userId}`)
-  return response.data as BackOfficeUser
+  binding.verify(response.headers)
+  return parseBackOfficeUser(response.data as BackOfficeUserDetail, binding.instant)
 }
 
-export async function createUser(data: CreateUserRequest): Promise<BackOfficeUser> {
+export async function createUser(data: CreateUserRequest): Promise<CreatedBackOfficeUser> {
+  const binding = await localResponseBinding()
   const response = await apiClient.post('/users', data)
-  return response.data as BackOfficeUser
+  binding.verify(response.headers)
+  return parseBackOfficeUser(response.data as CreatedBackOfficeUser, binding.instant)
 }
 
-export async function updateUser(userId: string, data: UpdateUserRequest): Promise<BackOfficeUser> {
+export async function updateUser(userId: string, data: UpdateUserRequest): Promise<UpdatedBackOfficeUser> {
+  const binding = await localResponseBinding()
   const response = await apiClient.put(`/users/${userId}`, data)
-  return response.data as BackOfficeUser
+  binding.verify(response.headers)
+  return response.data as UpdatedBackOfficeUser
 }
 
 // NOTE: deleteUser is not implemented in the API. Use deactivateUser instead.
@@ -107,9 +132,12 @@ export async function resetUserPassword(userId: string): Promise<unknown> {
   return response.data
 }
 
-export async function getUserAuditLog(userId: string): Promise<PaginatedResult<AuditLogEntry>> {
+export async function getUserAuditLog(userId: string): Promise<AuditLogEntry[]> {
+  const binding = await localResponseBinding()
   const response = await apiClient.get(`/users/${userId}/audit`)
-  return response.data as PaginatedResult<AuditLogEntry>
+  binding.verify(response.headers)
+  if (!Array.isArray(response.data)) throw new Error('Invalid user audit history')
+  return response.data.map(parseAuditEntry)
 }
 
 // ==================== CONTENT ENDPOINTS ====================
@@ -129,23 +157,39 @@ export async function getProducts(
   if (filters.sort) queryParams.set('sort', filters.sort)
   if (filters.direction) queryParams.set('direction', filters.direction)
   const query = queryParams.toString()
+  const binding = await localResponseBinding(signal)
   const response = await apiClient.get(`/clients/${clientId}/products${query ? `?${query}` : ''}`, { signal })
-  return response.data as ProductPage
+  binding.verify(response.headers)
+  const page = response.data as ProductPage
+  if (!page || !Array.isArray(page.items)) throw new Error('Invalid product page')
+  return { ...page, items: page.items.map((item) => projectProductDates(item, binding.instant)) }
+}
+
+function projectProductDates(product: Product, instant: (value: unknown) => LocalInstantValue): Product {
+  if (!product || typeof product !== 'object') throw new Error('Invalid product')
+  return { ...product, createdAt: localInstantDateTime(instant(product.createdAt)),
+    updatedAt: localInstantDateTime(instant(product.updatedAt)) }
 }
 
 export async function getProduct(productId: string, signal?: AbortSignal): Promise<Product> {
+  const binding = await localResponseBinding(signal)
   const response = await apiClient.get(`/products/${productId}`, { signal })
-  return response.data as Product
+  binding.verify(response.headers)
+  return projectProductDates(response.data as Product, binding.instant)
 }
 
 export async function createProduct(clientId: string, data: CreateProductRequest): Promise<Product> {
+  const binding = await localResponseBinding()
   const response = await apiClient.post(`/clients/${clientId}/products`, data)
-  return response.data as Product
+  binding.verify(response.headers)
+  return projectProductDates(response.data as Product, binding.instant)
 }
 
 export async function updateProduct(productId: string, data: UpdateProductRequest): Promise<Product> {
+  const binding = await localResponseBinding()
   const response = await apiClient.put(`/products/${productId}`, data)
-  return response.data as Product
+  binding.verify(response.headers)
+  return projectProductDates(response.data as Product, binding.instant)
 }
 
 // GET /api/backoffice/content/{productId} — Get content for a specific product
@@ -187,6 +231,7 @@ export async function publishContent(
 // ==================== SUBMISSIONS ENDPOINTS ====================
 
 export async function getSubmissions(params?: GetSubmissionsRequest): Promise<PaginatedResult<SubmissionSummary>> {
+  const binding = await localResponseBinding()
   const queryParams = new URLSearchParams()
   if (params?.page) queryParams.set('page', String(params.page))
   if (params?.pageSize) queryParams.set('pageSize', String(params.pageSize))
@@ -200,12 +245,23 @@ export async function getSubmissions(params?: GetSubmissionsRequest): Promise<Pa
 
   const queryString = queryParams.toString()
   const response = await apiClient.get(`/submissions${queryString ? `?${queryString}` : ''}`)
-  return response.data as PaginatedResult<SubmissionSummary>
+  binding.verify(response.headers)
+  const page = response.data as PaginatedResult<SubmissionSummary>
+  if (!page || !Array.isArray(page.data)) throw new Error('Invalid submission page')
+  return { ...page, data: page.data.map((row) => ({ ...row,
+    createdAt: binding.instant(row.createdAt),
+    updatedAt: row.updatedAt ? binding.instant(row.updatedAt) : null,
+  })) }
 }
 
 export async function getSubmission(id: string): Promise<Submission> {
+  const binding = await localResponseBinding()
   const response = await apiClient.get(`/submissions/${id}`)
-  return response.data as Submission
+  binding.verify(response.headers)
+  const row = response.data as Submission
+  return { ...row, createdAt: binding.instant(row.createdAt),
+    updatedAt: row.updatedAt ? binding.instant(row.updatedAt) : null,
+    expiresAt: row.expiresAt ? binding.instant(row.expiresAt) : null }
 }
 
 export async function deleteSubmission(id: string): Promise<void> {
@@ -213,8 +269,10 @@ export async function deleteSubmission(id: string): Promise<void> {
 }
 
 export async function exportSubmissions(format?: 'csv' | 'json'): Promise<Blob> {
+  const binding = await localResponseBinding()
   const f = format ?? 'csv'
   const response = await apiClient.get(`/submissions/export?format=${f}`, { responseType: 'blob' })
+  binding.verify(response.headers)
   return response.data as Blob
 }
 
@@ -225,12 +283,23 @@ export async function exportSubmissions(format?: 'csv' | 'json'): Promise<Blob> 
 // ==================== ANALYTICS ENDPOINTS ====================
 
 export async function getOverviewMetrics(params?: { fromDate?: string; toDate?: string }): Promise<OverviewMetrics> {
+  const binding = await localResponseBinding()
   const queryParams = new URLSearchParams()
   if (params?.fromDate) queryParams.set('fromDate', params.fromDate)
   if (params?.toDate) queryParams.set('toDate', params.toDate)
   const queryString = queryParams.toString()
   const response = await apiClient.get(`/analytics/overview${queryString ? `?${queryString}` : ''}`)
-  return response.data as OverviewMetrics
+  binding.verify(response.headers)
+  const metrics = response.data as OverviewMetrics
+  if (!metrics || typeof metrics.totalSubmissions !== 'number' ||
+      typeof metrics.verifiedSubmissions !== 'number' ||
+      typeof metrics.verificationRate !== 'number' ||
+      typeof metrics.conversionRate !== 'number' ||
+      typeof metrics.totalPageViews !== 'number' ||
+      metrics.fromDate !== (params?.fromDate || null) ||
+      metrics.toDate !== (params?.toDate || null))
+    throw new Error('Invalid saved-zone analytics response')
+  return metrics
 }
 
 export async function getFunnelData(): Promise<FunnelStageCount[]> {
@@ -324,7 +393,7 @@ export interface AuditLogEntry {
   ipAddress?: string
   userAgent?: string
   details?: Record<string, unknown>
-  createdAt: string
+  createdAt: LocalInstantValue
   [key: string]: unknown
 }
 
@@ -340,8 +409,17 @@ export interface GetAuditLogsParams {
   sortDirection?: 'asc' | 'desc'
 }
 
+function parseAuditEntry(value: unknown): AuditLogEntry {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid audit entry')
+  const data = value as Record<string, unknown>
+  if (typeof data.id !== 'string' || typeof data.action !== 'string' ||
+      typeof data.entityType !== 'string') throw new Error('Invalid audit entry')
+  return { ...data, createdAt: parseLocalInstant(data.createdAt) } as AuditLogEntry
+}
+
 // Fixed: /audit → /audit-logs
 export async function getAuditLogs(params?: GetAuditLogsParams): Promise<PaginatedResult<AuditLogEntry>> {
+  const binding = await localResponseBinding()
   const queryParams = new URLSearchParams()
   if (params?.page) queryParams.set('page', String(params.page))
   if (params?.pageSize) queryParams.set('pageSize', String(params.pageSize))
@@ -353,21 +431,29 @@ export async function getAuditLogs(params?: GetAuditLogsParams): Promise<Paginat
 
   const queryString = queryParams.toString()
   const response = await apiClient.get(`/audit-logs${queryString ? `?${queryString}` : ''}`)
-  return response.data as PaginatedResult<AuditLogEntry>
+  binding.verify(response.headers)
+  const result = response.data as PaginatedResult<unknown>
+  if (!result || !Array.isArray(result.data)) throw new Error('Invalid audit page')
+  return { ...result, data: result.data.map(parseAuditEntry) }
 }
 
 // GET /api/backoffice/audit-logs/{id} — Get single audit log entry by ID
 export async function getAuditLogById(id: string): Promise<AuditLogEntry> {
+  const binding = await localResponseBinding()
   const response = await apiClient.get(`/audit-logs/${id}`)
-  return response.data as AuditLogEntry
+  binding.verify(response.headers)
+  return parseAuditEntry(response.data)
 }
 
 // GET /api/backoffice/audit-logs/entity?entityType={type}&entityId={id}
 export async function getEntityAuditLog(entityType: string, entityId: string): Promise<AuditLogEntry[]> {
+  const binding = await localResponseBinding()
   const response = await apiClient.get('/audit-logs/entity', {
     params: { entityType, entityId }
   })
-  return response.data as AuditLogEntry[]
+  binding.verify(response.headers)
+  if (!Array.isArray(response.data)) throw new Error('Invalid audit history')
+  return response.data.map(parseAuditEntry)
 }
 
 // ==================== CLIENTS ENDPOINTS ====================
@@ -390,8 +476,13 @@ export async function getClients(): Promise<Client[]> {
 }
 
 export async function getClient(id: string): Promise<Client> {
+  const binding = await localResponseBinding()
   const response = await apiClient.get(`/clients/${id}`)
-  return response.data as Client
+  binding.verify(response.headers)
+  const client = response.data as Client
+  if (!client || typeof client !== 'object') throw new Error('Invalid Client response')
+  return { ...client, createdAt: localInstantDateTime(binding.instant(client.createdAt)),
+    ...(client.updatedAt !== undefined && { updatedAt: localInstantDateTime(binding.instant(client.updatedAt)) }) }
 }
 
 // NOTE: createClient and deleteClient are not implemented in the API.
@@ -399,8 +490,15 @@ export async function getClient(id: string): Promise<Client> {
 // export async function deleteClient(id: string): Promise<void> { ... }
 
 export async function updateClient(id: string, data: Partial<Client>): Promise<Client> {
+  const binding = await localResponseBinding()
   const response = await apiClient.put(`/clients/${id}`, data)
-  return response.data as Client
+  binding.verify(response.headers)
+  const envelope = response.data as { client?: Client }
+  if (!envelope || typeof envelope !== 'object' || !envelope.client) throw new Error('Invalid Client update response')
+  return { ...envelope.client,
+    createdAt: localInstantDateTime(binding.instant(envelope.client.createdAt)),
+    ...(envelope.client.updatedAt !== undefined && {
+      updatedAt: localInstantDateTime(binding.instant(envelope.client.updatedAt)) }) }
 }
 
 export async function getClientDashboard(id: string): Promise<Record<string, unknown>> {

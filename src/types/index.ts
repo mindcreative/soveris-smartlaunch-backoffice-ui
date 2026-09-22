@@ -8,4 +8,5 @@ export * from './themes'
 export * from './billing'
 // Note: users.ts exports UserRole which conflicts with auth.ts
 // Export users types separately when needed
-export type { BackOfficeUser, CreateUserRequest, UpdateUserRequest } from './users'
+export type { BackOfficeUser, BackOfficeUserDetail, CreatedBackOfficeUser, UpdatedBackOfficeUser,
+  CreateUserRequest, UpdateUserRequest } from './users'

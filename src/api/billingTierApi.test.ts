@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
+import { useAuthStore } from '../stores/authStore'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from './apiClient'
 import {
   BillingSubscriptionContractError,
@@ -15,12 +16,18 @@ import type {
   BillingSubscriptionTierChangeRequest,
 } from '../types/billing'
 
+beforeEach(() => useAuthStore.setState({ user: {
+  id: 'actor', clientId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+  email: 'actor@example.test', displayName: 'Actor', role: 'Admin',
+  accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600,
+} }))
+
 const CLIENT = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 const SUBSCRIPTION = '11111111-2222-3333-8444-555555555555'
 const OPERATION = '01991f20-1234-7abc-8abc-1234567890ab'
 const PENDING = '01991f20-5678-7abc-8abc-1234567890ab'
-const AT = '2026-09-20T12:00:00.000000Z'
-const EFFECTIVE = '2026-09-30T08:30:00.000000Z'
+const AT = '2026-09-20T12:00:00.000000'
+const EFFECTIVE = '2026-09-30T08:30:00.000000'
 
 function state(pending = true): string {
   return JSON.stringify({
@@ -31,17 +38,17 @@ function state(pending = true): string {
       subscriptionTier: 'brand', tierRevision: 7, cycleCreditAmount: 100,
       entitlements: { schemaVersion: 1, rateLimits: { requestsPerMinute: 60, concurrentAiOperations: 4 }, featureFlags: { contentGeneration: true, imageGeneration: true } },
       changeEffectivePolicy: 'immediate', prorationPolicy: 'replace', unusedCreditPolicy: 'rollover',
-      billingCycleAnchor: '2026-08-31T08:30:00.000000Z', status: 'active',
-      validFrom: '2026-08-31T08:30:00.000000Z', validTo: null,
-      createdAt: '2026-08-31T08:30:00.000000Z', updatedAt: AT,
+      billingCycleAnchor: '2026-08-31T08:30:00.000000', status: 'active',
+      validFrom: '2026-08-31T08:30:00.000000', validTo: null,
+      createdAt: '2026-08-31T08:30:00.000000', updatedAt: AT,
     },
     pendingChange: null, subscriptionHistory: [],
     grantHistory: { items: [], historyAsOf: AT, nextCursor: null },
     ...(pending ? { pendingTierChange: {
       schemaVersion: 1, operationId: PENDING, subscriptionTier: 'basic',
       expectedTierRevision: 7, effectivePolicy: 'next_billing_cycle',
-      effectiveCycleIndex: 2, effectiveCycleStart: '2026-09-30T08:30:00.000000Z',
-      effectiveCycleEnd: '2026-10-31T08:30:00.000000Z', scheduledAt: AT,
+      effectiveCycleIndex: 2, effectiveCycleStart: '2026-09-30T08:30:00.000000',
+      effectiveCycleEnd: '2026-10-31T08:30:00.000000', scheduledAt: AT,
       reason: 'Approved downgrade',
     } } : {}),
   })
@@ -103,7 +110,7 @@ function tierCase(
     effectivePolicy: 'next_billing_cycle',
     effectiveCycleIndex: 2,
     effectiveCycleStart: EFFECTIVE,
-    effectiveCycleEnd: '2026-10-31T08:30:00.000000Z',
+    effectiveCycleEnd: '2026-10-31T08:30:00.000000',
     scheduledAt: AT,
     reason: request.reason,
   } : null
@@ -116,7 +123,7 @@ function tierCase(
         subscriptionTier: resultingTier,
         tierRevision: resultingRevision,
         status: 'active',
-        validFrom: '2026-08-31T08:30:00.000000Z',
+        validFrom: '2026-08-31T08:30:00.000000',
         validTo: null,
         pendingTierChange,
         observedAt: AT,
@@ -262,16 +269,16 @@ describe('tier administration strict adapters', () => {
       classificationRevision: 5, tierRevision: 7,
       pendingTierChangeOperationId: PENDING,
       policyPublicationId: '22222222-2222-3333-8444-555555555555',
-      policyActivationRevision: 9, policyVersion: 'input-04-v1', policyHash: 'abc', commandEffectiveAt: '2026-09-30T08:30:00.000000Z', commandAuthorityHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      evaluatedAt: AT, lossAt: '2026-09-30T08:30:00.000000Z',
-      accessUntil: '2026-10-07T08:30:00.000000Z', retainedCount: 1,
+      policyActivationRevision: 9, policyVersion: 'input-04-v1', policyHash: 'abc', commandEffectiveAt: '2026-09-30T08:30:00.000000', commandAuthorityHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      evaluatedAt: AT, lossAt: '2026-09-30T08:30:00.000000',
+      accessUntil: '2026-10-07T08:30:00.000000', retainedCount: 1,
       earliestProofExpiry: null,
       totalCount: 3, graceCount: 2, suspendedCount: 0,
-      deadlineGroups: [{ lossAt: '2026-09-30T08:30:00.000000Z', accessUntil: '2026-10-07T08:30:00.000000Z', graceCount: 2, newlyAffectedCount: 2 }],
+      deadlineGroups: [{ lossAt: '2026-09-30T08:30:00.000000', accessUntil: '2026-10-07T08:30:00.000000', graceCount: 2, newlyAffectedCount: 2 }],
       deadlineGroupsTruncated: false, unlistedGraceCount: 0, unlistedNewlyAffectedCount: 0,
       affectedResourcesTruncated: false,
       preservationFacts: { contentPreserved: true, assetsPreserved: true, creditsUnchanged: true, acceptedAiWorkUnchanged: true },
-      affectedResources: [{ resourceType: 'product', resourceId: '33333333-2222-3333-8444-555555555555', disposition: 'grace', accessUntil: '2026-10-07T08:30:00.000000Z', proofExpiresAt: null }],
+      affectedResources: [{ resourceType: 'product', resourceId: '33333333-2222-3333-8444-555555555555', disposition: 'grace', accessUntil: '2026-10-07T08:30:00.000000', proofExpiresAt: null }],
     }
     expect(parseResourceAccessPreview(JSON.stringify(value), CLIENT, SUBSCRIPTION, request)).toMatchObject({
       policyVersion: 'input-04-v1', retainedCount: 1, totalCount: 3, graceCount: 2,
@@ -283,7 +290,7 @@ describe('tier administration strict adapters', () => {
       ...value, deadlineGroups: [{ ...value.deadlineGroups[0], graceCount: 1 }],
     }), CLIENT, SUBSCRIPTION, request)).toThrow(BillingSubscriptionContractError)
 
-    const proofExpiresAt = '2026-10-03T08:30:00.000000Z'
+    const proofExpiresAt = '2026-10-03T08:30:00.000000'
     const proofPreview = { ...value, earliestProofExpiry: proofExpiresAt,
       affectedResources: [{ resourceType: 'domain_binding',
         resourceId: '33333333-2222-3333-8444-555555555555', disposition: 'grace',
@@ -312,19 +319,19 @@ describe('tier administration strict adapters', () => {
         previousSubscriptionTier: 'brand', resultingSubscriptionTier: 'brand',
         expectedTierRevision: 7, previousTierRevision: 7, resultingTierRevision: 7,
         reason: 'Approved downgrade', operationAsOf: AT,
-        effectiveAt: '2026-09-30T08:30:00.000000Z',
+        effectiveAt: '2026-09-30T08:30:00.000000',
         action: 'schedule', previousPendingTierChangeOperationId: null,
         pendingTierChangeOperationId: OPERATION, pendingSubscriptionTier: 'basic',
         previousPendingSubscriptionTier: null,
       },
       tierState: {
         subscriptionTier: 'brand', tierRevision: 7, status: 'active',
-        validFrom: '2026-08-31T08:30:00.000000Z', validTo: null,
+        validFrom: '2026-08-31T08:30:00.000000', validTo: null,
         pendingTierChange: {
           schemaVersion: 1, operationId: OPERATION, subscriptionTier: 'basic',
           expectedTierRevision: 7, effectivePolicy: 'next_billing_cycle',
-          effectiveCycleIndex: 2, effectiveCycleStart: '2026-09-30T08:30:00.000000Z',
-          effectiveCycleEnd: '2026-10-31T08:30:00.000000Z', scheduledAt: AT,
+          effectiveCycleIndex: 2, effectiveCycleStart: '2026-09-30T08:30:00.000000',
+          effectiveCycleEnd: '2026-10-31T08:30:00.000000', scheduledAt: AT,
           reason: 'Approved downgrade',
         }, observedAt: AT,
       },
@@ -401,7 +408,7 @@ describe('tier administration strict adapters', () => {
   })
 
   it('keeps policy grace and earlier proof expiry separate across history and reminder parsing', () => {
-    const proofExpiresAt = '2026-09-25T08:30:00.000000Z'
+    const proofExpiresAt = '2026-09-25T08:30:00.000000'
     const item = {
       ...consequence('grace_started'), totalCount: 2, retainedCount: 1, graceCount: 1,
       earliestProofExpiry: proofExpiresAt,
@@ -479,7 +486,7 @@ describe('tier administration strict adapters', () => {
     )
 
     expect(post).toHaveBeenCalledWith(
-      `/api/billing/clients/${CLIENT}/subscriptions/${SUBSCRIPTION}/tier-changes/pending/replace`,
+      `/api/backoffice/clients/${CLIENT}/billing/subscriptions/${SUBSCRIPTION}/tier-changes/pending/replace`,
       retainedBody,
       { responseType: 'text', signal, headers: { 'Content-Type': 'application/json' }, onAuthReplay }
     )

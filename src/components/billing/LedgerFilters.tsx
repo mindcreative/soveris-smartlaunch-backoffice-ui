@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { canonicalizeGuid } from '../../lib/guid'
+import { normalizeLocalWallInput } from '../../timezone/LocalInstant'
 import {
   BILLING_LEDGER_TRANSACTION_TYPES,
   type BillingLedgerFilters,
@@ -57,18 +58,15 @@ export function normalizeLedgerFilterDraft(draft: LedgerFilterDraft): {
     else errors[field] = 'Enter a complete hyphenated GUID.'
   }
 
-  const instants: Partial<Record<'from' | 'to', number>> = {}
   for (const field of ['from', 'to'] as const) {
     const value = draft[field].trim()
     if (!value) continue
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) errors[field] = 'Enter a valid local date and time.'
-    else {
-      filters[field] = date.toISOString()
-      instants[field] = date.getTime()
-    }
+    try {
+      const local = normalizeLocalWallInput(value)
+      filters[field] = local
+    } catch { errors[field] = 'Enter a valid local date and time.' }
   }
-  if (instants.from !== undefined && instants.to !== undefined && instants.from >= instants.to) {
+  if (filters.from && filters.to && filters.from >= filters.to) {
     errors.range = 'From must be earlier than To.'
   }
 
@@ -115,8 +113,6 @@ export function LedgerFilters({ appliedFiltersActive, busy, onApply, onClear }: 
   const summaryRef = useRef<HTMLDivElement>(null)
   const applyRef = useRef<HTMLButtonElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'local time'
-
   const setField = (field: keyof LedgerFilterDraft, value: string) => {
     setDraft((current) => ({ ...current, [field]: value }))
   }
@@ -144,7 +140,7 @@ export function LedgerFilters({ appliedFiltersActive, busy, onApply, onClear }: 
   return (
     <section aria-labelledby="ledger-filter-heading" className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
       <h2 id="ledger-filter-heading" ref={headingRef} tabIndex={-1} className="text-lg font-semibold text-gray-950 outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Filter ledger operations</h2>
-      <p className="mt-1 text-sm text-gray-600">Dates and times use {timezone}. From is inclusive; To is exclusive.</p>
+      <p className="mt-1 text-sm text-gray-600">Dates and times use your saved timezone. From is inclusive; To is exclusive.</p>
 
       {Object.keys(errors).length > 0 && (
         <div ref={summaryRef} tabIndex={-1} role="alert" className="state-indicator mt-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-950 outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
@@ -172,12 +168,12 @@ export function LedgerFilters({ appliedFiltersActive, busy, onApply, onClear }: 
         <FilterInput id="reservationId" label="Reservation ID" value={draft.reservationId} error={errors.reservationId} describedBy={describedBy('reservationId')} onChange={(value) => setField('reservationId', value)} />
 
         <div className="min-w-0">
-          <label htmlFor="ledger-from" className="block text-sm font-medium text-gray-800">From ({timezone}, inclusive)</label>
+          <label htmlFor="ledger-from" className="block text-sm font-medium text-gray-800">From (your saved timezone, inclusive)</label>
           <input id="ledger-from" type="datetime-local" value={draft.from} onChange={(event) => setField('from', event.target.value)} aria-invalid={Boolean(errors.from || errors.range)} aria-describedby={errors.from ? 'ledger-from-error' : errors.range ? 'ledger-range-error' : undefined} className="mt-1 min-h-11 w-full min-w-0 rounded-md border border-gray-300 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600" />
           {errors.from && <p id="ledger-from-error" className="mt-1 text-sm text-red-700">{errors.from}</p>}
         </div>
         <div className="min-w-0">
-          <label htmlFor="ledger-to" className="block text-sm font-medium text-gray-800">To ({timezone}, exclusive)</label>
+          <label htmlFor="ledger-to" className="block text-sm font-medium text-gray-800">To (your saved timezone, exclusive)</label>
           <input id="ledger-to" type="datetime-local" value={draft.to} onChange={(event) => setField('to', event.target.value)} aria-invalid={Boolean(errors.to || errors.range)} aria-describedby={errors.to ? 'ledger-to-error' : errors.range ? 'ledger-range-error' : undefined} className="mt-1 min-h-11 w-full min-w-0 rounded-md border border-gray-300 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600" />
           {errors.to && <p id="ledger-to-error" className="mt-1 text-sm text-red-700">{errors.to}</p>}
           {errors.range && <p id="ledger-range-error" className="mt-1 text-sm text-red-700">{errors.range}</p>}

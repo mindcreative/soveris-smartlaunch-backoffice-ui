@@ -8,7 +8,7 @@ import { LoadingSpinner } from '../shared/LoadingSpinner'
 export function AdminShell() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isAuthenticated, isLoading, isInitialized } = useAuth()
+  const { isAuthenticated, isLoading, isInitialized, user } = useAuth()
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
 
@@ -73,7 +73,7 @@ export function AdminShell() {
           onOpenMobileNavigation={() => setMobileNavigationOpen(true)}
         />
         <main id="main-content" className="min-w-0 px-4 py-6 sm:px-6 lg:px-8">
-          <Outlet />
+          <Outlet key={`${user?.id}:${user?.clientId}`} />
         </main>
       </div>
     </div>

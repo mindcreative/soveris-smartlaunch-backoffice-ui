@@ -1,3 +1,4 @@
+import { fulfillLocal, installTimeZoneRoute } from './localPresentationMocks'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 
@@ -56,16 +57,16 @@ async function expectNoSeriousAxeViolations(page: Page): Promise<void> {
   expect(results.violations.filter((violation) => ['serious', 'critical'].includes(violation.impact ?? ''))).toEqual([])
 }
 
-test.beforeEach(async ({ page }) => { await installAdminSession(page) })
+test.beforeEach(async ({ page }) => { await installAdminSession(page); await installTimeZoneRoute(page) })
 
 test('renders exact semantic ledger fields on a direct route and preserves workspace history', async ({ page }) => {
   const requests: string[] = []
-  await page.route('**/api/billing/clients/*/ledger*', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/ledger*', async (route) => {
     requests.push(route.request().url())
-    await route.fulfill({ status: 200, contentType: 'application/json', body: ledgerBody() })
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: ledgerBody() })
   })
-  await page.route('**/api/billing/clients/*/account', async (route) => {
-    await route.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"Credit account not configured"}' })
+  await page.route('**/api/backoffice/clients/*/billing/account', async (route) => {
+    await fulfillLocal(route, { status: 404, contentType: 'application/json', body: '{"error":"Credit account not configured"}' })
   })
 
   await page.goto(ledgerPath)
@@ -87,11 +88,11 @@ test('renders exact semantic ledger fields on a direct route and preserves works
 
 test('normalizes filters, keeps validation local, and clears into a fresh traversal', async ({ page }) => {
   const requests: URL[] = []
-  await page.route('**/api/billing/clients/*/ledger*', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/ledger*', async (route) => {
     const url = new URL(route.request().url())
     requests.push(url)
     const filtered = url.searchParams.has('transactionType')
-    await route.fulfill({
+    await fulfillLocal(route, {
       status: 200, contentType: 'application/json',
       body: filtered ? '{"items":[],"asOf":"2026-08-24T08:00:00+00:00","nextCursor":null}' : ledgerBody(),
     })
@@ -123,13 +124,13 @@ test('normalizes filters, keeps validation local, and clears into a fresh traver
 
 test('uses cursor-only continuation and requires explicit fresh start after a continuation 400', async ({ page }) => {
   const requests: URL[] = []
-  await page.route('**/api/billing/clients/*/ledger*', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/ledger*', async (route) => {
     const url = new URL(route.request().url())
     requests.push(url)
     if (url.searchParams.has('cursor')) {
-      await route.fulfill({ status: 400, contentType: 'application/problem+json', body: '{"title":"Invalid ledger query"}' })
+      await fulfillLocal(route, { status: 400, contentType: 'application/problem+json', body: '{"title":"Invalid ledger query"}' })
     } else {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: ledgerBody('opaque +/ cursor') })
+      await fulfillLocal(route, { status: 200, contentType: 'application/json', body: ledgerBody('opaque +/ cursor') })
     }
   })
   await page.goto(ledgerPath)
@@ -148,18 +149,18 @@ test('uses cursor-only continuation and requires explicit fresh start after a co
 
 test('retains rows through a transient continuation failure, retries the cursor, and focuses the end', async ({ page }) => {
   let cursorRequests = 0
-  await page.route('**/api/billing/clients/*/ledger*', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/ledger*', async (route) => {
     const url = new URL(route.request().url())
     if (!url.searchParams.has('cursor')) {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: ledgerBody('same-opaque-cursor') })
+      await fulfillLocal(route, { status: 200, contentType: 'application/json', body: ledgerBody('same-opaque-cursor') })
       return
     }
     cursorRequests += 1
     if (cursorRequests <= 2) {
-      await route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"Unavailable"}' })
+      await fulfillLocal(route, { status: 500, contentType: 'application/json', body: '{"error":"Unavailable"}' })
       return
     }
-    await route.fulfill({
+    await fulfillLocal(route, {
       status: 200, contentType: 'application/json',
       body: ledgerBody(null, '77777777-7777-7777-7777-777777777778'),
     })
@@ -180,12 +181,12 @@ test('retains rows through a transient continuation failure, retries the cursor,
 test('loading, empty, denied, and initial error states pass accessibility scans', async ({ page }) => {
   let mode: 'loading' | 'empty' | 'denied' | 'error' = 'loading'
   let release: (() => void) | undefined
-  await page.route('**/api/billing/clients/*/ledger*', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/ledger*', async (route) => {
     if (mode === 'loading') await new Promise<void>((resolve) => { release = resolve })
     if (mode === 'empty' || mode === 'loading') {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: '{"items":[],"asOf":"2026-08-24T08:00:00+00:00","nextCursor":null}' })
+      await fulfillLocal(route, { status: 200, contentType: 'application/json', body: '{"items":[],"asOf":"2026-08-24T08:00:00+00:00","nextCursor":null}' })
     } else {
-      await route.fulfill({ status: mode === 'denied' ? 403 : 500, contentType: 'application/json', body: '{"error":"Unavailable"}' })
+      await fulfillLocal(route, { status: mode === 'denied' ? 403 : 500, contentType: 'application/json', body: '{"error":"Unavailable"}' })
     }
   })
   await page.goto(ledgerPath)
@@ -209,8 +210,8 @@ test('loading, empty, denied, and initial error states pass accessibility scans'
 test('320px reflow, text spacing, forced colours, reduced motion, keyboard, and targets remain usable', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 700 })
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
-  await page.route('**/api/billing/clients/*/ledger*', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: ledgerBody() })
+  await page.route('**/api/backoffice/clients/*/billing/ledger*', async (route) => {
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: ledgerBody() })
   })
   await page.goto(ledgerPath)
   await expect(page.getByRole('list', { name: 'Newest-first immutable Billing ledger operations' })).toBeVisible()
@@ -242,34 +243,34 @@ test('confirms one scoped request and downloads through one fresh private redemp
   const requestBodies: unknown[] = []
   const redemptionBodies: unknown[] = []
   let statusGets = 0
-  await page.route('**/api/billing/clients/*/ledger*', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: ledgerBody() })
+  await page.route('**/api/backoffice/clients/*/billing/ledger*', async (route) => {
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: ledgerBody() })
   })
-  await page.route(`**/api/audit/exports/${EXPORT_ID}/redemptions`, async (route) => {
+  await page.route(`**/api/backoffice/billing/ledger/exports/${EXPORT_ID}/redemptions`, async (route) => {
     redemptionBodies.push(route.request().postDataJSON())
-    await route.fulfill({
+    await fulfillLocal(route, {
       status: 200,
       contentType: 'text/csv; charset=utf-8',
       headers: {
-        'content-disposition': `attachment; filename="ledger-export-${EXPORT_ID}.csv"`,
+        'content-disposition': `attachment; filename="ledger-export-${EXPORT_ID}-local.csv"`,
         'cache-control': 'private, no-store',
         'x-content-type-options': 'nosniff',
       },
       body: 'ledger_id,amount\n1,2\n',
     })
   })
-  await page.route(`**/api/audit/exports/${EXPORT_ID}`, async (route) => {
+  await page.route(`**/api/backoffice/billing/ledger/exports/${EXPORT_ID}`, async (route) => {
     statusGets += 1
-    await route.fulfill({
+    await fulfillLocal(route, {
       status: 200, contentType: 'application/json',
       body: exportStatusBody('completed', statusGets === 1 ? 'poll-reference' : 'fresh-download-reference'),
     })
   })
-  await page.route('**/api/audit/exports', async (route) => {
+  await page.route('**/api/backoffice/billing/ledger/exports', async (route) => {
     requestBodies.push(route.request().postDataJSON())
-    await route.fulfill({
+    await fulfillLocal(route, {
       status: 202, contentType: 'application/json',
-      headers: { location: `/api/audit/exports/${EXPORT_ID}` },
+      headers: { location: `/api/backoffice/billing/ledger/exports/${EXPORT_ID}` },
       body: acceptedExportBody(),
     })
   })
@@ -291,14 +292,18 @@ test('confirms one scoped request and downloads through one fresh private redemp
   await dialog.getByRole('button', { name: 'Confirm CSV export' }).dblclick()
 
   await expect(page.getByRole('heading', { name: 'Export status: completed' })).toBeVisible()
-  expect(requestBodies).toEqual([{ clientId: CLIENT_ID, filters: {} }])
+  expect(requestBodies).toEqual([{ clientId: CLIENT_ID, filters: {
+    creditAccountId: null, from: null, to: null,
+    transactionType: null, actorUserId: null, jobId: null,
+    reservationId: null,
+  } }])
   expect(statusGets).toBe(1)
   expect(await page.locator('body').textContent()).not.toContain('poll-reference')
 
   const downloadPromise = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Download ledger CSV' }).click()
   const download = await downloadPromise
-  expect(download.suggestedFilename()).toBe(`ledger-export-${EXPORT_ID}.csv`)
+  expect(download.suggestedFilename()).toBe(`ledger-export-${EXPORT_ID}-local.csv`)
   expect(redemptionBodies).toEqual([{ reference: 'fresh-download-reference' }])
   expect(statusGets).toBe(2)
   expect(requestBodies).toHaveLength(1)
@@ -315,16 +320,16 @@ test('bounds automatic polling and manual refresh remains GET-only', async ({ pa
   await page.clock.install()
   let exportPosts = 0
   let statusGets = 0
-  await page.route('**/api/billing/clients/*/ledger*', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: ledgerBody() })
+  await page.route('**/api/backoffice/clients/*/billing/ledger*', async (route) => {
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: ledgerBody() })
   })
-  await page.route(`**/api/audit/exports/${EXPORT_ID}`, async (route) => {
+  await page.route(`**/api/backoffice/billing/ledger/exports/${EXPORT_ID}`, async (route) => {
     statusGets += 1
-    await route.fulfill({ status: 200, contentType: 'application/json', body: exportStatusBody('pending') })
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: exportStatusBody('pending') })
   })
-  await page.route('**/api/audit/exports', async (route) => {
+  await page.route('**/api/backoffice/billing/ledger/exports', async (route) => {
     exportPosts += 1
-    await route.fulfill({ status: 202, contentType: 'application/json', body: acceptedExportBody() })
+    await fulfillLocal(route, { status: 202, contentType: 'application/json', body: acceptedExportBody() })
   })
 
   await page.goto(ledgerPath)
@@ -349,30 +354,30 @@ test('terminal, ambiguous, revoked, and denied-redemption states expose no parti
   let exportPosts = 0
   let downloads = 0
   page.on('download', () => { downloads += 1 })
-  await page.route('**/api/billing/clients/*/ledger*', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: ledgerBody() })
+  await page.route('**/api/backoffice/clients/*/billing/ledger*', async (route) => {
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: ledgerBody() })
   })
-  await page.route(`**/api/audit/exports/${EXPORT_ID}/redemptions`, async (route) => {
-    await route.fulfill({ status: 403, contentType: 'application/json', body: '{"error":"Insufficient permissions"}' })
+  await page.route(`**/api/backoffice/billing/ledger/exports/${EXPORT_ID}/redemptions`, async (route) => {
+    await fulfillLocal(route, { status: 403, contentType: 'application/json', body: '{"error":"Insufficient permissions"}' })
   })
-  await page.route(`**/api/audit/exports/${EXPORT_ID}`, async (route) => {
+  await page.route(`**/api/backoffice/billing/ledger/exports/${EXPORT_ID}`, async (route) => {
     if (mode === 'revoked') {
-      await route.fulfill({ status: 403, contentType: 'application/json', body: '{"error":"Insufficient permissions"}' })
+      await fulfillLocal(route, { status: 403, contentType: 'application/json', body: '{"error":"Insufficient permissions"}' })
       return
     }
     const status = mode === 'failed' ? 'failed' : mode === 'expired' ? 'expired' : 'completed'
-    await route.fulfill({
+    await fulfillLocal(route, {
       status: 200, contentType: 'application/json',
       body: exportStatusBody(status, mode === 'redemption-denied' ? 'one-use-reference' : null),
     })
   })
-  await page.route('**/api/audit/exports', async (route) => {
+  await page.route('**/api/backoffice/billing/ledger/exports', async (route) => {
     exportPosts += 1
     if (mode === 'ambiguous') {
-      await route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"Unable to process request"}' })
+      await fulfillLocal(route, { status: 500, contentType: 'application/json', body: '{"error":"Unable to process request"}' })
       return
     }
-    await route.fulfill({ status: 202, contentType: 'application/json', body: acceptedExportBody() })
+    await fulfillLocal(route, { status: 202, contentType: 'application/json', body: acceptedExportBody() })
   })
 
   const requestExport = async () => {

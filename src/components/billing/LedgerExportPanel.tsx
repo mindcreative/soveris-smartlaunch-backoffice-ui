@@ -15,6 +15,7 @@ import type {
   BillingLedgerExportStatusMetadata,
   BillingLedgerFilters,
 } from '../../types/billing'
+import { SavedZoneTime } from '../../timezone/SavedZoneTime'
 
 export const LEDGER_EXPORT_POLL_INTERVAL_MS = 2_000
 export const LEDGER_EXPORT_POLL_WINDOW_MS = 60_000
@@ -38,17 +39,14 @@ function exportSourceFilters(filters: BillingLedgerFilters): BillingLedgerFilter
   return exportFilters
 }
 
-function formatInstant(value: string): string {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'long' }).format(new Date(value))
-}
-
 function FilterScope({ filters }: { filters: BillingLedgerExportFilters }) {
   return (
     <dl className="mt-3 grid min-w-0 gap-2 text-sm sm:grid-cols-2">
       {FILTER_LABELS.map(([key, label]) => (
         <div key={key} className="min-w-0 rounded-md bg-gray-50 p-2">
           <dt className="font-semibold text-gray-800">{label}</dt>
-          <dd className="break-all text-gray-700">{filters[key] ?? 'Unfiltered'}</dd>
+          <dd className="break-all text-gray-700">{(key === 'from' || key === 'to') && filters[key]
+            ? <SavedZoneTime value={filters[key]!} /> : filters[key] ?? 'Unfiltered'}</dd>
         </div>
       ))}
     </dl>
@@ -81,7 +79,6 @@ export function LedgerExportPanel({
   const [feedback, setFeedback] = useState('')
   const [announcement, setAnnouncement] = useState('')
   const [downloadBusy, setDownloadBusy] = useState(false)
-  const [eligibilityTick, setEligibilityTick] = useState(0)
   const confirmInFlight = useRef(false)
   const downloadInFlight = useRef(false)
   const commandController = useRef<AbortController | null>(null)
@@ -297,9 +294,7 @@ export function LedgerExportPanel({
     try {
       const result = await billingApi.getLedgerExportStatus(attempt, controller.signal)
       if (epoch !== scopeEpoch.current || controller.signal.aborted) return
-      if (result.metadata.status !== 'completed' || !result.reference ||
-          Date.parse(result.reference.expiresAt) <= Date.now() ||
-          !result.metadata.artifactExpiresAt || Date.parse(result.metadata.artifactExpiresAt) <= Date.now()) {
+      if (result.metadata.status !== 'completed' || !result.reference) {
         setFeedback('A fresh download reference is unavailable or expired. The completed export is retained; choose Download again to request a new reference.')
         return
       }
@@ -309,7 +304,7 @@ export function LedgerExportPanel({
       try {
         const anchor = document.createElement('a')
         anchor.href = url
-        anchor.download = `ledger-export-${attempt.exportId}.csv`
+        anchor.download = `ledger-export-${attempt.exportId}-local.csv`
         anchor.click()
       } finally {
         URL.revokeObjectURL(url)
@@ -344,20 +339,7 @@ export function LedgerExportPanel({
     attempt || commandState === 'ambiguous' || commandState === 'contract' || terminal
   )
   const requestActionAllowed = !metadata || metadata.status === 'completed' || terminal || commandState === 'ambiguous'
-  const artifactEligible = metadata?.status === 'completed' && Boolean(
-    metadata.artifactExpiresAt && Date.parse(metadata.artifactExpiresAt) > Date.now()
-  )
-
-  useEffect(() => {
-    if (metadata?.status !== 'completed' || !metadata.artifactExpiresAt) return
-    const remaining = Date.parse(metadata.artifactExpiresAt) - Date.now()
-    if (remaining <= 0) return
-    const timer = window.setTimeout(
-      () => setEligibilityTick((current) => current + 1),
-      Math.min(remaining + 1, 2_147_483_647)
-    )
-    return () => window.clearTimeout(timer)
-  }, [eligibilityTick, metadata?.artifactExpiresAt, metadata?.status])
+  const artifactEligible = metadata?.status === 'completed' && Boolean(metadata.artifactExpiresAt)
 
   return (
     <section aria-labelledby="ledger-export-title" className="state-indicator mb-6 min-w-0 rounded-lg border border-gray-300 bg-white p-4 sm:p-5">
@@ -383,11 +365,11 @@ export function LedgerExportPanel({
           <dl className="mt-3 grid min-w-0 gap-2 sm:grid-cols-2">
             <div><dt className="font-semibold">Export ID</dt><dd className="break-all">{metadata.exportId}</dd></div>
             <div><dt className="font-semibold">Client ID</dt><dd className="break-all">{metadata.clientId}</dd></div>
-            <div><dt className="font-semibold">Requested</dt><dd><time dateTime={metadata.requestedAt}>{formatInstant(metadata.requestedAt)}</time></dd></div>
-            <div><dt className="font-semibold">Export snapshot as of</dt><dd><time dateTime={metadata.asOf}>{formatInstant(metadata.asOf)}</time></dd></div>
+            <div><dt className="font-semibold">Requested</dt><dd><SavedZoneTime value={metadata.requestedAt} /></dd></div>
+            <div><dt className="font-semibold">Export snapshot as of</dt><dd><SavedZoneTime value={metadata.asOf} /></dd></div>
             {metadata.rowCount !== null && <div><dt className="font-semibold">CSV rows</dt><dd>{metadata.rowCount}</dd></div>}
             {metadata.byteSize !== null && <div><dt className="font-semibold">CSV size</dt><dd>{metadata.byteSize} bytes</dd></div>}
-            {metadata.artifactExpiresAt && <div><dt className="font-semibold">Artifact expires</dt><dd><time dateTime={metadata.artifactExpiresAt}>{formatInstant(metadata.artifactExpiresAt)}</time></dd></div>}
+            {metadata.artifactExpiresAt && <div><dt className="font-semibold">Artifact expires</dt><dd><SavedZoneTime value={metadata.artifactExpiresAt} /></dd></div>}
           </dl>
           <h4 className="mt-4 font-semibold">Immutable export filters</h4>
           <FilterScope filters={metadata.filters} />

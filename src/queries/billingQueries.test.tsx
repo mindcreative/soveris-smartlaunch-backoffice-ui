@@ -47,7 +47,7 @@ function snapshot(clientId: string): BillingAccountSnapshot {
     availableBalance: clientId === CLIENT_A ? '10.0000' : '20.0000',
     activeReservationCount: 0,
     status: 'active',
-    asOf: '2026-08-24T07:00:00+00:00',
+    asOf: '2026-08-24T07:00:00.000000',
     walletVersion: '1',
   }
 }
@@ -481,9 +481,9 @@ function ledgerPage(
       ruleVersion: null,
       actorUserId: null,
       reason: null,
-      createdAt: '2026-08-24T07:00:00+00:00',
+      createdAt: '2026-08-24T07:00:00.000000',
     }],
-    asOf,
+    asOf: asOf.slice(0, 19) + '.000000',
     nextCursor,
   }
 }

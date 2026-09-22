@@ -5,6 +5,7 @@ import type {
   BillingSubscriptionCreationReceipt,
   BillingSubscriptionState,
 } from '../../types/billing'
+import { LocalInstant } from '../../timezone/LocalInstant'
 
 export interface ReceiptMatch {
   subscription: boolean
@@ -43,10 +44,10 @@ export function matchSubscriptionReceipt(
     subscription.changeEffectivePolicy === receipt.subscription.changeEffectivePolicy &&
     subscription.prorationPolicy === receipt.subscription.prorationPolicy &&
     subscription.unusedCreditPolicy === receipt.subscription.unusedCreditPolicy &&
-    Date.parse(subscription.validFrom) === Date.parse(receipt.subscription.validFrom) &&
+    subscription.validFrom === receipt.subscription.validFrom &&
     (subscription.validTo === null || receipt.subscription.validTo === null
       ? subscription.validTo === receipt.subscription.validTo
-      : Date.parse(subscription.validTo) === Date.parse(receipt.subscription.validTo)))
+      : subscription.validTo === receipt.subscription.validTo))
   const subscriptionMismatch = Boolean(subscription && !subscriptionMatches)
 
   const grant = state.grantHistory.items.find((item) =>
@@ -65,8 +66,8 @@ export function matchSubscriptionReceipt(
     entitlementsEqual(grant.entitlementsSnapshot, receipt.initialGrant.entitlementsSnapshot) &&
     decimalsEqual(grant.creditAmount, receipt.initialGrant.creditAmount) &&
     grant.grantType === receipt.initialGrant.grantType &&
-    Date.parse(grant.cycleStart) === Date.parse(receipt.initialGrant.cycleStart) &&
-    Date.parse(grant.cycleEnd) === Date.parse(receipt.initialGrant.cycleEnd))
+    grant.cycleStart === receipt.initialGrant.cycleStart &&
+    grant.cycleEnd === receipt.initialGrant.cycleEnd)
   return {
     subscription: subscriptionMatches,
     grant: grantMatches,
@@ -163,7 +164,7 @@ export function SubscriptionReview({
         <h3 className="mt-5 font-semibold text-gray-950">Current account snapshot</h3>
         {Boolean(accountRefreshError) && <p role="alert" className="state-indicator mt-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">Account refresh failed. Any displayed account values are the last validated same-Client snapshot and may be stale.</p>}
         {accountRefreshing && <p role="status" className="state-indicator mt-2 text-sm text-gray-700">Refreshing the current account snapshot…</p>}
-        {currentAccount ? <><p className="mt-1 text-sm text-gray-700">Separate current values as of <time dateTime={currentAccount.asOf}>{currentAccount.asOf}</time>.</p><dl className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4"><Value label="Current owned balance" value={currentAccount.ownedBalance} mono /><Value label="Current reserved balance" value={currentAccount.activelyReservedAmount} mono /><Value label="Current available balance" value={currentAccount.availableBalance} mono /><Value label="Current account status" value={currentAccount.status} /></dl></> : <p className="mt-1 text-sm text-gray-700">Current account balance is unavailable with this permission or while refresh is pending.</p>}
+        {currentAccount ? <><p className="mt-1 text-sm text-gray-700">Separate current values as of <LocalInstant value={currentAccount.asOf} />.</p><dl className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4"><Value label="Current owned balance" value={currentAccount.ownedBalance} mono /><Value label="Current reserved balance" value={currentAccount.activelyReservedAmount} mono /><Value label="Current available balance" value={currentAccount.availableBalance} mono /><Value label="Current account status" value={currentAccount.status} /></dl></> : <p className="mt-1 text-sm text-gray-700">Current account balance is unavailable with this permission or while refresh is pending.</p>}
       </section>
     </div>
   )

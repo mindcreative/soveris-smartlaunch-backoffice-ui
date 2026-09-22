@@ -1,13 +1,22 @@
+import type { LocalInstantValue } from '../timezone/LocalInstant'
+
 export interface BackOfficeUser {
   id: string
   email: string
   displayName: string
   role: UserRole
   isActive: boolean
-  createdAt: string
-  updatedAt: string
+  createdAt: LocalInstantValue
+  updatedAt: LocalInstantValue
   clientId: string
+  timeZoneId: string
 }
+
+export type BackOfficeUserDetail = Pick<BackOfficeUser,
+  'id' | 'email' | 'displayName' | 'role' | 'isActive' | 'createdAt'>
+export type CreatedBackOfficeUser = Pick<BackOfficeUser,
+  'id' | 'email' | 'displayName' | 'role' | 'timeZoneId'>
+export interface UpdatedBackOfficeUser { message: string }
 
 export type UserRole = 'Admin' | 'Editor' | 'Viewer'
 
@@ -16,6 +25,7 @@ export interface CreateUserRequest {
   password: string
   displayName: string
   role: UserRole
+  timeZoneId: string
 }
 
 export interface UpdateUserRequest {
@@ -35,5 +45,5 @@ export interface UserAuditLog {
   entityId?: string
   ipAddress?: string
   userAgent?: string
-  createdAt: string
+  createdAt: LocalInstantValue
 }

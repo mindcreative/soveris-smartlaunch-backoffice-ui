@@ -1,5 +1,7 @@
 import type { BillingLedgerItem, BillingLedgerTransactionType } from '../../types/billing'
 import { CreditAmount } from './CreditAmount'
+import { LocalInstant } from '../../timezone/LocalInstant'
+import type { LocalInstantValue } from '../../timezone/LocalInstant'
 
 const TYPE_PRESENTATION: Record<BillingLedgerTransactionType, { label: string; description: string }> = {
   subscription_grant: { label: 'Subscription grant', description: 'Positive owned-credit grant.' },
@@ -13,10 +15,8 @@ const TYPE_PRESENTATION: Record<BillingLedgerTransactionType, { label: string; d
   reservation_released: { label: 'Reservation released', description: 'Positive release of reserved capacity; not income or an owned-credit grant.' },
 }
 
-function DisplayTime({ value }: { value: string }) {
-  const display = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'long' })
-    .format(new Date(value))
-  return <time dateTime={value}>{display}</time>
+function DisplayTime({ value }: { value: LocalInstantValue }) {
+  return <LocalInstant value={value} />
 }
 
 const IDENTIFIERS: Array<[keyof BillingLedgerItem, string]> = [

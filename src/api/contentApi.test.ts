@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useAuthStore } from '../stores/authStore'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from './apiClient'
 import {
   createProduct,
@@ -11,6 +12,12 @@ import {
   validateContent,
 } from './endpoints'
 import type { ProductContentV1 } from '../types'
+
+beforeEach(() => useAuthStore.setState({ user: {
+  id: 'actor', clientId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+  email: 'actor@example.test', displayName: 'Actor', role: 'Admin',
+  accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600,
+} }))
 
 const content: ProductContentV1 = {
   slug: 'demo',
@@ -62,7 +69,7 @@ describe('canonical content API', () => {
       status: 'active', publicationStatus: 'draft', revision: 1,
       contentSchemaVersion: null, contentRevision: 1, draftSchemaVersion: null,
       draftRevision: 0, completeness: { isComplete: false, missingRequirements: ['form'] },
-      canonicalUrl: null, createdAt: '2026-09-12T00:00:00Z', updatedAt: '2026-09-12T00:00:00Z',
+      canonicalUrl: null, createdAt: '2026-09-12T00:00:00.000000', updatedAt: '2026-09-12T00:00:00.000000',
     }
     const get = vi.spyOn(apiClient, 'get')
       .mockResolvedValueOnce({ data: page, status: 200 })
@@ -72,12 +79,12 @@ describe('canonical content API', () => {
       .mockResolvedValueOnce({ data: { ...product, publicationStatus: 'published' }, status: 200 })
     const put = vi.spyOn(apiClient, 'put').mockResolvedValue({ data: product, status: 200 })
 
-    await expect(getProducts('client-id', { status: 'all', publication: 'all' }, signal)).resolves.toBe(page)
-    await expect(getProduct('product-id', signal)).resolves.toBe(product)
-    await expect(createProduct('client-id', { operationId: 'operation-id', name: 'Demo', slug: 'demo' })).resolves.toBe(product)
+    await expect(getProducts('client-id', { status: 'all', publication: 'all' }, signal)).resolves.toEqual(page)
+    await expect(getProduct('product-id', signal)).resolves.toEqual(product)
+    await expect(createProduct('client-id', { operationId: 'operation-id', name: 'Demo', slug: 'demo' })).resolves.toEqual(product)
     await expect(updateProduct('product-id', {
       operationId: 'operation-id', expectedRevision: 1, name: 'Demo', slug: 'demo', status: 'active',
-    })).resolves.toBe(product)
+    })).resolves.toEqual(product)
     await expect(publishContent('product-id', { expectedDraftRevision: 2, expectedRevision: 1 })).resolves.toMatchObject({ publicationStatus: 'published' })
 
     expect(get).toHaveBeenNthCalledWith(1, '/clients/client-id/products?status=all&publication=all', { signal })

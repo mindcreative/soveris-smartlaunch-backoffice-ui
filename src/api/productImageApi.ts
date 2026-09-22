@@ -1,6 +1,17 @@
 import type { AxiosProgressEvent } from 'axios'
 import { apiClient } from './apiClient'
 import type { ProductImageRole, ProductImageUploadResponse } from '../types/productImages'
+import { localInstantDateTime } from '../timezone/LocalInstant'
+import { localResponseBinding } from '../timezone/responseGuard'
+
+function projectUpload(response: ProductImageUploadResponse,
+  instant: Awaited<ReturnType<typeof localResponseBinding>>['instant']): ProductImageUploadResponse {
+  if (!response || (response.status !== 'completed' && response.status !== 'processing'))
+    throw new Error('Invalid product image upload response')
+  if (response.status === 'processing') return response
+  return { ...response, asset: { ...response.asset,
+    createdAt: localInstantDateTime(instant(response.asset.createdAt)) } }
+}
 
 export async function uploadProductImage(
   productId: string,
@@ -11,6 +22,7 @@ export async function uploadProductImage(
   onUploadProgress: (event: AxiosProgressEvent) => void,
   onAuthReplay?: () => void,
 ): Promise<ProductImageUploadResponse> {
+  const binding = await localResponseBinding(signal)
   const body = new FormData()
   body.append('operationId', operationId)
   body.append('assetRole', role)
@@ -20,7 +32,8 @@ export async function uploadProductImage(
     body,
     { signal, onUploadProgress, onAuthReplay, headers: { 'Content-Type': undefined } },
   )
-  return response.data
+  binding.verify(response.headers)
+  return projectUpload(response.data, binding.instant)
 }
 
 export async function getProductImageUploadStatus(
@@ -28,11 +41,13 @@ export async function getProductImageUploadStatus(
   operationId: string,
   signal: AbortSignal,
 ): Promise<ProductImageUploadResponse> {
+  const binding = await localResponseBinding(signal)
   const response = await apiClient.get<ProductImageUploadResponse>(
     `/products/${productId}/assets/images/uploads/${operationId}`,
     { signal },
   )
-  return response.data
+  binding.verify(response.headers)
+  return projectUpload(response.data, binding.instant)
 }
 
 export async function getProductImagePreview(

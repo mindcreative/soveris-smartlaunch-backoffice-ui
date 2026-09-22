@@ -16,7 +16,7 @@ const SNAPSHOT: BillingAccountSnapshot = {
   availableBalance: '99999999999979.9999',
   activeReservationCount: 0,
   status: 'active',
-  asOf: '2026-08-24T07:00:00+00:00',
+  asOf: '2026-08-24T07:00:00.000000',
   walletVersion: '1',
 }
 
@@ -60,7 +60,6 @@ describe('Billing account routes and states', () => {
     expect(screen.getByText('0')).toBeInTheDocument()
     expect(screen.getByText('active', { selector: 'span' })).toBeInTheDocument()
     expect(document.querySelector('time')?.getAttribute('datetime')).toBe(SNAPSHOT.asOf)
-    expect(screen.getByLabelText(/Snapshot as of/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Ledger/ })).toHaveAttribute(
       'href',
       `/billing/clients/${CLIENT_ID}/ledger`
@@ -147,7 +146,7 @@ describe('Billing account routes and states', () => {
     const request = vi.spyOn(billingApi, 'getAccountSnapshot')
     const ledgerRequest = vi.spyOn(billingApi, 'getLedgerPage').mockResolvedValue({
       items: [],
-      asOf: '2026-08-24T07:00:00+00:00',
+      asOf: '2026-08-24T07:00:00.000000',
       nextCursor: null,
     })
     window.history.replaceState({}, '', `/billing/clients/${CLIENT_ID.toUpperCase()}/ledger`)

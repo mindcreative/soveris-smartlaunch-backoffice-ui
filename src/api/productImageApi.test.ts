@@ -1,12 +1,20 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useAuthStore } from '../stores/authStore'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from './apiClient'
 import { getProductImagePreview, getProductImageUploadStatus, uploadProductImage } from './productImageApi'
+
+beforeEach(() => useAuthStore.setState({ user: {
+  id: 'actor', clientId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+  email: 'actor@example.test', displayName: 'Actor', role: 'Admin',
+  accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600,
+} }))
 
 describe('product image asset API', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it('uses exact multipart, status and authenticated preview routes', async () => {
-    const completed = { operationId: 'operation-id', status: 'completed' }
+    const completed = { operationId: 'operation-id', status: 'completed',
+      asset: { createdAt: '2026-09-22T16:38:09.117474' } }
     const blob = new Blob(['bytes'], { type: 'image/webp' })
     const post = vi.spyOn(apiClient, 'post').mockResolvedValue({ data: completed, status: 201 })
     const get = vi.spyOn(apiClient, 'get')

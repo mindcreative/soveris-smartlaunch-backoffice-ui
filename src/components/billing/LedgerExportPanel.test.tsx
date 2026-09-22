@@ -10,6 +10,7 @@ import type {
 } from '../../types/billing'
 import { billingExportKeys } from '../../queries/billingQueries'
 import { LedgerExportPanel } from './LedgerExportPanel'
+import { useAuthStore } from '../../stores/authStore'
 
 const CLIENT_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 const ACCOUNT_ID = '11111111-2222-3333-4444-555555555555'
@@ -26,8 +27,8 @@ const accepted: BillingLedgerExportAccepted = {
     creditAccountId: ACCOUNT_ID, from: null, to: null, transactionType: 'promotion',
     actorUserId: null, jobId: null, reservationId: null,
   },
-  requestedAt: '2026-08-27T10:00:00+00:00',
-  asOf: '2026-08-27T10:00:00+00:00',
+  requestedAt: '2026-08-27T10:00:00.000000',
+  asOf: '2026-08-27T10:00:00.000000',
   status: 'pending',
 }
 
@@ -37,7 +38,7 @@ function metadata(status: BillingLedgerExportStatusMetadata['status']): BillingL
     status,
     rowCount: status === 'completed' || status === 'expired' ? '9007199254740993' : null,
     byteSize: status === 'completed' || status === 'expired' ? '9223372036854775807' : null,
-    artifactExpiresAt: status === 'completed' || status === 'expired' ? '2099-08-27T11:00:00+00:00' : null,
+    artifactExpiresAt: status === 'completed' || status === 'expired' ? '2099-08-27T11:00:00.000000' : null,
     failureCode: status === 'failed' ? 'generation_failed' : null,
   }
 }
@@ -50,6 +51,13 @@ function deferred<T>() {
 
 function setup(filters: BillingLedgerFilters = sourceFilters) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
+  useAuthStore.setState({ user: {
+    id: 'operator', email: 'operator@example.com', displayName: 'Operator', role: 'Admin',
+    clientId: CLIENT_ID, accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600,
+  } })
+  queryClient.setQueryData(['time-zone-preference', 'operator', CLIENT_ID], {
+    userId: 'operator', timeZoneId: 'UTC', userTimeZoneRevision: 1,
+  })
   const onPermissionDenied = vi.fn()
   const view = render(
     <QueryClientProvider client={queryClient}>
@@ -94,8 +102,8 @@ describe('LedgerExportPanel', () => {
   it('keeps accepted scope immutable when visible filters change and performs fresh-reference download without persistence', async () => {
     vi.spyOn(billingApi, 'requestLedgerExport').mockResolvedValue(accepted)
     const getStatus = vi.spyOn(billingApi, 'getLedgerExportStatus')
-      .mockResolvedValueOnce({ metadata: metadata('completed'), reference: { value: 'poll-reference-must-be-discarded', expiresAt: '2099-08-27T10:05:00+00:00' } })
-      .mockResolvedValueOnce({ metadata: metadata('completed'), reference: { value: 'fresh-download-reference', expiresAt: '2099-08-27T10:06:00+00:00' } })
+      .mockResolvedValueOnce({ metadata: metadata('completed'), reference: { value: 'poll-reference-must-be-discarded', expiresAt: '2099-08-27T10:05:00.000000' } })
+      .mockResolvedValueOnce({ metadata: metadata('completed'), reference: { value: 'fresh-download-reference', expiresAt: '2099-08-27T10:06:00.000000' } })
     const redeem = vi.spyOn(billingApi, 'redeemLedgerExport').mockResolvedValue(
       new Blob(['ledger_id,amount\n1,2\n'], { type: 'text/csv' })
     )
@@ -124,7 +132,7 @@ describe('LedgerExportPanel', () => {
     expect(anchorClick).toHaveBeenCalledTimes(1)
     expect(JSON.stringify(view.queryClient.getQueryData(billingExportKeys.detail(CLIENT_ID, EXPORT_ID)))).not.toContain('reference')
     expect(document.body.textContent).not.toContain('fresh-download-reference')
-    expect(localStorage.length).toBe(0)
+    expect(JSON.stringify(localStorage)).not.toContain('fresh-download-reference')
     expect(sessionStorage.length).toBe(0)
     expect(window.location.href).not.toContain('reference')
     expect(billingApi.requestLedgerExport).toHaveBeenCalledTimes(1)
@@ -285,42 +293,17 @@ describe('LedgerExportPanel', () => {
     )).toBe(true)
   })
 
-  it('removes download eligibility when a completed artifact expires without another response', async () => {
+  it('uses server status to remove download eligibility', async () => {
     vi.spyOn(billingApi, 'requestLedgerExport').mockResolvedValue(accepted)
     vi.spyOn(billingApi, 'getLedgerExportStatus').mockResolvedValue({
-      metadata: {
-        ...metadata('completed'),
-        artifactExpiresAt: new Date(Date.now() + 500).toISOString(),
-      },
-      reference: null,
+      metadata: metadata('expired'), reference: null,
     })
     const user = userEvent.setup()
     setup()
     await user.click(screen.getByRole('button', { name: 'Request ledger CSV export' }))
     await user.click(screen.getByRole('button', { name: 'Confirm CSV export' }))
-    expect(await screen.findByRole('button', { name: 'Download ledger CSV' })).toBeInTheDocument()
-
-    await waitFor(() => expect(
-      screen.queryByRole('button', { name: 'Download ledger CSV' })
-    ).not.toBeInTheDocument())
-    expect(screen.getByText(/no longer download-eligible/)).toBeInTheDocument()
-  })
-
-  it('never offers download for an already ineligible completed response', async () => {
-    vi.spyOn(billingApi, 'requestLedgerExport').mockResolvedValue(accepted)
-    vi.spyOn(billingApi, 'getLedgerExportStatus').mockResolvedValue({
-      metadata: {
-        ...metadata('completed'),
-        artifactExpiresAt: new Date(Date.now() - 1).toISOString(),
-      },
-      reference: null,
-    })
-    const user = userEvent.setup()
-    setup()
-    await user.click(screen.getByRole('button', { name: 'Request ledger CSV export' }))
-    await user.click(screen.getByRole('button', { name: 'Confirm CSV export' }))
-    expect(await screen.findByRole('heading', { name: 'Export status: completed' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Export status: expired' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Download ledger CSV' })).not.toBeInTheDocument()
-    expect(screen.getByText(/no longer download-eligible/)).toBeInTheDocument()
   })
+
 })

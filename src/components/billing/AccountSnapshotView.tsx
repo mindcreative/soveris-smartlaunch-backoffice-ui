@@ -1,5 +1,6 @@
 import type { BillingAccountSnapshot } from '../../types/billing'
 import { CreditAmount } from './CreditAmount'
+import { LocalInstant } from '../../timezone/LocalInstant'
 
 const statusClasses = {
   active: 'bg-green-100 text-green-800',
@@ -17,11 +18,6 @@ function AmountCard({ label, value }: { label: string; value: string }) {
 }
 
 export function AccountSnapshotView({ snapshot }: { snapshot: BillingAccountSnapshot }) {
-  const displayAsOf = new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'long',
-  }).format(new Date(snapshot.asOf))
-
   return (
     <section aria-labelledby="account-summary-heading" className="space-y-5">
       <h2 id="account-summary-heading" className="sr-only">Current credit account snapshot</h2>
@@ -49,9 +45,7 @@ export function AccountSnapshotView({ snapshot }: { snapshot: BillingAccountSnap
         <div className="min-w-0 rounded-lg border border-gray-200 bg-white p-5">
           <dt className="text-sm font-medium text-gray-600">Snapshot as of</dt>
           <dd className="mt-2 break-words text-sm font-medium text-gray-900">
-            <time dateTime={snapshot.asOf} aria-label={`Snapshot as of ${displayAsOf}`}>
-              {displayAsOf}
-            </time>
+            <LocalInstant value={snapshot.asOf} />
           </dd>
         </div>
       </dl>

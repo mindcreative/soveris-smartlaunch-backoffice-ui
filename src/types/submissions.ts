@@ -1,3 +1,5 @@
+import type { LocalInstantValue } from '../timezone/LocalInstant'
+
 export type SubmissionStatus = 'pending' | 'verified' | 'invalid'
 
 export interface SubmissionSummary {
@@ -5,8 +7,8 @@ export interface SubmissionSummary {
   email: string
   productName?: string
   isVerified?: boolean
-  createdAt: string
-  updatedAt?: string
+  createdAt: LocalInstantValue
+  updatedAt?: LocalInstantValue | null
 }
 
 export interface Submission {
@@ -17,9 +19,9 @@ export interface Submission {
   productName?: string
   formData?: Record<string, unknown>
   status: SubmissionStatus
-  createdAt: string
-  updatedAt?: string
-  expiresAt?: string
+  createdAt: LocalInstantValue
+  updatedAt?: LocalInstantValue | null
+  expiresAt?: LocalInstantValue | null
   clientId?: string
   isVerified?: boolean
 }

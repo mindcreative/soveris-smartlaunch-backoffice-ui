@@ -7,6 +7,7 @@ import { EmptyState } from '../../components/shared/EmptyState'
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner'
 import { ErrorDisplay } from '../../components/shared/ErrorDisplay'
 import type { AuditLogEntry } from '../../api/endpoints'
+import { LocalInstant } from '../../timezone/LocalInstant'
 
 // ==================== TYPES ====================
 
@@ -95,19 +96,6 @@ const RESULT_STATUS_OPTIONS = [
   { value: 'Failure', label: 'Failure' },
   { value: 'Pending', label: 'Pending' },
 ]
-
-function formatTimestamp(isoString: string): string {
-  const date = new Date(isoString)
-  return date.toLocaleString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  })
-}
 
 function getStatusBadgeClass(resultStatus?: string): string {
   switch (resultStatus) {
@@ -213,12 +201,12 @@ export function AuditLogPage() {
     {
       key: 'createdAt',
       label: 'Timestamp',
-      sortable: true,
+      sortable: false,
       render: (_value, row) => {
         const r = row as AuditLogEntry
         return (
           <span className="text-gray-600 whitespace-nowrap">
-            {formatTimestamp(r.createdAt)}
+            <LocalInstant value={r.createdAt} />
           </span>
         )
       },
@@ -491,7 +479,7 @@ export function AuditLogPage() {
               </div>
               <div>
                 <dt className="text-sm font-medium text-gray-500">Timestamp</dt>
-                <dd className="mt-1 text-sm text-gray-900">{formatTimestamp(selectedLog.createdAt)}</dd>
+                <dd className="mt-1 text-sm text-gray-900"><LocalInstant value={selectedLog.createdAt} /></dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-gray-500">User</dt>

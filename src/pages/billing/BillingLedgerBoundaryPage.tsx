@@ -17,6 +17,7 @@ import {
   useBillingLedger,
 } from '../../queries/billingQueries'
 import type { BillingLedgerFilters } from '../../types/billing'
+import { LocalInstant, localInstantLabel } from '../../timezone/LocalInstant'
 
 function errorStatus(error: unknown): number | undefined {
   return error && typeof error === 'object' && 'status' in error ? (error as ApiError).status : undefined
@@ -68,7 +69,6 @@ function CanonicalLedgerPage({ clientId }: { clientId: string }) {
   const filtersActive = Object.keys(filters).length > 0
   const rowsPresent = query.items.length > 0
   const status = errorStatus(query.error)
-
   useEffect(() => { headingRef.current?.focus() }, [clientId])
 
   useLayoutEffect(() => {
@@ -101,7 +101,7 @@ function CanonicalLedgerPage({ clientId }: { clientId: string }) {
     const pageCount = query.data?.pages.length ?? 0
     if (!query.isFetching && pageCount > 0) {
       const verb = previousPageCount.current > 0 && pageCount > previousPageCount.current ? 'loaded' : 'found'
-      setAnnouncement(`${query.items.length} ledger operations ${verb}. Results snapshot as of ${query.asOf}.`)
+      setAnnouncement(`${query.items.length} ledger operations ${verb}. Results snapshot as of ${query.asOf ? localInstantLabel(query.asOf) : 'unavailable'}.`)
       previousPageCount.current = pageCount
     }
   }, [query.asOf, query.data?.pages.length, query.isFetching, query.items.length])
@@ -132,7 +132,10 @@ function CanonicalLedgerPage({ clientId }: { clientId: string }) {
 
   return (
     <LedgerPageFrame clientId={clientId} headingRef={headingRef}>
-      <LedgerFilters appliedFiltersActive={filtersActive} busy={transitionBusy || query.isPending} onApply={(nextFilters) => void startTraversal(nextFilters, 'Filters applied. Loading a fresh ledger snapshot.')} onClear={clearFilters} />
+      <LedgerFilters appliedFiltersActive={filtersActive} busy={transitionBusy || query.isPending}
+
+        onApply={(nextFilters) => void startTraversal(nextFilters, 'Filters applied. Loading a fresh ledger snapshot.')}
+        onClear={clearFilters} />
       <LedgerExportPanel clientId={clientId} filters={filters} onPermissionDenied={denyExportScope} />
       <div aria-live="polite" aria-atomic="true" className="sr-only">{announcement}</div>
 
@@ -141,7 +144,8 @@ function CanonicalLedgerPage({ clientId }: { clientId: string }) {
       {initialError && status === 401 && <ErrorDisplay message="Session ended" detail="Sign in again to request this private ledger." />}
       {initialError && durableContractFailure && <ErrorDisplay message="Ledger unavailable" detail="The server response did not match the Billing ledger contract. No ledger rows have been displayed." onRetry={() => void startTraversal(filters, 'Starting a fresh ledger request.')} />}
       {initialError && status === 400 && <ErrorDisplay message="Ledger filters were rejected" detail="The server rejected the applied values. Adjust the filters and apply them again." />}
-      {initialError && status !== 400 && status !== 401 && status !== 403 && !durableContractFailure && <ErrorDisplay message="Ledger unavailable" detail="The ledger could not be loaded. Try again; no balance has been inferred." onRetry={() => void startTraversal(filters, 'Retrying with a fresh ledger snapshot.')} />}
+      {initialError && status === 422 && <ErrorDisplay message="Local time is unavailable" detail="This time does not exist or occurs twice in your saved timezone. Edit the filter and apply again." />}
+      {initialError && status !== 400 && status !== 401 && status !== 403 && status !== 409 && status !== 422 && !durableContractFailure && <ErrorDisplay message="Ledger unavailable" detail="The ledger could not be loaded. Try again; no balance has been inferred." onRetry={() => void startTraversal(filters, 'Retrying with a fresh ledger snapshot.')} />}
 
       {!query.isPending && !initialError && !rowsPresent && !filtersActive && <EmptyState title="No ledger operations" description="No immutable credit operations exist for this authorized Client scope." />}
       {!query.isPending && !initialError && !rowsPresent && filtersActive && (
@@ -155,7 +159,7 @@ function CanonicalLedgerPage({ clientId }: { clientId: string }) {
       {rowsPresent && (
         <>
           <div role="status" className="state-indicator mb-4 rounded-md border border-blue-300 bg-blue-50 p-3 text-sm text-blue-950">
-            <p>Results snapshot as of <time dateTime={query.asOf}>{query.asOf ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'long' }).format(new Date(query.asOf)) : ''}</time>.</p>
+            <p>Results snapshot as of {query.asOf && <LocalInstant value={query.asOf} />}.</p>
             <p className="mt-1">Rows are shown newest first in server order. Signed credits show the available-credit effect; “Owned balance after” is authoritative after that operation and is not necessarily the current balance.</p>
           </div>
           {(query.isStale || laterError) && (

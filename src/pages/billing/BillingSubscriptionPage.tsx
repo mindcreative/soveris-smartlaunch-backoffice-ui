@@ -4,15 +4,14 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { ApiError } from '../../api/apiClient'
 import { BillingContractError, BillingSubscriptionContractError, ClientCapabilitiesContractError } from '../../api/billingApi'
 import { BillingWorkspaceNav } from '../../components/billing/BillingWorkspaceNav'
-import { EMPTY_SUBSCRIPTION_DRAFT, SubscriptionCreationForm, type SubscriptionDraft } from '../../components/billing/SubscriptionCreationForm'
-import { SubscriptionReview } from '../../components/billing/SubscriptionReview'
+import { LocalSubscriptionCreationWorkspace, LocalSubscriptionCreatedNotice } from '../../components/billing/LocalSubscriptionCreationWorkspace'
+import type { LocalSubscriptionReceipt } from '../../api/localSubscriptionApi'
 import { SubscriptionLifecycleControlsView } from '../../components/billing/SubscriptionLifecycleControls'
 import { CapabilityPolicyContext } from '../../components/billing/CapabilityPolicyContext'
 import { ResourceAccessConsequenceTimeline } from '../../components/billing/ResourceAccessConsequenceTimeline'
 import { SubscriptionTierControls } from '../../components/billing/SubscriptionTierControls'
 import { Breadcrumbs, EmptyState, ErrorDisplay, Forbidden, LoadingSpinner } from '../../components/shared'
 import { useAuth } from '../../hooks/useAuth'
-import { useSubscriptionCreation } from '../../hooks/useSubscriptionCreation'
 import { useSubscriptionLifecycle } from '../../hooks/useSubscriptionLifecycle'
 import { canonicalizeGuid } from '../../lib/guid'
 import {
@@ -23,38 +22,12 @@ import {
   useBillingSubscriptions,
 } from '../../queries/billingQueries'
 import type { BillingSubscriptionItem, BillingSubscriptionState } from '../../types/billing'
+import { SavedZoneTime } from '../../timezone/SavedZoneTime'
 
 function errorStatus(error: unknown): number | undefined {
   return error && typeof error === 'object' && 'status' in error
     ? (error as ApiError).status
     : undefined
-}
-
-function equivalentDecimal(left: string, right: string): boolean {
-  const normalize = (value: string) => value.includes('.')
-    ? value.replace(/0+$/, '').replace(/\.$/, '') : value
-  return normalize(left) === normalize(right)
-}
-
-function reconcilesAttempt(
-  item: BillingSubscriptionItem,
-  request: NonNullable<ReturnType<typeof useSubscriptionCreation>['attempt']>['request']
-): boolean {
-  return item.planName === request.planName &&
-    item.subscriptionTier === request.subscriptionTier &&
-    equivalentDecimal(item.cycleCreditAmount, request.cycleCreditAmount) &&
-    Date.parse(item.validFrom) === Date.parse(request.validFrom) &&
-    (item.validTo === null || request.validTo === null
-      ? item.validTo === request.validTo
-      : Date.parse(item.validTo) === Date.parse(request.validTo)) &&
-    item.changeEffectivePolicy === request.changeEffectivePolicy &&
-    item.prorationPolicy === request.prorationPolicy &&
-    item.unusedCreditPolicy === request.unusedCreditPolicy &&
-    item.entitlements.schemaVersion === request.entitlements.schemaVersion &&
-    item.entitlements.rateLimits.requestsPerMinute === request.entitlements.rateLimits.requestsPerMinute &&
-    item.entitlements.rateLimits.concurrentAiOperations === request.entitlements.rateLimits.concurrentAiOperations &&
-    item.entitlements.featureFlags.contentGeneration === request.entitlements.featureFlags.contentGeneration &&
-    item.entitlements.featureFlags.imageGeneration === request.entitlements.featureFlags.imageGeneration
 }
 
 function SubscriptionFrame({ clientId, headingRef, children }: {
@@ -102,8 +75,8 @@ function CurrentSubscription({ subscription, state, hasNextPage, isLoadingMore, 
         <div><dt className="text-sm font-medium text-gray-600">Stored subscription tier</dt><dd className="text-gray-950">{subscription.subscriptionTier}</dd></div>
         <div><dt className="text-sm font-medium text-gray-600">Tier revision</dt><dd className="font-mono text-gray-950">{subscription.tierRevision}</dd></div>
         <div><dt className="text-sm font-medium text-gray-600">Cycle credits</dt><dd className="break-all text-gray-950">{subscription.cycleCreditAmount}</dd></div>
-        <div><dt className="text-sm font-medium text-gray-600">Valid from</dt><dd className="break-all text-gray-950"><time dateTime={subscription.validFrom}>{subscription.validFrom}</time></dd></div>
-        <div><dt className="text-sm font-medium text-gray-600">Valid to</dt><dd className="break-all text-gray-950">{subscription.validTo ?? 'No end date'}</dd></div>
+        <div><dt className="text-sm font-medium text-gray-600">Valid from</dt><dd className="break-all text-gray-950"><SavedZoneTime value={subscription.validFrom} /></dd></div>
+        <div><dt className="text-sm font-medium text-gray-600">Valid to</dt><dd className="break-all text-gray-950">{subscription.validTo ? <SavedZoneTime value={subscription.validTo} /> : 'No end date'}</dd></div>
         <div><dt className="text-sm font-medium text-gray-600">Change timing</dt><dd className="text-gray-950">{subscription.changeEffectivePolicy}</dd></div>
         <div><dt className="text-sm font-medium text-gray-600">Proration</dt><dd className="text-gray-950">{subscription.prorationPolicy}</dd></div>
         <div><dt className="text-sm font-medium text-gray-600">Unused credits</dt><dd className="text-gray-950">Rollover</dd></div>
@@ -112,19 +85,19 @@ function CurrentSubscription({ subscription, state, hasNextPage, isLoadingMore, 
         <div><dt className="text-sm font-medium text-gray-600">Content generation</dt><dd className="text-gray-950">{subscription.entitlements.featureFlags.contentGeneration ? 'Enabled' : 'Disabled'}</dd></div>
         <div><dt className="text-sm font-medium text-gray-600">Image generation</dt><dd className="text-gray-950">{subscription.entitlements.featureFlags.imageGeneration ? 'Enabled' : 'Disabled'}</dd></div>
       </dl>
-      <p className="mt-4 text-sm text-gray-600">Monthly credits renew by UTC calendar month from the subscription start.</p>
+      <p className="mt-4 text-sm text-gray-600">The server derives monthly billing boundaries from the original subscription instant.</p>
       {(subscription.pendingImmediateDebit || subscription.immediateChangeContext || state.pendingChange ||
         state.pendingImmediateDebit || state.immediateChangeContext) && (
         <p role="status" className="state-indicator mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
           Additional subscription change context is present and is read-only on this page.
         </p>
       )}
-      {state.pendingTierChange && <div role="status" className="state-indicator mt-4 rounded-md border border-violet-300 bg-violet-50 p-3 text-sm text-violet-950"><p className="font-semibold">Pending tier change</p><p>{state.pendingTierChange.subscriptionTier} at {state.pendingTierChange.effectiveCycleStart}; expected revision {state.pendingTierChange.expectedTierRevision}; operation <span className="break-all font-mono">{state.pendingTierChange.operationId}</span>.</p></div>}
+      {state.pendingTierChange && <div role="status" className="state-indicator mt-4 rounded-md border border-violet-300 bg-violet-50 p-3 text-sm text-violet-950"><p className="font-semibold">Pending tier change</p><p>{state.pendingTierChange.subscriptionTier} at <SavedZoneTime value={state.pendingTierChange.effectiveCycleStart} />; expected revision {state.pendingTierChange.expectedTierRevision}; operation <span className="break-all font-mono">{state.pendingTierChange.operationId}</span>.</p></div>}
       <h3 className="mt-6 font-semibold text-gray-950">Authoritative grant history</h3>
-      {state.grantHistory.items.length === 0 ? <p className="mt-2 text-sm text-gray-600">No grant evidence is present in the loaded history.</p> : <ul className="mt-3 space-y-3">{state.grantHistory.items.map((grant) => <li key={grant.grantId} className="min-w-0 rounded-md border border-gray-200 p-3 text-sm"><dl className="grid min-w-0 gap-2 sm:grid-cols-2"><div><dt className="font-medium text-gray-600">Grant ID</dt><dd className="break-all font-mono">{grant.grantId}</dd></div><div><dt className="font-medium text-gray-600">Grant operation ID</dt><dd className="break-all font-mono">{grant.grantOperationId}</dd></div><div><dt className="font-medium text-gray-600">Ledger entry ID</dt><dd className="break-all font-mono">{grant.ledgerEntryId}</dd></div><div><dt className="font-medium text-gray-600">Credit amount</dt><dd className="break-all font-mono">{grant.creditAmount}</dd></div><div><dt className="font-medium text-gray-600">Plan snapshot</dt><dd className="break-words">{grant.planNameSnapshot}</dd></div><div><dt className="font-medium text-gray-600">Tier snapshot</dt><dd>{grant.subscriptionTierSnapshot} at revision <span className="font-mono">{grant.tierRevisionSnapshot}</span></dd></div><div><dt className="font-medium text-gray-600">Created at</dt><dd className="break-all">{grant.createdAt}</dd></div></dl></li>)}</ul>}
+      {state.grantHistory.items.length === 0 ? <p className="mt-2 text-sm text-gray-600">No grant evidence is present in the loaded history.</p> : <ul className="mt-3 space-y-3">{state.grantHistory.items.map((grant) => <li key={grant.grantId} className="min-w-0 rounded-md border border-gray-200 p-3 text-sm"><dl className="grid min-w-0 gap-2 sm:grid-cols-2"><div><dt className="font-medium text-gray-600">Grant ID</dt><dd className="break-all font-mono">{grant.grantId}</dd></div><div><dt className="font-medium text-gray-600">Grant operation ID</dt><dd className="break-all font-mono">{grant.grantOperationId}</dd></div><div><dt className="font-medium text-gray-600">Ledger entry ID</dt><dd className="break-all font-mono">{grant.ledgerEntryId}</dd></div><div><dt className="font-medium text-gray-600">Credit amount</dt><dd className="break-all font-mono">{grant.creditAmount}</dd></div><div><dt className="font-medium text-gray-600">Plan snapshot</dt><dd className="break-words">{grant.planNameSnapshot}</dd></div><div><dt className="font-medium text-gray-600">Tier snapshot</dt><dd>{grant.subscriptionTierSnapshot} at revision <span className="font-mono">{grant.tierRevisionSnapshot}</span></dd></div><div><dt className="font-medium text-gray-600">Created at</dt><dd className="break-all"><SavedZoneTime value={grant.createdAt} /></dd></div></dl></li>)}</ul>}
       {hasNextPage && <button type="button" onClick={() => { void onLoadMore().catch(() => undefined) }} disabled={isLoadingMore} className="mt-4 min-h-11 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:cursor-wait disabled:opacity-60">{isLoadingMore ? 'Loading grant history…' : 'Load more grant history'}</button>}
       {Boolean(continuationError) && <p role="alert" className="state-indicator mt-3 text-sm text-red-800">More grant history could not be validated. Previously validated evidence remains visible.</p>}
-      {state.subscriptionHistory.length > 0 && <><h3 className="mt-6 font-semibold text-gray-950">Terminal subscription history</h3><ul className="mt-3 space-y-2">{state.subscriptionHistory.map((item) => <li key={item.subscriptionId} className="min-w-0 rounded-md border border-gray-200 p-3 text-sm"><span className="font-medium">{item.planName}</span> · {item.status} · tier {item.subscriptionTier} revision <span className="font-mono">{item.tierRevision}</span> · valid <time dateTime={item.validFrom}>{item.validFrom}</time> to {item.validTo ? <time dateTime={item.validTo}>{item.validTo}</time> : "open end"} · <span className="break-all font-mono">{item.subscriptionId}</span></li>)}</ul></>}
+      {state.subscriptionHistory.length > 0 && <><h3 className="mt-6 font-semibold text-gray-950">Terminal subscription history</h3><ul className="mt-3 space-y-2">{state.subscriptionHistory.map((item) => <li key={item.subscriptionId} className="min-w-0 rounded-md border border-gray-200 p-3 text-sm"><span className="font-medium">{item.planName}</span> · {item.status} · tier {item.subscriptionTier} revision <span className="font-mono">{item.tierRevision}</span> · valid <SavedZoneTime value={item.validFrom} /> to {item.validTo ? <SavedZoneTime value={item.validTo} /> : "open end"} · <span className="break-all font-mono">{item.subscriptionId}</span></li>)}</ul></>}
     </section>
   )
 }
@@ -141,7 +114,7 @@ function TerminalHistory({ state, hasNextPage, isLoadingMore, continuationError,
     <section aria-labelledby="terminal-history-heading" className="mt-4 rounded-lg border border-gray-200 bg-white p-4 sm:p-6">
       <h2 id="terminal-history-heading" className="text-lg font-semibold text-gray-950">Read-only subscription history</h2>
       <p role="status" className="state-indicator mt-2 text-sm text-gray-700">Terminal history is evidence only and does not represent a current subscription.</p>
-      {state.subscriptionHistory.length > 0 && <ul className="mt-3 space-y-2">{state.subscriptionHistory.map((item) => <li key={item.subscriptionId} className="min-w-0 rounded-md border border-gray-200 p-3 text-sm"><span className="font-medium">{item.planName}</span> · {item.status} · tier {item.subscriptionTier} revision <span className="font-mono">{item.tierRevision}</span> · valid <time dateTime={item.validFrom}>{item.validFrom}</time> to {item.validTo ? <time dateTime={item.validTo}>{item.validTo}</time> : "open end"} · <span className="break-all font-mono">{item.subscriptionId}</span></li>)}</ul>}
+      {state.subscriptionHistory.length > 0 && <ul className="mt-3 space-y-2">{state.subscriptionHistory.map((item) => <li key={item.subscriptionId} className="min-w-0 rounded-md border border-gray-200 p-3 text-sm"><span className="font-medium">{item.planName}</span> · {item.status} · tier {item.subscriptionTier} revision <span className="font-mono">{item.tierRevision}</span> · valid <SavedZoneTime value={item.validFrom} /> to {item.validTo ? <SavedZoneTime value={item.validTo} /> : "open end"} · <span className="break-all font-mono">{item.subscriptionId}</span></li>)}</ul>}
       {state.grantHistory.items.length > 0 && <><p className="mt-3 text-sm text-gray-700">{state.grantHistory.items.length} validated historical grant {state.grantHistory.items.length === 1 ? 'record is' : 'records are'} loaded.</p><ul className="mt-2 space-y-2">{state.grantHistory.items.map((grant) => <li key={grant.grantId} className="rounded-md border border-gray-200 p-3 text-sm"><span className="font-medium">{grant.planNameSnapshot}</span> · tier {grant.subscriptionTierSnapshot} revision <span className="font-mono">{grant.tierRevisionSnapshot}</span> · <span className="break-all font-mono">{grant.grantId}</span></li>)}</ul></>}
       {hasNextPage && <button type="button" onClick={() => { void onLoadMore().catch(() => undefined) }} disabled={isLoadingMore} className="mt-4 min-h-11 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800">{isLoadingMore ? 'Loading grant history…' : 'Load more grant history'}</button>}
       {Boolean(continuationError) && <p role="alert" className="mt-3 text-sm text-red-800">More grant history could not be validated.</p>}
@@ -167,19 +140,14 @@ function CanonicalSubscriptionPage({ clientId, canCreate, onDurableError }: {
   const accountQuery = useBillingAccount(canViewAccount ? clientId : null)
   const capabilityQuery = useClientCapabilities(clientId)
   const consequenceQuery = useResourceAccessConsequences(clientId)
-  const creation = useSubscriptionCreation(clientId, {
-    onPermissionDenied: (error) => onDurableError({ source: 'subscription', error }),
-  })
   const lifecycle = useSubscriptionLifecycle(clientId, {
     onPermissionDenied: (error) => onDurableError({ source: 'subscription', error }),
   })
-  const [draft, setDraft] = useState<SubscriptionDraft>(EMPTY_SUBSCRIPTION_DRAFT)
+  const [localReceipt, setLocalReceipt] = useState<LocalSubscriptionReceipt | null>(null)
   const [tierAuthorityPending, setTierAuthorityPending] = useState(false)
-  const [reconciliation, setReconciliation] = useState<'idle' | 'checking' | 'matched' | 'absent' | 'unavailable' | 'mismatch'>('idle')
-  const reconciliationErrorRef = useRef<unknown>(null)
 
   useEffect(() => {
-    const clearDraft = () => setDraft(EMPTY_SUBSCRIPTION_DRAFT)
+    const clearDraft = () => setLocalReceipt(null)
     window.addEventListener('auth:cleared', clearDraft)
     window.addEventListener('auth:refreshed', clearDraft)
     return () => {
@@ -212,6 +180,7 @@ function CanonicalSubscriptionPage({ clientId, canCreate, onDurableError }: {
 
   useEffect(() => { headingRef.current?.focus() }, [clientId])
   useLayoutEffect(() => { setTierAuthorityPending(false) }, [clientId])
+  useEffect(() => { setLocalReceipt(null) }, [clientId])
 
   useEffect(() => {
     if (subscriptionQuery.error && (
@@ -249,29 +218,6 @@ function CanonicalSubscriptionPage({ clientId, canCreate, onDurableError }: {
     }
   }, [onDurableError, subscriptionQuery.continuationError])
 
-  useEffect(() => {
-    if (!creation.error || reconciliationErrorRef.current === creation.error ||
-        (creation.outcome !== 'unknown' && creation.outcome !== 'rejected')) return
-    reconciliationErrorRef.current = creation.error
-    if (creation.outcome !== 'unknown') {
-      void subscriptionQuery.refetch()
-      if (canViewAccount) void accountQuery.refetch()
-      return
-    }
-    setReconciliation('checking')
-    void Promise.all([
-      subscriptionQuery.refetch(),
-      canViewAccount ? accountQuery.refetch() : Promise.resolve(null),
-    ]).then(([result]) => {
-      if (result.error || !creation.attempt) return setReconciliation('unavailable')
-      const matching = [result.data?.current, ...(result.data?.subscriptionHistory ?? [])]
-        .find((item) => item?.creationOperationId === creation.attempt?.request.creationOperationId)
-      if (!matching) return setReconciliation('absent')
-      const request = creation.attempt.request
-      setReconciliation(reconcilesAttempt(matching, request) ? 'matched' : 'mismatch')
-    }).catch(() => setReconciliation('unavailable'))
-  }, [accountQuery, canViewAccount, creation.error, creation.outcome, subscriptionQuery])
-
   const subscriptionError = subscriptionQuery.error
   const accountError = accountQuery.error
   const subscriptionStatus = errorStatus(subscriptionError)
@@ -295,24 +241,8 @@ function CanonicalSubscriptionPage({ clientId, canCreate, onDurableError }: {
     return <SubscriptionFrame clientId={clientId} headingRef={headingRef}><ErrorDisplay message="Subscription state unavailable" detail="The current subscription state could not be loaded. No state has been inferred." onRetry={() => void subscriptionQuery.refetch()} /></SubscriptionFrame>
   }
 
-  if (creation.receipt) {
-    return <SubscriptionFrame clientId={clientId} headingRef={headingRef}><div className="space-y-4"><CapabilityPolicyContext clientId={clientId} capabilities={capabilityQuery.data} isLoading={capabilityQuery.isPending} isFetching={capabilityQuery.isFetching} error={capabilityQuery.error} onRetry={() => void capabilityQuery.refetch()} /><SubscriptionReview
-      receipt={creation.receipt}
-      state={subscription}
-      currentAccount={canViewAccount ? account : null}
-      hasNextPage={subscriptionQuery.hasNextPage}
-      isLoadingMore={subscriptionQuery.isLoadingMore}
-      continuationError={subscriptionQuery.continuationError}
-      stateRefreshError={subscriptionError}
-      accountRefreshError={accountError}
-      stateRefreshing={subscriptionQuery.isFetching}
-      accountRefreshing={accountQuery.isFetching}
-      onLoadMore={subscriptionQuery.loadMore}
-    /></div></SubscriptionFrame>
-  }
-
   if (subscription?.current) {
-    return <SubscriptionFrame clientId={clientId} headingRef={headingRef}><div className="space-y-4">{!tierAuthorityPending && <CapabilityPolicyContext clientId={clientId} capabilities={capabilityQuery.data} isLoading={capabilityQuery.isPending} isFetching={capabilityQuery.isFetching} error={capabilityQuery.error} onRetry={() => void capabilityQuery.refetch()} />}<SubscriptionTierControls clientId={clientId} state={subscription} preflight={tierPreflight} onPermissionDenied={(error) => onDurableError({ source: 'subscription', error })} onAuthorityPending={setTierAuthorityPending} />{tierAuthorityPending && <p role="status" className="state-indicator rounded-md border border-violet-200 bg-violet-50 p-3 text-sm text-violet-950">Current subscription and consequence details are hidden until authoritative reconciliation completes.</p>}{!tierAuthorityPending && <SubscriptionLifecycleControlsView clientId={clientId} state={subscription} preflight={lifecyclePreflight} lifecycle={lifecycle} />}{subscriptionError && <p role="alert" className="state-indicator rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">Refresh failed. This is the last validated subscription state for this Client and may be stale.</p>}<CreationOutcomePanel creation={creation} canViewAccount={canViewAccount} clientId={clientId} state={subscription} reconciliation={reconciliation} />{!tierAuthorityPending && <CurrentSubscription subscription={subscription.current} state={subscription} hasNextPage={subscriptionQuery.hasNextPage} isLoadingMore={subscriptionQuery.isLoadingMore} continuationError={subscriptionQuery.continuationError} onLoadMore={subscriptionQuery.loadMore} />}{!tierAuthorityPending && <ResourceAccessConsequenceTimeline consequences={consequenceQuery.data} isLoading={consequenceQuery.isPending} error={consequenceQuery.error} onRetry={() => void consequenceQuery.refetch()} />}</div></SubscriptionFrame>
+    return <SubscriptionFrame clientId={clientId} headingRef={headingRef}><div className="space-y-4">{localReceipt && <LocalSubscriptionCreatedNotice receipt={localReceipt} />}{!tierAuthorityPending && <CapabilityPolicyContext clientId={clientId} capabilities={capabilityQuery.data} isLoading={capabilityQuery.isPending} isFetching={capabilityQuery.isFetching} error={capabilityQuery.error} onRetry={() => void capabilityQuery.refetch()} />}<SubscriptionTierControls clientId={clientId} state={subscription} preflight={tierPreflight} onPermissionDenied={(error) => onDurableError({ source: 'subscription', error })} onAuthorityPending={setTierAuthorityPending} />{tierAuthorityPending && <p role="status" className="state-indicator rounded-md border border-violet-200 bg-violet-50 p-3 text-sm text-violet-950">Current subscription and consequence details are hidden until authoritative reconciliation completes.</p>}{!tierAuthorityPending && <SubscriptionLifecycleControlsView clientId={clientId} state={subscription} preflight={lifecyclePreflight} lifecycle={lifecycle} />}{subscriptionError && <p role="alert" className="state-indicator rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">Refresh failed. This is the last validated subscription state for this Client and may be stale.</p>}{!tierAuthorityPending && <CurrentSubscription subscription={subscription.current} state={subscription} hasNextPage={subscriptionQuery.hasNextPage} isLoadingMore={subscriptionQuery.isLoadingMore} continuationError={subscriptionQuery.continuationError} onLoadMore={subscriptionQuery.loadMore} />}{!tierAuthorityPending && <ResourceAccessConsequenceTimeline consequences={consequenceQuery.data} isLoading={consequenceQuery.isPending} error={consequenceQuery.error} onRetry={() => void consequenceQuery.refetch()} />}</div></SubscriptionFrame>
   }
   if (lifecycle.receipt && subscription) {
     return <SubscriptionFrame clientId={clientId} headingRef={headingRef}><div className="space-y-4"><CapabilityPolicyContext clientId={clientId} capabilities={capabilityQuery.data} isLoading={capabilityQuery.isPending} isFetching={capabilityQuery.isFetching} error={capabilityQuery.error} onRetry={() => void capabilityQuery.refetch()} /><SubscriptionLifecycleControlsView clientId={clientId} state={subscription} preflight={lifecyclePreflight} lifecycle={lifecycle} /><TerminalHistory state={subscription} hasNextPage={subscriptionQuery.hasNextPage} isLoadingMore={subscriptionQuery.isLoadingMore} continuationError={subscriptionQuery.continuationError} onLoadMore={subscriptionQuery.loadMore} /></div></SubscriptionFrame>
@@ -352,80 +282,15 @@ function CanonicalSubscriptionPage({ clientId, canCreate, onDurableError }: {
             Credit account readiness cannot be checked with your current permission. The server will verify it when you submit.
           </p>
         )}
-        <CreationOutcomePanel creation={creation} canViewAccount={canViewAccount} clientId={clientId} state={subscription} reconciliation={reconciliation} />
-        <SubscriptionCreationForm
+        <LocalSubscriptionCreationWorkspace
           clientId={clientId}
-          onConfirm={creation.confirm}
-          disabled={creation.outcome !== 'idle'}
-          draft={draft}
-          onDraftChange={setDraft}
           onPreconfirm={preconfirm}
-          serverValidationError={creation.outcome === 'rejected' && errorStatus(creation.error) === 400}
+          onCreated={setLocalReceipt}
         />
       </div>
       {subscription && <TerminalHistory state={subscription} hasNextPage={subscriptionQuery.hasNextPage} isLoadingMore={subscriptionQuery.isLoadingMore} continuationError={subscriptionQuery.continuationError} onLoadMore={subscriptionQuery.loadMore} />}
     </SubscriptionFrame>
   )
-}
-
-function CreationOutcomePanel({ creation, canViewAccount, clientId, reconciliation }: {
-  creation: ReturnType<typeof useSubscriptionCreation>
-  canViewAccount: boolean
-  clientId: string
-  state?: BillingSubscriptionState
-  reconciliation: 'idle' | 'checking' | 'matched' | 'absent' | 'unavailable' | 'mismatch'
-}) {
-  const headingRef = useRef<HTMLHeadingElement>(null)
-  useEffect(() => {
-    if (creation.outcome !== 'idle') headingRef.current?.focus()
-  }, [creation.outcome])
-  if (creation.outcome === 'idle' || creation.receipt) return null
-  if (creation.outcome === 'submitting') {
-    return <section aria-labelledby="creation-progress-heading" className="rounded-md border border-indigo-300 bg-indigo-50 p-4"><h2 id="creation-progress-heading" ref={headingRef} tabIndex={-1} className="font-semibold text-indigo-950 outline-none">Creating subscription</h2><p role="status" className="state-indicator mt-1 text-sm text-indigo-950">Submitting the retained operation once…</p></section>
-  }
-
-  const error = creation.error as ApiError | null
-  const status = errorStatus(error)
-  const code = error?.code
-  if (creation.outcome === 'unknown') {
-    const guidance = reconciliation === 'checking' ? 'Checking authoritative subscription evidence before retry is allowed…'
-      : reconciliation === 'matched' ? 'Matching authoritative subscription evidence was found. The operation is recovered; no retry is needed.'
-        : reconciliation === 'absent' ? 'No matching evidence was found in the authoritative state. Only the exact retained operation may be retried.'
-          : reconciliation === 'mismatch' ? 'Authoritative evidence conflicts with the retained material. The outcome remains unresolved and retry is blocked.'
-            : 'Authoritative reconciliation is unavailable. The outcome remains unresolved and retry is blocked.'
-    return <section aria-labelledby="creation-unknown-heading" className="rounded-md border border-amber-300 bg-amber-50 p-4"><h2 id="creation-unknown-heading" ref={headingRef} tabIndex={-1} className="font-semibold text-amber-950 outline-none">Outcome unknown</h2><p role="alert" className="state-indicator mt-1 text-sm text-amber-950">The subscription may have been created. The exact operation identity and byte-equivalent body are retained; no replacement identity will be generated.</p><p className="mt-2 text-sm text-amber-950">{guidance}</p><div className="mt-3 flex flex-wrap gap-3">{reconciliation === 'absent' && <button type="button" onClick={() => void creation.retry()} className="min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Retry exact operation</button>}<button type="button" onClick={creation.abandon} className="min-h-11 rounded-md border border-amber-500 bg-white px-4 py-2 text-sm font-semibold text-amber-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Abandon unresolved attempt</button></div><p className="mt-2 text-xs text-amber-900">Abandon only if you accept that the earlier request may still have committed; returning later will refresh authoritative state.</p></section>
-  }
-
-  let title = 'Subscription creation rejected'
-  let detail = 'The server rejected this logical operation. Your entered values and operation identity remain unchanged.'
-  let allowNew = true
-  if (status === 400) {
-    title = 'Invalid subscription creation request'
-    detail = 'The server rejected the request as invalid without assigning errors to individual fields.'
-  } else if (status === 404) {
-    title = 'Billing not configured'
-    detail = 'Billing or its CreditAccount is not configured for this Client. Nothing has been provisioned automatically.'
-  } else if (status === 409 && code === 'subscription_operation_conflict') {
-    title = 'Operation identity conflict'
-    detail = 'This creation operation identity is already bound to different material. It cannot be retried with changed values.'
-    allowNew = false
-  } else if (status === 409 && code === 'subscription_current_conflict') {
-    title = 'Current subscription conflict'
-    detail = 'Another current subscription exists. The authoritative state has been refreshed and will not be overwritten.'
-    allowNew = false
-  } else if (status === 409 && code === 'credit_account_inactive') {
-    title = 'Credit account inactive'
-    detail = 'The CreditAccount is not active. Its status has not been changed.'
-  } else if (status === 409 && code === 'credit_balance_overflow') {
-    title = 'Credit balance capacity conflict'
-    detail = 'The exact requested amount would exceed account capacity. It has not been rounded or reduced.'
-  } else if (status === 413 || status === 415) {
-    title = 'Subscription request contract failure'
-    detail = status === 413
-      ? 'The server rejected this closed request as too large.'
-      : 'The server rejected the required JSON media type.'
-  }
-  return <section aria-labelledby="creation-rejected-heading" className="rounded-md border border-red-300 bg-red-50 p-4"><h2 id="creation-rejected-heading" ref={headingRef} tabIndex={-1} className="font-semibold text-red-950 outline-none">{title}</h2><p role="alert" className="state-indicator mt-1 text-sm text-red-950">{detail}</p>{status === 404 && canViewAccount && <a href={`/billing/clients/${clientId}/account`} className="mt-2 inline-flex min-h-11 items-center font-semibold text-indigo-700 underline">Open Account</a>}{allowNew && <div className="mt-3"><button type="button" onClick={creation.abandon} className="min-h-11 rounded-md border border-red-400 bg-white px-4 py-2 text-sm font-semibold text-red-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Start a new logical submission</button></div>}</section>
 }
 
 function PermissionAwareSubscriptionPage({ clientId }: { clientId: string }) {

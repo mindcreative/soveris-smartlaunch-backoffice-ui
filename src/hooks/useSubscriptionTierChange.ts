@@ -421,7 +421,7 @@ export function useSubscriptionTierChange(
       }
       const activeAttempt = Object.freeze({
         clientId, subscriptionId, action: frozen.material.action,
-        route: `/api/billing/clients/${clientId}/subscriptions/${subscriptionId}/tier-changes${
+        route: `/api/backoffice/clients/${clientId}/billing/subscriptions/${subscriptionId}/tier-changes${
           frozen.material.action === 'replace' ? '/pending/replace'
             : frozen.material.action === 'cancel_pending' ? '/pending/cancel' : ''
         }`,

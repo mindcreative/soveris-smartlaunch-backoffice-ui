@@ -1,3 +1,4 @@
+import { fulfillLocal, installTimeZoneRoute } from './localPresentationMocks'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page, type Route } from '@playwright/test'
 
@@ -24,7 +25,7 @@ function freemiumCapabilitiesBody(clientId: string): string {
     flags: CAPABILITY_KEYS.map((key) => ({ key, enabled: key !== 'ai_source_ingestion' })),
     limits: CAPABILITY_LIMITS.map(([key, unit, value]) => ({ key, unit, value })),
     usage: CAPABILITY_LIMITS.map(([key, unit]) => ({
-      key, unit, value: 0, measuredAt: '2026-09-06T11:59:00+00:00',
+      key, unit, value: 0, measuredAt: '2026-09-06T11:59:00.000000+00:00',
     })),
     operations: CAPABILITY_KEYS.map((key) => {
       const ai = key.startsWith('ai_')
@@ -40,7 +41,7 @@ function freemiumCapabilitiesBody(clientId: string): string {
           : ai ? ['entitlement_not_available'] : [],
       }
     }),
-    evaluatedAt: '2026-09-06T12:00:00+00:00', nextBoundary: null,
+    evaluatedAt: '2026-09-06T12:00:00.000000+00:00', nextBoundary: null,
   })
 }
 
@@ -49,7 +50,7 @@ function paidCapabilitiesBody(clientId: string): string {
   value.policySource = 'customer_subscription'
   value.subscription = {
     storedTier: 'brand', effectiveTier: 'brand', status: 'active', tierRevision: 7,
-    validFrom: '2026-09-01T00:00:00+00:00', validTo: null,
+    validFrom: '2026-09-01T00:00:00.000000+00:00', validTo: null,
   }
   value.operations = (value.operations as Array<Record<string, unknown>>).map((operation) => {
     if (operation.key === 'ai_content_generation' || operation.key === 'ai_image_generation') {
@@ -57,13 +58,13 @@ function paidCapabilitiesBody(clientId: string): string {
     }
     return operation
   })
-  value.nextBoundary = '2026-10-01T00:00:00+00:00'
+  value.nextBoundary = '2026-10-01T00:00:00.000000+00:00'
   return JSON.stringify(value)
 }
 
 function tierStateBody(clientId: string, pendingOperationId?: string): string {
   const value = JSON.parse(lifecycleStateBody(
-    clientId, 'active', null, '2026-09-20T12:00:00+00:00'
+    clientId, 'active', null, '2026-09-20T12:00:00.000000+00:00'
   ).replaceAll('99999999999999.9999', '100.0000')) as Record<string, unknown>
   const current = value.current as Record<string, unknown>
   current.tierRevision = 7
@@ -71,9 +72,9 @@ function tierStateBody(clientId: string, pendingOperationId?: string): string {
     value.pendingTierChange = {
       schemaVersion: 1, operationId: pendingOperationId, subscriptionTier: 'basic',
       expectedTierRevision: 7, effectivePolicy: 'next_billing_cycle', effectiveCycleIndex: 2,
-      effectiveCycleStart: '2026-10-01T00:00:00+00:00',
-      effectiveCycleEnd: '2026-11-01T00:00:00+00:00',
-      scheduledAt: '2026-09-20T12:00:00+00:00', reason: 'Administrative tier change',
+      effectiveCycleStart: '2026-10-01T00:00:00.000000+00:00',
+      effectiveCycleEnd: '2026-11-01T00:00:00.000000+00:00',
+      scheduledAt: '2026-09-20T12:00:00.000000+00:00', reason: 'Administrative tier change',
     }
   }
   return JSON.stringify(value)
@@ -99,16 +100,16 @@ function tierPreviewBody(
     policyPublicationId: '55555555-2222-4333-8444-555555555555',
     policyActivationRevision: 9,
     policyVersion: 'input-04-v1',
-    policyHash: 'abc', commandEffectiveAt: action === 'apply_immediate' ? null : '2026-10-01T00:00:00+00:00', commandAuthorityHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    evaluatedAt: '2026-09-20T12:00:00+00:00',
-    lossAt: '2026-10-01T00:00:00+00:00',
-    accessUntil: '2026-10-08T00:00:00+00:00',
+    policyHash: 'abc', commandEffectiveAt: action === 'apply_immediate' ? null : '2026-10-01T00:00:00.000000+00:00', commandAuthorityHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    evaluatedAt: '2026-09-20T12:00:00.000000+00:00',
+    lossAt: '2026-10-01T00:00:00.000000+00:00',
+    accessUntil: '2026-10-08T00:00:00.000000+00:00',
     earliestProofExpiry: null,
     retainedCount: 1,
     totalCount: 3,
     graceCount: 2,
     suspendedCount: 0,
-    deadlineGroups: [{ lossAt: '2026-10-01T00:00:00+00:00', accessUntil: '2026-10-08T00:00:00+00:00', graceCount: 2, newlyAffectedCount: 2 }],
+    deadlineGroups: [{ lossAt: '2026-10-01T00:00:00.000000+00:00', accessUntil: '2026-10-08T00:00:00.000000+00:00', graceCount: 2, newlyAffectedCount: 2 }],
     deadlineGroupsTruncated: false, unlistedGraceCount: 0, unlistedNewlyAffectedCount: 0,
     affectedResourcesTruncated: false,
     preservationFacts: {
@@ -144,8 +145,8 @@ function scheduledTierReceiptBody(clientId: string, body: string): string {
       previousTierRevision: request.expectedTierRevision,
       resultingTierRevision: request.expectedTierRevision,
       reason: request.reason,
-      operationAsOf: '2026-09-20T12:00:00+00:00',
-      effectiveAt: '2026-10-01T00:00:00+00:00',
+      operationAsOf: '2026-09-20T12:00:00.000000+00:00',
+      effectiveAt: '2026-10-01T00:00:00.000000+00:00',
       action: 'schedule',
       previousPendingTierChangeOperationId: null,
       pendingTierChangeOperationId: request.operationId,
@@ -156,7 +157,7 @@ function scheduledTierReceiptBody(clientId: string, body: string): string {
       subscriptionTier: 'brand',
       tierRevision: request.expectedTierRevision,
       status: 'active',
-      validFrom: '2026-09-01T00:00:00+00:00',
+      validFrom: '2026-09-01T00:00:00.000000+00:00',
       validTo: null,
       pendingTierChange: {
         schemaVersion: 1,
@@ -165,12 +166,12 @@ function scheduledTierReceiptBody(clientId: string, body: string): string {
         expectedTierRevision: request.expectedTierRevision,
         effectivePolicy: 'next_billing_cycle',
         effectiveCycleIndex: 2,
-        effectiveCycleStart: '2026-10-01T00:00:00+00:00',
-        effectiveCycleEnd: '2026-11-01T00:00:00+00:00',
-        scheduledAt: '2026-09-20T12:00:00+00:00',
+        effectiveCycleStart: '2026-10-01T00:00:00.000000+00:00',
+        effectiveCycleEnd: '2026-11-01T00:00:00.000000+00:00',
+        scheduledAt: '2026-09-20T12:00:00.000000+00:00',
         reason: request.reason,
       },
-      observedAt: '2026-09-20T12:00:00+00:00',
+      observedAt: '2026-09-20T12:00:00.000000+00:00',
     },
   })
 }
@@ -185,15 +186,15 @@ async function installTierReads(
 ): Promise<void> {
   await page.route('**/api/backoffice/clients/*/capabilities', async (route) => {
     const clientId = /clients\/([^/]+)\/capabilities/.exec(route.request().url())?.[1] ?? CLIENT_A
-    await route.fulfill({
+    await fulfillLocal(route, {
       status: 200,
       contentType: 'application/json',
       body: paidCapabilitiesBody(clientId),
     })
   })
-  await page.route('**/api/billing/clients/*/subscriptions/**/resource-access-preview', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions/**/resource-access-preview', async (route) => {
     if (options.beforePreview) await options.beforePreview()
-    const clientId = /clients\/([^/]+)\/subscriptions/.exec(route.request().url())?.[1] ?? CLIENT_A
+    const clientId = /clients\/([^/]+)\/billing\/subscriptions/.exec(route.request().url())?.[1] ?? CLIENT_A
     const request = JSON.parse(route.request().postData() ?? '{}') as {
       action?: string
       subscriptionTier?: string
@@ -212,16 +213,16 @@ async function installTierReads(
         proofExpiresAt: options.proofExpiresAt,
       }]
     }
-    await route.fulfill({
+    await fulfillLocal(route, {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(preview),
     })
   })
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
     if (route.request().method() !== 'GET') return route.fallback()
-    const clientId = /clients\/([^/]+)\/subscriptions/.exec(route.request().url())?.[1] ?? CLIENT_A
-    await route.fulfill({
+    const clientId = /clients\/([^/]+)\/billing\/subscriptions/.exec(route.request().url())?.[1] ?? CLIENT_A
+    await fulfillLocal(route, {
       status: 200,
       contentType: 'application/json',
       body: tierStateBody(clientId, options.pendingOperationId?.()),
@@ -230,14 +231,14 @@ async function installTierReads(
 }
 
 function accountBody(clientId: string, owned = '10.0000'): string {
-  return `{"creditAccountId":"11111111-2222-3333-4444-555555555555","clientId":"${clientId}","ownedBalance":${owned},"activelyReservedAmount":0.0000,"availableBalance":${owned},"activeReservationCount":0,"status":"active","asOf":"2026-09-06T12:00:00+00:00","walletVersion":1}`
+  return `{"creditAccountId":"11111111-2222-3333-4444-555555555555","clientId":"${clientId}","ownedBalance":${owned},"activelyReservedAmount":0.0000,"availableBalance":${owned},"activeReservationCount":0,"status":"active","asOf":"2026-09-06T12:00:00.000000+00:00","walletVersion":1}`
 }
 
 function emptyStateBody(clientId: string): string {
   return JSON.stringify({
-    clientId, stateAsOf: '2026-09-06T12:00:00+00:00', current: null,
+    clientId, stateAsOf: '2026-09-06T12:00:00.000000+00:00', current: null,
     pendingChange: null, subscriptionHistory: [],
-    grantHistory: { items: [], historyAsOf: '2026-09-06T12:00:00+00:00', nextCursor: null },
+    grantHistory: { items: [], historyAsOf: '2026-09-06T12:00:00.000000+00:00', nextCursor: null },
   })
 }
 
@@ -247,7 +248,7 @@ function lifecycleStateBody(
   clientId: string,
   status: LifecycleStatus,
   validTo: string | null = null,
-  stateAsOf = '2026-09-07T09:00:00+00:00'
+  stateAsOf = '2026-09-07T09:00:00.000000+00:00'
 ): string {
   const terminal = status === 'cancelled' || status === 'expired'
   const subscription = {
@@ -262,9 +263,9 @@ function lifecycleStateBody(
       featureFlags: { contentGeneration: true, imageGeneration: true },
     },
     changeEffectivePolicy: 'immediate', prorationPolicy: 'replace',
-    unusedCreditPolicy: 'rollover', billingCycleAnchor: '2026-09-01T00:00:00+00:00',
-    status, validFrom: '2026-09-01T00:00:00+00:00', validTo,
-    createdAt: '2026-09-01T00:00:00+00:00', updatedAt: stateAsOf,
+    unusedCreditPolicy: 'rollover', billingCycleAnchor: '2026-09-01T00:00:00.000000+00:00',
+    status, validFrom: '2026-09-01T00:00:00.000000+00:00', validTo,
+    createdAt: '2026-09-01T00:00:00.000000+00:00', updatedAt: stateAsOf,
   }
   const grant = {
     grantId: '33333333-3333-4333-8333-555555555555',
@@ -275,10 +276,10 @@ function lifecycleStateBody(
     subscriptionTierSnapshot: 'brand', tierRevisionSnapshot: 0,
     entitlementsSnapshot: subscription.entitlements,
     grantType: 'billing_cycle',
-    cycleStart: '2026-09-01T00:00:00+00:00', cycleEnd: '2026-10-01T00:00:00+00:00',
+    cycleStart: '2026-09-01T00:00:00.000000+00:00', cycleEnd: '2026-10-01T00:00:00.000000+00:00',
     creditAmount: '__AMOUNT__',
     ledgerEntryId: '44444444-4444-4444-8444-555555555555',
-    createdAt: '2026-09-01T00:00:00+00:00',
+    createdAt: '2026-09-01T00:00:00.000000+00:00',
   }
   return JSON.stringify({
     clientId, stateAsOf, current: terminal ? null : subscription,
@@ -298,7 +299,7 @@ function lifecycleReceiptBody(
     expectedStatus: 'active' | 'paused'
     reason: string
   }
-  const operationAsOf = '2026-09-07T09:00:01+00:00'
+  const operationAsOf = '2026-09-07T09:00:01.000000+00:00'
   return JSON.stringify({
     lifecycleOperationId: request.lifecycleOperationId,
     clientId: CLIENT_A,
@@ -323,16 +324,16 @@ function historicalStateBody(clientId: string, continuation: boolean): string {
   const month = continuation ? '2026-08' : '2026-09'
   const nextMonth = continuation ? '2026-09' : '2026-10'
   return JSON.stringify({
-    clientId, stateAsOf: '2026-09-06T12:00:00+00:00', current: null,
+    clientId, stateAsOf: '2026-09-06T12:00:00.000000+00:00', current: null,
     pendingChange: null,
     subscriptionHistory: [{
       subscriptionId, creationOperationId: operationId, planTermsOperationId: operationId,
       clientId, planName: 'Historical Pro', subscriptionTier: 'brand_premium', tierRevision: 4,
       cycleCreditAmount: 1250.0000, entitlements,
       changeEffectivePolicy: 'immediate', prorationPolicy: 'replace', unusedCreditPolicy: 'rollover',
-      billingCycleAnchor: '2026-08-01T00:00:00+00:00', status: 'cancelled',
-      validFrom: '2026-08-01T00:00:00+00:00', validTo: '2026-09-05T00:00:00+00:00',
-      createdAt: '2026-08-01T00:00:00+00:00', updatedAt: '2026-09-05T00:00:00+00:00',
+      billingCycleAnchor: '2026-08-01T00:00:00.000000+00:00', status: 'cancelled',
+      validFrom: '2026-08-01T00:00:00.000000+00:00', validTo: '2026-09-05T00:00:00.000000+00:00',
+      createdAt: '2026-08-01T00:00:00.000000+00:00', updatedAt: '2026-09-05T00:00:00.000000+00:00',
     }],
     grantHistory: {
       items: [{
@@ -341,12 +342,12 @@ function historicalStateBody(clientId: string, continuation: boolean): string {
         subscriptionId, planTermsOperationId: operationId, planNameSnapshot: 'Historical Pro',
         subscriptionTierSnapshot: 'basic', tierRevisionSnapshot: 1,
         entitlementsSnapshot: entitlements, grantType: 'billing_cycle',
-        cycleStart: `${month}-01T00:00:00+00:00`, cycleEnd: `${nextMonth}-01T00:00:00+00:00`,
+        cycleStart: `${month}-01T00:00:00.000000+00:00`, cycleEnd: `${nextMonth}-01T00:00:00.000000+00:00`,
         creditAmount: 1250.0000,
         ledgerEntryId: continuation ? '44444444-4444-4444-8444-555555555554' : '44444444-4444-4444-8444-555555555555',
-        createdAt: `${month}-01T00:00:00+00:00`,
+        createdAt: `${month}-01T00:00:00.000000+00:00`,
       }],
-      historyAsOf: '2026-09-06T12:00:00+00:00', nextCursor: continuation ? null : 'older-page',
+      historyAsOf: '2026-09-06T12:00:00.000000+00:00', nextCursor: continuation ? null : 'older-page',
     },
   })
 }
@@ -366,22 +367,34 @@ async function installSession(page: Page, role: 'Admin' | 'Viewer' = 'Admin'): P
 }
 
 async function installReads(page: Page): Promise<void> {
-  await page.route('**/api/billing/clients/*/account', async (route) => {
-    const clientId = /clients\/([^/]+)\/account/.exec(route.request().url())?.[1] ?? CLIENT_A
-    await route.fulfill({ status: 200, contentType: 'application/json', body: accountBody(clientId) })
+  await page.route('**/api/backoffice/clients/*/billing/account', async (route) => {
+    const clientId = /clients\/([^/]+)\/billing\/account/.exec(route.request().url())?.[1] ?? CLIENT_A
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: accountBody(clientId) })
   })
-  await page.route('**/api/billing/clients/*/resource-access-consequences', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+  await page.route('**/api/backoffice/clients/*/billing/resource-access-consequences', async (route) => {
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: '[]' })
   })
 }
 
 async function fillDraft(page: Page): Promise<void> {
   await page.getByLabel('Plan name').fill('Pro')
-  await page.getByLabel('Cycle credit amount').fill('1250.0000')
+  await page.getByLabel('Cycle credits').fill('1250.0000')
   await page.getByLabel('Requests per minute').fill('60')
   await page.getByLabel('Concurrent AI operations').fill('4')
   await page.getByLabel('Content generation').check()
-  await page.getByLabel('Valid from (UTC)').fill(new Date().toISOString().slice(0, 16))
+  await page.getByLabel('Valid from').fill('2026-09-22T12:00')
+  await page.getByLabel('Ongoing (no end)').check()
+}
+
+async function fulfillLocalSubscriptionPreview(route: Route): Promise<void> {
+  const request = route.request().postDataJSON() as { validFrom: string; endCycleIndex: number | null }
+  const local = (wall: string) => (wall)
+  await fulfillLocal(route, { status: 200, contentType: 'application/json', body: JSON.stringify({
+    status: 'resolved', validFrom: local(request.validFrom),
+    firstCycleBoundary: local('2026-10-22T12:00:00.000000'), validTo: null,
+    endCycleIndex: request.endCycleIndex,
+    resolutionFingerprint: `v1.${'a'.repeat(64)}`,
+  }) })
 }
 
 async function expectNoAxeViolations(page: Page): Promise<void> {
@@ -391,23 +404,26 @@ async function expectNoAxeViolations(page: Page): Promise<void> {
 
 test.beforeEach(async ({ page }, testInfo) => {
   await installSession(page, testInfo.title.includes('permission loss') ? 'Viewer' : 'Admin')
+  await installTimeZoneRoute(page)
   await installReads(page)
 })
 
 test('requires and freezes an explicit paid tier before subscription creation', async ({ page }) => {
   const bodies: string[] = []
   await page.route('**/api/backoffice/clients/*/capabilities', async (route) => {
-    await route.fulfill({
+    await fulfillLocal(route, {
       status: 200, contentType: 'application/json', body: freemiumCapabilitiesBody(CLIENT_A),
     })
   })
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
     if (route.request().method() === 'GET') {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: emptyStateBody(CLIENT_A) })
+      await fulfillLocal(route, { status: 200, contentType: 'application/json', body: emptyStateBody(CLIENT_A) })
       return
     }
+    if (new URL(route.request().url()).pathname.endsWith('/local-time-preview'))
+      return fulfillLocalSubscriptionPreview(route)
     bodies.push(route.request().postData() ?? '')
-    await route.fulfill({ status: 400, contentType: 'application/problem+json', body: '{}' })
+    await fulfillLocal(route, { status: 400, contentType: 'application/problem+json', body: '{}' })
   })
   await page.goto(pathFor(CLIENT_A))
   const tier = page.getByRole('combobox', { name: 'Subscription tier' })
@@ -426,15 +442,124 @@ test('requires and freezes an explicit paid tier before subscription creation', 
   await expectNoAxeViolations(page)
 })
 
-test('creation review acknowledges locally within 100ms p95 and labels held submission within 500ms', async ({ page }) => {
-  let releaseCreation: (() => void) | undefined
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
+test('finite local creation keeps local request and review dates out of canonical UTC wire and DOM', async ({ page }) => {
+  let postedBody = ''
+  await page.route('**/api/billing/clients/**', async (route) => {
+    throw new Error(`Canonical billing route reached: ${route.request().url()}`)
+  })
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
     if (route.request().method() === 'GET') {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: emptyStateBody(CLIENT_A) })
+      await fulfillLocal(route, { status: 200, contentType: 'application/json', body: emptyStateBody(CLIENT_A) })
       return
     }
+    if (new URL(route.request().url()).pathname.endsWith('/local-time-preview')) {
+      const request = route.request().postDataJSON() as { validFrom: string; endCycleIndex: number }
+      expect(request).toMatchObject({ validFrom: '2026-09-22T12:00:00.000000', endCycleIndex: 2 })
+      const local = (wall: string) => (wall)
+      await fulfillLocal(route, { status: 200, contentType: 'application/json', body: JSON.stringify({
+        status: 'resolved', validFrom: local(request.validFrom),
+        firstCycleBoundary: local('2026-10-22T12:00:00.000000'),
+        validTo: local('2026-11-22T12:00:00.000000'), endCycleIndex: 2,
+        resolutionFingerprint: `v1.${'a'.repeat(64)}`,
+      }) })
+      return
+    }
+    postedBody = route.request().postData() ?? ''
+    await fulfillLocal(route, { status: 400, contentType: 'application/problem+json', body: '{}' })
+  })
+  await page.goto(pathFor(CLIENT_A))
+  await fillDraft(page)
+  await page.getByRole('combobox', { name: 'Subscription tier' }).selectOption('basic')
+  await page.getByLabel('Finite billing cycles').check()
+  await page.getByLabel('Number of cycles').fill('2')
+  await page.getByRole('button', { name: 'Review subscription' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Confirm subscription creation' })
+  await expect(dialog).toContainText('2026-09-22')
+  await expect(dialog).toContainText('2026-11-22')
+  expect(await dialog.locator('time').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('datetime'))))
+    .toEqual(expect.arrayContaining(['2026-09-22T12:00:00.000000', '2026-11-22T12:00:00.000000']))
+  expect(await dialog.locator('time[datetime$="Z"]').count()).toBe(0)
+  await dialog.getByRole('button', { name: 'Confirm creation' }).click()
+  await expect.poll(() => postedBody).not.toBe('')
+  expect(postedBody).toContain('"validFrom":"2026-09-22T12:00:00.000000"')
+  expect(postedBody).toContain('"endCycleIndex":2')
+  expect(postedBody).not.toMatch(/"valid(?:From|To)":"[^\"]*Z"/)
+})
+
+test('replays one exact local creation body after a backend timezone change', async ({ page }) => {
+  const bodies: string[] = []
+  await page.route('**/api/backoffice/clients/*/capabilities', async (route) => {
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: freemiumCapabilitiesBody(CLIENT_A) })
+  })
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
+    const path = new URL(route.request().url()).pathname
+    if (route.request().method() === 'GET') {
+      await fulfillLocal(route, { status: 200, contentType: 'application/json', body: emptyStateBody(CLIENT_A) })
+    } else if (path.endsWith('/local-time-preview')) {
+      await fulfillLocalSubscriptionPreview(route)
+    } else {
+      bodies.push(route.request().postData() ?? '')
+      await route.fulfill({ status: 503, contentType: 'application/problem+json', body: '{}' })
+    }
+  })
+  await page.goto(pathFor(CLIENT_A))
+  await fillDraft(page)
+  await page.getByRole('combobox', { name: 'Subscription tier' }).selectOption('basic')
+  await page.getByRole('button', { name: 'Review subscription' }).click()
+  await page.getByRole('dialog', { name: 'Confirm subscription creation' })
+    .getByRole('button', { name: 'Confirm creation' }).click()
+  await expect(page.getByRole('button', { name: 'Replay exact request' })).toBeVisible()
+  expect(bodies).toHaveLength(1)
+  await page.getByRole('button', { name: 'Replay exact request' }).click()
+  await expect.poll(() => bodies.length).toBe(2)
+  expect(bodies[1]).toBe(bodies[0])
+  expect((JSON.parse(bodies[1]!) as { creationOperationId: string }).creationOperationId)
+    .toBe((JSON.parse(bodies[0]!) as { creationOperationId: string }).creationOperationId)
+})
+
+test('rejects spring gaps and autumn overlaps with a validFrom field error', async ({ page }) => {
+  await page.route('**/api/backoffice/clients/*/capabilities', async (route) => {
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: freemiumCapabilitiesBody(CLIENT_A) })
+  })
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
+    if (route.request().method() === 'GET') {
+      await fulfillLocal(route, { status: 200, contentType: 'application/json', body: emptyStateBody(CLIENT_A) })
+      return
+    }
+    if (!new URL(route.request().url()).pathname.endsWith('/local-time-preview'))
+      throw new Error('Creation must wait for a valid preview')
+    const request = route.request().postDataJSON() as { validFrom: string }
+    expect(request).not.toHaveProperty('selectedOffset')
+    const code = request.validFrom.startsWith('2026-03-29')
+      ? 'local_time_nonexistent' : 'local_time_ambiguous'
+    await route.fulfill({ status: 422, contentType: 'application/problem+json',
+      body: JSON.stringify({ title: 'Choose another local time', code, field: 'validFrom' }) })
+  })
+  await page.goto(pathFor(CLIENT_A))
+  await fillDraft(page)
+  await page.getByRole('combobox', { name: 'Subscription tier' }).selectOption('basic')
+  const start = page.getByLabel('Valid from')
+  await start.fill('2026-03-29T02:30')
+  await page.getByRole('button', { name: 'Review subscription' }).click()
+  await expect(page.getByRole('alert', { name: 'Correct the subscription form' })).toContainText('Choose another time')
+  await expect(start).toHaveValue('2026-03-29T02:30')
+  await start.fill('2026-10-25T02:30')
+  await page.getByRole('button', { name: 'Review subscription' }).click()
+  await expect(page.getByRole('alert', { name: 'Correct the subscription form' })).toContainText('Choose another time')
+  await expect(page.getByRole('combobox', { name: /Occurrence/ })).toHaveCount(0)
+})
+
+test('creation review acknowledges locally within 100ms p95 and labels held submission within 500ms', async ({ page }) => {
+  let releaseCreation: (() => void) | undefined
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
+    if (route.request().method() === 'GET') {
+      await fulfillLocal(route, { status: 200, contentType: 'application/json', body: emptyStateBody(CLIENT_A) })
+      return
+    }
+    if (new URL(route.request().url()).pathname.endsWith('/local-time-preview'))
+      return fulfillLocalSubscriptionPreview(route)
     await new Promise<void>((resolve) => { releaseCreation = resolve })
-    await route.fulfill({ status: 400, contentType: 'application/problem+json', body: '{}' })
+    await fulfillLocal(route, { status: 400, contentType: 'application/problem+json', body: '{}' })
   })
   await page.goto(pathFor(CLIENT_A))
   await fillDraft(page)
@@ -449,7 +574,8 @@ test('creation review acknowledges locally within 100ms p95 and labels held subm
       element.addEventListener('click', () => {
         const started = performance.now()
         const observer = new MutationObserver(() => {
-          if (document.querySelector('[role="dialog"]')) {
+          if ([...document.querySelectorAll('[role="status"]')].some((item) =>
+            item.textContent?.includes('Checking the local time'))) {
             evidence.creationAckMs = performance.now() - started
             observer.disconnect()
           }
@@ -472,7 +598,7 @@ test('creation review acknowledges locally within 100ms p95 and labels held subm
 
   await review.click()
   await dialog.getByRole('button', { name: 'Confirm creation' }).click()
-  await expect(page.getByRole('status').filter({ hasText: 'Submitting the retained operation once' })).toBeVisible({ timeout: 500 })
+  await expect(page.getByRole('status').filter({ hasText: 'Creating or replaying the retained subscription operation' })).toBeVisible({ timeout: 500 })
   await expect.poll(() => Boolean(releaseCreation)).toBe(true)
   releaseCreation?.()
 })
@@ -481,33 +607,33 @@ test('previews and schedules a tier downgrade while capability evidence is unava
   let pendingOperationId: string | undefined
   const commands: string[] = []
   await page.route('**/api/backoffice/clients/*/capabilities', async (route) => {
-    await route.fulfill({ status: 503, contentType: 'application/problem+json', body: '{}' })
+    await fulfillLocal(route, { status: 503, contentType: 'application/problem+json', body: '{}' })
   })
-  await page.route('**/api/billing/clients/*/subscriptions/**/resource-access-preview', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions/**/resource-access-preview', async (route) => {
     const request = JSON.parse(route.request().postData() ?? '{}') as { action: string }
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: JSON.stringify({
       clientId: CLIENT_A, subscriptionId: '22222222-2222-3333-8444-555555555555',
       action: request.action, currentSubscriptionTier: 'brand', targetSubscriptionTier: 'basic',
       effectivePolicy: 'next_billing_cycle', statusRevision: 4, classificationRevision: 5,
       tierRevision: 7, pendingTierChangeOperationId: null,
       policyPublicationId: '55555555-2222-4333-8444-555555555555',
-      policyActivationRevision: 9, policyVersion: 'input-04-v1', policyHash: 'abc', commandEffectiveAt: '2026-10-01T00:00:00+00:00', commandAuthorityHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      evaluatedAt: '2026-09-20T12:00:00+00:00', lossAt: '2026-10-01T00:00:00+00:00',
-      accessUntil: '2026-10-08T00:00:00+00:00', earliestProofExpiry: null,
+      policyActivationRevision: 9, policyVersion: 'input-04-v1', policyHash: 'abc', commandEffectiveAt: '2026-10-01T00:00:00.000000+00:00', commandAuthorityHash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      evaluatedAt: '2026-09-20T12:00:00.000000+00:00', lossAt: '2026-10-01T00:00:00.000000+00:00',
+      accessUntil: '2026-10-08T00:00:00.000000+00:00', earliestProofExpiry: null,
       retainedCount: 1, totalCount: 3,
-      graceCount: 2, suspendedCount: 0, deadlineGroups: [{ lossAt: '2026-10-01T00:00:00+00:00', accessUntil: '2026-10-08T00:00:00+00:00', graceCount: 2, newlyAffectedCount: 2 }], deadlineGroupsTruncated: false, unlistedGraceCount: 0, unlistedNewlyAffectedCount: 0, affectedResourcesTruncated: false,
+      graceCount: 2, suspendedCount: 0, deadlineGroups: [{ lossAt: '2026-10-01T00:00:00.000000+00:00', accessUntil: '2026-10-08T00:00:00.000000+00:00', graceCount: 2, newlyAffectedCount: 2 }], deadlineGroupsTruncated: false, unlistedGraceCount: 0, unlistedNewlyAffectedCount: 0, affectedResourcesTruncated: false,
       preservationFacts: { contentPreserved: true, assetsPreserved: true, creditsUnchanged: true, acceptedAiWorkUnchanged: true },
       affectedResources: [],
     }) })
   })
-  await page.route('**/api/billing/clients/*/subscriptions/**/tier-changes', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions/**/tier-changes', async (route) => {
     const body = route.request().postData() ?? ''
     commands.push(body)
     const request = JSON.parse(body) as {
       operationId: string; expectedTierRevision: number; subscriptionTier: string; reason: string
     }
     pendingOperationId = request.operationId
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: JSON.stringify({
       schemaVersion: 1,
       receipt: {
         schemaVersion: 1, operationId: request.operationId, clientId: CLIENT_A,
@@ -515,28 +641,28 @@ test('previews and schedules a tier downgrade while capability evidence is unava
         effectivePolicy: 'next_billing_cycle', requestedSubscriptionTier: 'basic',
         previousSubscriptionTier: 'brand', resultingSubscriptionTier: 'brand',
         expectedTierRevision: 7, previousTierRevision: 7, resultingTierRevision: 7,
-        reason: request.reason, operationAsOf: '2026-09-20T12:00:00+00:00',
-        effectiveAt: '2026-10-01T00:00:00+00:00',
+        reason: request.reason, operationAsOf: '2026-09-20T12:00:00.000000+00:00',
+        effectiveAt: '2026-10-01T00:00:00.000000+00:00',
         action: 'schedule', previousPendingTierChangeOperationId: null,
         pendingTierChangeOperationId: request.operationId, pendingSubscriptionTier: 'basic',
         previousPendingSubscriptionTier: null,
       },
       tierState: {
         subscriptionTier: 'brand', tierRevision: 7, status: 'active',
-        validFrom: '2026-09-01T00:00:00+00:00', validTo: null,
+        validFrom: '2026-09-01T00:00:00.000000+00:00', validTo: null,
         pendingTierChange: {
           schemaVersion: 1, operationId: request.operationId, subscriptionTier: 'basic',
           expectedTierRevision: 7, effectivePolicy: 'next_billing_cycle', effectiveCycleIndex: 2,
-          effectiveCycleStart: '2026-10-01T00:00:00+00:00',
-          effectiveCycleEnd: '2026-11-01T00:00:00+00:00',
-          scheduledAt: '2026-09-20T12:00:00+00:00', reason: request.reason,
-        }, observedAt: '2026-09-20T12:00:00+00:00',
+          effectiveCycleStart: '2026-10-01T00:00:00.000000+00:00',
+          effectiveCycleEnd: '2026-11-01T00:00:00.000000+00:00',
+          scheduledAt: '2026-09-20T12:00:00.000000+00:00', reason: request.reason,
+        }, observedAt: '2026-09-20T12:00:00.000000+00:00',
       },
     }) })
   })
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
     if (route.request().method() === 'GET') {
-      await route.fulfill({
+      await fulfillLocal(route, {
         status: 200, contentType: 'application/json', body: tierStateBody(CLIENT_A, pendingOperationId),
       })
       return
@@ -548,7 +674,7 @@ test('previews and schedules a tier downgrade while capability evidence is unava
   await expect(page.getByText('Policy evidence could not be validated.')).toBeVisible()
   await page.getByRole('button', { name: 'Schedule for next cycle' }).click()
   const dialog = page.getByRole('dialog', { name: 'Confirm subscription tier change' })
-  await expect(dialog).toContainText('At 2026-10-01T00:00:00+00:00, new paid work will stop.')
+  await expect(dialog).toContainText('At 2026-10-01T00:00:00.000000, new paid work will stop.')
   await expect(dialog).toContainText('Content and assets will not be deleted. Credits and accepted AI work are unchanged.')
   await dialog.getByRole('button', { name: 'Confirm tier change' }).click()
   await expect(page.getByText('Authoritative state reconciled.')).toBeVisible()
@@ -563,12 +689,12 @@ test('pending replacement uses the displayed new target and cancellation names t
   const pendingOperationId = '01991f20-5678-7abc-8abc-1234567890ab'
   const previews: Array<{ action: string; subscriptionTier: string }> = []
   await installTierReads(page, { pendingOperationId: () => pendingOperationId })
-  await page.route('**/api/billing/clients/*/subscriptions/**/resource-access-preview', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions/**/resource-access-preview', async (route) => {
     const request = JSON.parse(route.request().postData() ?? '{}') as {
       action: string; subscriptionTier: string
     }
     previews.push(request)
-    await route.fulfill({
+    await fulfillLocal(route, {
       status: 200, contentType: 'application/json',
       body: tierPreviewBody(CLIENT_A, request.action, request.subscriptionTier, pendingOperationId),
     })
@@ -594,7 +720,7 @@ test('pending replacement uses the displayed new target and cancellation names t
 test('tier preview and confirmation remain accessible under reflow and assistive display settings', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 700 })
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
-  await installTierReads(page, { proofExpiresAt: '2026-10-04T00:00:00+00:00' })
+  await installTierReads(page, { proofExpiresAt: '2026-10-04T00:00:00.000000+00:00' })
   await page.goto(pathFor(CLIENT_A))
   await page.addStyleTag({ content: '* { line-height: 1.5 !important; letter-spacing: .12em !important; word-spacing: .16em !important; } p { margin-bottom: 2em !important; }' })
   const trigger = page.getByRole('button', { name: 'Schedule for next cycle' })
@@ -604,8 +730,8 @@ test('tier preview and confirmation remain accessible under reflow and assistive
   await expect(dialog).toBeVisible()
   await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused()
   await expect(dialog).toContainText('Content and assets will not be deleted.')
-  await expect(dialog).toContainText('policy grace deadline for 2 affected resources is 2026-10-08T00:00:00+00:00')
-  await expect(dialog).toContainText('earliest known ownership or TLS proof expiry for an affected domain binding is 2026-10-04T00:00:00+00:00')
+  await expect(dialog).toContainText('policy grace deadline for 2 affected resources is 2026-10-08T00:00:00.000000')
+  await expect(dialog).toContainText('earliest known ownership or TLS proof expiry for an affected domain binding is 2026-10-04T00:00:00.000000')
   await expectNoAxeViolations(page)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   const targetSizes = await dialog.locator('button:visible').evaluateAll((elements) =>
@@ -640,9 +766,9 @@ test('tier preview acknowledges locally within 100ms p95 and labels held progres
   await installTierReads(page, {
     beforePreview: () => new Promise<void>((resolve) => { releasePreview = resolve }),
   })
-  await page.route('**/api/billing/clients/*/subscriptions/**/tier-changes', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions/**/tier-changes', async (route) => {
     await new Promise<void>((resolve) => { releaseCommand = resolve })
-    await route.fulfill({ status: 400, contentType: 'application/problem+json', body: '{}' })
+    await fulfillLocal(route, { status: 400, contentType: 'application/problem+json', body: '{}' })
   })
   await page.goto(pathFor(CLIENT_A))
   const trigger = page.getByRole('button', { name: 'Schedule for next cycle' })
@@ -704,13 +830,13 @@ test('held fresh tier preflight shows progress before preview and blocks duplica
   await expect(trigger).toBeVisible()
   let release: (() => void) | undefined
   let reads = 0
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
     if (route.request().method() !== 'GET' ||
         !new URL(route.request().url()).pathname.endsWith('/subscriptions'))
       return route.fallback()
     reads += 1
     await new Promise<void>((resolve) => { release = resolve })
-    await route.fulfill({ status: 200, contentType: 'application/json',
+    await fulfillLocal(route, { status: 200, contentType: 'application/json',
       body: tierStateBody(CLIENT_A) })
   })
   await trigger.click()
@@ -718,7 +844,7 @@ test('held fresh tier preflight shows progress before preview and blocks duplica
     hasText: 'Checking fresh subscription authority before preview',
   })).toBeVisible({ timeout: 500 })
   await expect(trigger).toBeDisabled()
-  expect(reads).toBe(1)
+  await expect.poll(() => reads).toBe(1)
   release?.()
   await expect(page.getByRole('dialog', { name: 'Confirm subscription tier change' })).toBeVisible()
 })
@@ -727,9 +853,9 @@ test('handles every tier 409 variant without reusing stale confirmation material
   let code = 'subscription_tier_change_operation_conflict'
   const bodies: string[] = []
   await installTierReads(page)
-  await page.route('**/api/billing/clients/*/subscriptions/**/tier-changes', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions/**/tier-changes', async (route) => {
     bodies.push(route.request().postData() ?? '')
-    await route.fulfill({
+    await fulfillLocal(route, {
       status: 409,
       contentType: 'application/problem+json',
       body: JSON.stringify({ code, detail: 'private concurrency detail' }),
@@ -764,8 +890,8 @@ test('handles every tier 409 variant without reusing stale confirmation material
 
 test('purges private tier evidence on 403 authorization loss', async ({ page }) => {
   await installTierReads(page)
-  await page.route('**/api/billing/clients/*/subscriptions/**/tier-changes', async (route) => {
-    await route.fulfill({
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions/**/tier-changes', async (route) => {
+    await fulfillLocal(route, {
       status: 403,
       contentType: 'application/problem+json',
       body: '{"code":"insufficient_permissions","detail":"private authorization detail"}',
@@ -786,9 +912,9 @@ test('purges private tier evidence on 403 authorization loss', async ({ page }) 
 test('handles privacy-safe tier 404 without retaining the attempted command', async ({ page }) => {
   await installTierReads(page)
   const bodies: string[] = []
-  await page.route('**/api/billing/clients/*/subscriptions/**/tier-changes', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions/**/tier-changes', async (route) => {
     bodies.push(route.request().postData() ?? '')
-    await route.fulfill({
+    await fulfillLocal(route, {
       status: 404,
       contentType: 'application/problem+json',
       body: '{"code":"subscription_not_found","detail":"private missing target"}',
@@ -808,9 +934,9 @@ test('treats tier 500 and malformed 200 responses as unknown without blind retry
   let malformed = false
   const bodies: string[] = []
   await installTierReads(page)
-  await page.route('**/api/billing/clients/*/subscriptions/**/tier-changes', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions/**/tier-changes', async (route) => {
     bodies.push(route.request().postData() ?? '')
-    await route.fulfill(malformed
+    await fulfillLocal(route, malformed
       ? { status: 200, contentType: 'application/json', body: '{"private":"malformed tier receipt"}' }
       : { status: 500, contentType: 'application/problem+json', body: '{"detail":"private tier failure"}' })
   })
@@ -831,7 +957,7 @@ test('replays a byte-identical tier command after transport ambiguity', async ({
   let pendingOperationId: string | undefined
   const bodies: string[] = []
   await installTierReads(page, { pendingOperationId: () => pendingOperationId })
-  await page.route('**/api/billing/clients/*/subscriptions/**/tier-changes', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions/**/tier-changes', async (route) => {
     const body = route.request().postData() ?? ''
     bodies.push(body)
     if (bodies.length === 1) {
@@ -839,7 +965,7 @@ test('replays a byte-identical tier command after transport ambiguity', async ({
       return
     }
     pendingOperationId = (JSON.parse(body) as { operationId: string }).operationId
-    await route.fulfill({
+    await fulfillLocal(route, {
       status: 200,
       contentType: 'application/json',
       body: scheduledTierReceiptBody(CLIENT_A, body),
@@ -866,10 +992,10 @@ test('Client switching fences late tier previews and command receipts', async ({
       if (holdPreview) await new Promise<void>((resolve) => { releasePreview = resolve })
     },
   })
-  await page.route('**/api/billing/clients/*/subscriptions/**/tier-changes', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions/**/tier-changes', async (route) => {
     delayedCommand = route.request().postData() ?? ''
     await new Promise<void>((resolve) => { releaseCommand = resolve })
-    await route.fulfill({
+    await fulfillLocal(route, {
       status: 200,
       contentType: 'application/json',
       body: scheduledTierReceiptBody(CLIENT_A, delayedCommand),
@@ -909,23 +1035,23 @@ test('Client switching closes tier confirmation and fences delayed reconciliatio
   let blockReconciliation = false
   let releaseReconciliation: (() => void) | undefined
   await installTierReads(page, { pendingOperationId: () => pendingOperationId })
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
     if (route.request().method() !== 'GET') return route.fallback()
-    const clientId = /clients\/([^/]+)\/subscriptions/.exec(route.request().url())?.[1] ?? CLIENT_A
+    const clientId = /clients\/([^/]+)\/billing\/subscriptions/.exec(route.request().url())?.[1] ?? CLIENT_A
     if (blockReconciliation && clientId === CLIENT_A) {
       await new Promise<void>((resolve) => { releaseReconciliation = resolve })
     }
-    await route.fulfill({
+    await fulfillLocal(route, {
       status: 200,
       contentType: 'application/json',
       body: tierStateBody(clientId, clientId === CLIENT_A ? pendingOperationId : undefined),
     })
   })
-  await page.route('**/api/billing/clients/*/subscriptions/**/tier-changes', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions/**/tier-changes', async (route) => {
     const body = route.request().postData() ?? ''
     pendingOperationId = (JSON.parse(body) as { operationId: string }).operationId
     blockReconciliation = true
-    await route.fulfill({
+    await fulfillLocal(route, {
       status: 200,
       contentType: 'application/json',
       body: scheduledTierReceiptBody(CLIENT_A, body),
@@ -962,9 +1088,9 @@ test('pauses then reactivates with exact Client-scoped lifecycle commands', asyn
   let status: LifecycleStatus = 'active'
   const bodies: string[] = []
   let releasePause: (() => void) | undefined
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
     if (route.request().method() === 'GET') {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, status) })
+      await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, status) })
       return
     }
     const body = route.request().postData() ?? ''
@@ -974,7 +1100,7 @@ test('pauses then reactivates with exact Client-scoped lifecycle commands', asyn
     if (request.action === 'pause') {
       await new Promise<void>((resolve) => { releasePause = resolve })
     }
-    await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleReceiptBody(body, status) })
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleReceiptBody(body, status) })
   })
   await page.goto(pathFor(CLIENT_A))
   await expect(page.getByText('99999999999999.9999', { exact: true }).first()).toBeVisible()
@@ -1028,28 +1154,28 @@ test('pauses then reactivates with exact Client-scoped lifecycle commands', asyn
 })
 
 test('offers only due Expire and Cancel and preserves terminal history', async ({ page }) => {
-  const validTo = '2026-09-07T09:00:00+00:00'
+  const validTo = '2026-09-07T09:00:00.000000+00:00'
   let status: LifecycleStatus = 'active'
   let selectedAction = ''
-  await page.route('**/api/billing/clients/*/account', async (route) => {
-    await route.fulfill({ status: 500, contentType: 'application/problem+json', body: '{"detail":"unavailable"}' })
+  await page.route('**/api/backoffice/clients/*/billing/account', async (route) => {
+    await fulfillLocal(route, { status: 500, contentType: 'application/problem+json', body: '{"detail":"unavailable"}' })
   })
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
     if (route.request().method() === 'GET') {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, status, validTo) })
+      await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, status, validTo) })
       return
     }
     const body = route.request().postData() ?? ''
     selectedAction = (JSON.parse(body) as { action: string }).action
     status = selectedAction === 'expire' ? 'expired' : 'cancelled'
-    await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleReceiptBody(body, status, validTo) })
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleReceiptBody(body, status, validTo) })
   })
   await page.goto(pathFor(CLIENT_A))
   await expect(page.getByRole('button', { name: 'Expire subscription' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Cancel subscription' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Pause subscription' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Expire subscription' }).click()
-  await expect(page.getByRole('dialog')).toContainText(validTo)
+  await expect(page.getByRole('dialog')).toContainText('2026-09-07T09:00:00.000000')
   await page.getByLabel('Reason').fill('Finite validity boundary reached')
   await page.getByRole('button', { name: 'Confirm Expire' }).click()
   await expect(page.getByRole('heading', { name: 'Lifecycle operation completed' })).toBeVisible()
@@ -1065,11 +1191,11 @@ for (const [sourceStatus, action, resultStatus] of [
   ['paused', 'expire', 'expired'],
 ] as const) {
   test(`${sourceStatus} subscriptions can ${action} with terminal receipt evidence`, async ({ page }) => {
-    const validTo = action === 'expire' ? '2026-09-07T09:00:00+00:00' : null
+    const validTo = action === 'expire' ? '2026-09-07T09:00:00.000000+00:00' : null
     let status: LifecycleStatus = sourceStatus
-    await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
+    await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
       if (route.request().method() === 'GET') {
-        await route.fulfill({
+        await fulfillLocal(route, {
           status: 200, contentType: 'application/json',
           body: lifecycleStateBody(CLIENT_A, status, validTo),
         })
@@ -1077,7 +1203,7 @@ for (const [sourceStatus, action, resultStatus] of [
       }
       const body = route.request().postData() ?? ''
       status = resultStatus
-      await route.fulfill({
+      await fulfillLocal(route, {
         status: 200, contentType: 'application/json',
         body: lifecycleReceiptBody(body, resultStatus, validTo),
       })
@@ -1098,14 +1224,14 @@ test('cancels a paused subscription after validity and keeps immutable terminal 
   const validTo = '2026-09-07T08:59:59.999999+00:00'
   let status: LifecycleStatus = 'paused'
   let body = ''
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
     if (route.request().method() === 'GET') {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, status, validTo) })
+      await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, status, validTo) })
       return
     }
     body = route.request().postData() ?? ''
     status = 'cancelled'
-    await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleReceiptBody(body, status, validTo) })
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleReceiptBody(body, status, validTo) })
   })
   await page.goto(pathFor(CLIENT_A))
   await expect(page.getByRole('button', { name: 'Expire subscription' })).toBeVisible()
@@ -1129,9 +1255,9 @@ test('recovers lifecycle network ambiguity only through explicit byte-equivalent
   let status: LifecycleStatus = 'active'
   let postCount = 0
   const bodies: string[] = []
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
     if (route.request().method() === 'GET') {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, status) })
+      await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, status) })
       return
     }
     const body = route.request().postData() ?? ''
@@ -1139,7 +1265,7 @@ test('recovers lifecycle network ambiguity only through explicit byte-equivalent
     postCount += 1
     status = 'paused'
     if (postCount === 1) await route.abort('connectionreset')
-    else await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleReceiptBody(body, 'paused') })
+    else await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleReceiptBody(body, 'paused') })
   })
   await page.goto(pathFor(CLIENT_A))
   await page.getByRole('button', { name: 'Pause subscription' }).click()
@@ -1159,15 +1285,15 @@ test('recovers lifecycle network ambiguity only through explicit byte-equivalent
 test('revalidates stale lifecycle confirmation without sending a command', async ({ page }) => {
   let getCount = 0
   let postCount = 0
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
     if (route.request().method() === 'GET') {
       getCount += 1
       const status: LifecycleStatus = getCount === 1 ? 'active' : 'paused'
-      await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, status) })
+      await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, status) })
       return
     }
     postCount += 1
-    await route.fulfill({ status: 500, body: '{}' })
+    await fulfillLocal(route, { status: 500, body: '{}' })
   })
   await page.goto(pathFor(CLIENT_A))
   await page.getByRole('button', { name: 'Pause subscription' }).click()
@@ -1184,25 +1310,25 @@ test('replays the byte-identical lifecycle command through one successful auth r
   let postCount = 0
   let status: LifecycleStatus = 'active'
   await page.route('**/auth/refresh', async (route) => {
-    await route.fulfill({
+    await fulfillLocal(route, {
       status: 200, contentType: 'application/json',
       body: JSON.stringify({ accessToken: 'refreshed-token', refreshToken: 'refreshed-refresh' }),
     })
   })
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
     if (route.request().method() === 'GET') {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, status) })
+      await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, status) })
       return
     }
     const body = route.request().postData() ?? ''
     bodies.push(body)
     postCount += 1
     if (postCount === 1) {
-      await route.fulfill({ status: 401, contentType: 'application/problem+json', body: '{"detail":"expired"}' })
+      await fulfillLocal(route, { status: 401, contentType: 'application/problem+json', body: '{"detail":"expired"}' })
       return
     }
     status = 'paused'
-    await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleReceiptBody(body, status) })
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleReceiptBody(body, status) })
   })
   await page.goto(pathFor(CLIENT_A))
   await page.getByRole('button', { name: 'Pause subscription' }).click()
@@ -1217,17 +1343,17 @@ test('replays the byte-identical lifecycle command through one successful auth r
 test('renders lifecycle concurrency conflicts as determinate sanitized states', async ({ page }) => {
   let code = 'subscription_lifecycle_operation_conflict'
   let due = false
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
     if (route.request().method() === 'GET') {
-      await route.fulfill({
+      await fulfillLocal(route, {
         status: 200, contentType: 'application/json',
         body: lifecycleStateBody(
-          CLIENT_A, 'active', due ? '2026-09-07T09:00:00+00:00' : null
+          CLIENT_A, 'active', due ? '2026-09-07T09:00:00.000000+00:00' : null
         ),
       })
       return
     }
-    await route.fulfill({
+    await fulfillLocal(route, {
       status: 409, contentType: 'application/problem+json',
       body: JSON.stringify({ code, detail: 'raw private conflict material' }),
     })
@@ -1257,12 +1383,12 @@ test('renders lifecycle concurrency conflicts as determinate sanitized states', 
 })
 
 test('fresh lifecycle authorization loss removes all private lifecycle evidence', async ({ page }) => {
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
     if (route.request().method() === 'GET') {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, 'active') })
+      await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, 'active') })
       return
     }
-    await route.fulfill({
+    await fulfillLocal(route, {
       status: 403, contentType: 'application/problem+json',
       body: '{"detail":"raw private authorization detail"}',
     })
@@ -1279,8 +1405,8 @@ test('fresh lifecycle authorization loss removes all private lifecycle evidence'
 
 test('authorization refresh removes an open lifecycle dialog before fresh denial', async ({ page }) => {
   let deny = false
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
-    await route.fulfill(deny
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
+    await fulfillLocal(route, deny
       ? { status: 403, contentType: 'application/problem+json', body: '{}' }
       : { status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, 'active') })
   })
@@ -1303,14 +1429,14 @@ test('authorization refresh removes an open lifecycle dialog before fresh denial
 test('logout during a lifecycle command aborts the attempt and ignores its late receipt', async ({ page }) => {
   let releasePost: (() => void) | undefined
   let body = ''
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
     if (route.request().method() === 'GET') {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, 'active') })
+      await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, 'active') })
       return
     }
     body = route.request().postData() ?? ''
     await new Promise<void>((resolve) => { releasePost = resolve })
-    await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleReceiptBody(body, 'paused') })
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleReceiptBody(body, 'paused') })
   })
   await page.goto(pathFor(CLIENT_A))
   await page.getByRole('button', { name: 'Pause subscription' }).click()
@@ -1327,18 +1453,18 @@ test('logout during a lifecycle command aborts the attempt and ignores its late 
 
 test('keeps a valid lifecycle receipt while a failed authoritative refresh is marked stale', async ({ page }) => {
   let getCount = 0
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
     if (route.request().method() === 'GET') {
       getCount += 1
       if (getCount > 2) {
-        await route.fulfill({ status: 500, contentType: 'application/problem+json', body: '{"detail":"private refresh failure"}' })
+        await fulfillLocal(route, { status: 500, contentType: 'application/problem+json', body: '{"detail":"private refresh failure"}' })
       } else {
-        await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, 'active') })
+        await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, 'active') })
       }
       return
     }
     const body = route.request().postData() ?? ''
-    await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleReceiptBody(body, 'paused') })
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleReceiptBody(body, 'paused') })
   })
   await page.goto(pathFor(CLIENT_A))
   await page.getByRole('button', { name: 'Pause subscription' }).click()
@@ -1354,13 +1480,13 @@ test('keeps a valid lifecycle receipt while a failed authoritative refresh is ma
 test('treats lifecycle 500 and malformed 200 responses as unresolved without blind retry', async ({ page }) => {
   let malformed = false
   const bodies: string[] = []
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
     if (route.request().method() === 'GET') {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, 'active') })
+      await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, 'active') })
       return
     }
     bodies.push(route.request().postData() ?? '')
-    await route.fulfill(malformed
+    await fulfillLocal(route, malformed
       ? { status: 200, contentType: 'application/json', body: '{"private":"malformed receipt material"}' }
       : { status: 500, contentType: 'application/problem+json', body: '{"detail":"private server failure"}' })
   })
@@ -1380,13 +1506,13 @@ test('treats lifecycle 500 and malformed 200 responses as unresolved without bli
 test('blocks lifecycle replay when unknown-outcome reconciliation is unavailable', async ({ page }) => {
   let getCount = 0
   let postCount = 0
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
     if (route.request().method() === 'GET') {
       getCount += 1
       if (getCount > 2) {
-        await route.fulfill({ status: 500, contentType: 'application/problem+json', body: '{}' })
+        await fulfillLocal(route, { status: 500, contentType: 'application/problem+json', body: '{}' })
       } else {
-        await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, 'active') })
+        await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, 'active') })
       }
       return
     }
@@ -1406,15 +1532,15 @@ test('blocks lifecycle replay when unknown-outcome reconciliation is unavailable
 test('Client switching closes lifecycle dialogs, drops attempts, and ignores late receipts', async ({ page }) => {
   let releasePost: (() => void) | undefined
   let oldBody = ''
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
-    const clientId = /clients\/([^/]+)\/subscriptions/.exec(route.request().url())?.[1] ?? CLIENT_A
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
+    const clientId = /clients\/([^/]+)\/billing\/subscriptions/.exec(route.request().url())?.[1] ?? CLIENT_A
     if (route.request().method() === 'GET') {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleStateBody(clientId, 'active') })
+      await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleStateBody(clientId, 'active') })
       return
     }
     oldBody = route.request().postData() ?? ''
     await new Promise<void>((resolve) => { releasePost = resolve })
-    await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleReceiptBody(oldBody, 'paused') })
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleReceiptBody(oldBody, 'paused') })
   })
   await page.goto(pathFor(CLIENT_A))
   await page.getByRole('button', { name: 'Pause subscription' }).click()
@@ -1450,8 +1576,8 @@ test('Client switching closes lifecycle dialogs, drops attempts, and ignores lat
 test('lifecycle dialog reflows with long content, text spacing, forced colours, and reduced motion', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 700 })
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
-  await page.route('**/api/billing/clients/*/subscriptions**', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, 'active') })
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: lifecycleStateBody(CLIENT_A, 'active') })
   })
   await page.goto(pathFor(CLIENT_A))
   await page.addStyleTag({ content: '* { line-height: 1.5 !important; letter-spacing: .12em !important; word-spacing: .16em !important; } p { margin-bottom: 2em !important; }' })
@@ -1485,11 +1611,11 @@ test('lifecycle dialog reflows with long content, text spacing, forced colours, 
 
 test('Client switching clears the old draft and never flashes it under the new route', async ({ page }) => {
   let releaseB: (() => void) | undefined
-  await page.route('**/api/billing/clients/*/subscriptions*', async (route: Route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions*', async (route: Route) => {
     if (route.request().method() !== 'GET') return route.continue()
-    const clientId = /clients\/([^/]+)\/subscriptions/.exec(route.request().url())?.[1] ?? CLIENT_A
+    const clientId = /clients\/([^/]+)\/billing\/subscriptions/.exec(route.request().url())?.[1] ?? CLIENT_A
     if (clientId === CLIENT_B) await new Promise<void>((resolve) => { releaseB = resolve })
-    await route.fulfill({ status: 200, contentType: 'application/json', body: emptyStateBody(clientId) })
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: emptyStateBody(clientId) })
   })
   await page.goto(pathFor(CLIENT_A))
   await page.getByLabel('Plan name').fill('Private Client A plan')
@@ -1507,10 +1633,10 @@ test('Client switching clears the old draft and never flashes it under the new r
 
 test('loads terminal grant history with the opaque continuation cursor', async ({ page }) => {
   const urls: string[] = []
-  await page.route('**/api/billing/clients/*/subscriptions*', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions*', async (route) => {
     urls.push(route.request().url())
     const continuation = new URL(route.request().url()).searchParams.get('cursor') === 'older-page'
-    await route.fulfill({
+    await fulfillLocal(route, {
       status: 200, contentType: 'application/json',
       body: historicalStateBody(CLIENT_A, continuation),
     })
@@ -1525,8 +1651,10 @@ test('loads terminal grant history with the opaque continuation cursor', async (
 test('400% equivalent reflow and text spacing remain keyboard-safe with 44px targets', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 700 })
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
-  await page.route('**/api/billing/clients/*/subscriptions*', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: emptyStateBody(CLIENT_A) })
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
+    if (new URL(route.request().url()).pathname.endsWith('/local-time-preview'))
+      return fulfillLocalSubscriptionPreview(route)
+    await fulfillLocal(route, { status: 200, contentType: 'application/json', body: emptyStateBody(CLIENT_A) })
   })
   await page.goto(pathFor(CLIENT_A))
   await page.addStyleTag({ content: '* { line-height: 1.5 !important; letter-spacing: .12em !important; word-spacing: .16em !important; } p { margin-bottom: 2em !important; }' })
@@ -1534,7 +1662,7 @@ test('400% equivalent reflow and text spacing remain keyboard-safe with 44px tar
   await page.getByRole('combobox', { name: 'Subscription tier' }).selectOption('basic')
   await expect(page.getByRole('button', { name: 'Review subscription' })).toBeEnabled()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-  const targetSizes = await page.locator('a:visible, button:visible, input:not([type="checkbox"]):visible, label:has(input[type="checkbox"]):visible').evaluateAll((elements) =>
+  const targetSizes = await page.locator('a:visible, button:visible, input:not([type="checkbox"]):not([type="radio"]):visible, label:has(input[type="checkbox"]):visible, label:has(input[type="radio"]):visible').evaluateAll((elements) =>
     elements.map((element) => {
       const rect = element.getBoundingClientRect()
       return { width: rect.width, height: rect.height }
@@ -1553,8 +1681,8 @@ test('400% equivalent reflow and text spacing remain keyboard-safe with 44px tar
 })
 
 test('subscription permission loss denies direct access without exposing private controls', async ({ page }) => {
-  await page.route('**/api/billing/clients/*/subscriptions*', async (route) => {
-    await route.fulfill({
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions*', async (route) => {
+    await fulfillLocal(route, {
       status: 403, contentType: 'application/json', body: '{"error":"Insufficient permissions"}',
     })
   })
@@ -1564,8 +1692,8 @@ test('subscription permission loss denies direct access without exposing private
 })
 
 test('malformed subscription state fails closed without rendering private values', async ({ page }) => {
-  await page.route('**/api/billing/clients/*/subscriptions*', async (route) => {
-    await route.fulfill({
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions*', async (route) => {
+    await fulfillLocal(route, {
       status: 200, contentType: 'application/json',
       body: JSON.stringify({ clientId: CLIENT_A, privateBalance: '999999.0000' }),
     })

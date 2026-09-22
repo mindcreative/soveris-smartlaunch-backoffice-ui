@@ -8,6 +8,8 @@ import { queryClient } from '../queryClient'
 
 async function clearPrivateSessionQueries(): Promise<void> {
   await clearPrivateClientScope(queryClient)
+  await queryClient.cancelQueries()
+  queryClient.clear()
 }
 
 interface AuthState {
@@ -53,6 +55,9 @@ export const useAuthStore = create<AuthStore>()(
         },
 
         setUser: (user: AuthUser) => {
+          const previous = get().user
+          if (!previous || previous.id !== user.id || previous.clientId !== user.clientId)
+            queryClient.clear()
           set({ user, isAuthenticated: true, isInitialized: true })
         },
 
@@ -88,6 +93,8 @@ export const useAuthStore = create<AuthStore>()(
               refreshToken: result.refreshToken,
               expiresIn: result.expiresIn,
             }
+
+            await clearPrivateSessionQueries()
 
             set({
               user: fullUser,
@@ -143,7 +150,16 @@ export const useAuthStore = create<AuthStore>()(
         },
 
         handleSuccessfulRefresh: async () => {
-          await clearPrivateSessionQueries()
+          const actor = get().user
+          const preferenceKey = ['time-zone-preference', actor?.id, actor?.clientId]
+          await clearPrivateClientScope(queryClient)
+          await queryClient.cancelQueries()
+          for (const query of queryClient.getQueryCache().getAll()) {
+            if (JSON.stringify(query.queryKey) !== JSON.stringify(preferenceKey))
+              queryClient.removeQueries({ queryKey: query.queryKey, exact: true })
+          }
+          queryClient.getMutationCache().clear()
+          if (actor) await queryClient.invalidateQueries({ queryKey: preferenceKey, exact: true })
         },
 
         doRefreshToken: async () => {

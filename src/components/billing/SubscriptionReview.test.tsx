@@ -62,7 +62,8 @@ function state(): BillingSubscriptionState {
 
 const currentAccount: BillingAccountSnapshot = {
   ...receipt().account, ownedBalance: '1240.0000', availableBalance: '1235.0000',
-  activeReservationCount: 1, walletVersion: '2', asOf: '2026-02-15T12:05:00.000000Z',
+  activeReservationCount: 1, walletVersion: '2',
+  asOf: '2026-02-15T12:05:00.000000',
 }
 
 describe('SubscriptionReview', () => {

@@ -1,4 +1,7 @@
 import { useState } from 'react'
+function sortableValue(value: unknown): string {
+  return String(value)
+}
 
 export interface Column<T> {
   key: string
@@ -44,7 +47,7 @@ export function DataTable<T extends Record<string, unknown>>({
         if (aVal === bVal) return 0
         if (aVal == null) return 1
         if (bVal == null) return -1
-        const comparison = String(aVal).localeCompare(String(bVal))
+        const comparison = sortableValue(aVal).localeCompare(sortableValue(bVal))
         return sortDir === 'asc' ? comparison : -comparison
       })
     : data

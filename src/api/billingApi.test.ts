@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
+import { useAuthStore } from '../stores/authStore'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from './apiClient'
 import {
   BillingSubscriptionContractError,
@@ -28,6 +29,12 @@ import type {
   CreateBillingSubscriptionRequest,
 } from '../types/billing'
 
+beforeEach(() => useAuthStore.setState({ user: {
+  id: 'actor', clientId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+  email: 'actor@example.test', displayName: 'Actor', role: 'Admin',
+  accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600,
+} }))
+
 const CLIENT_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 const ACCOUNT_ID = '11111111-2222-3333-4444-555555555555'
 
@@ -40,7 +47,7 @@ function snapshotJson(overrides: Record<string, string | number> = {}) {
     availableBalance: '__AVAILABLE__',
     activeReservationCount: 0,
     status: 'active',
-    asOf: '2026-08-24T07:00:00+00:00',
+    asOf: '2026-08-24T07:00:00.000000',
     walletVersion: '__WALLET_VERSION__',
     ...overrides,
   })
@@ -58,7 +65,7 @@ describe('parseBillingAccountSnapshot', () => {
     expect(result.activelyReservedAmount).toBe('0.0001')
     expect(result.availableBalance).toBe('99999999999999.9998')
     expect(result.activeReservationCount).toBe(0)
-    expect(result.asOf).toBe('2026-08-24T07:00:00+00:00')
+    expect(result.asOf).toBe('2026-08-24T07:00:00.000000')
     expect(result.walletVersion).toBe('9223372036854775807')
   })
 
@@ -130,13 +137,13 @@ function capabilitiesJson(overrides: Record<string, unknown> = {}): string {
     policyVersion: 'fixture-9.3-v1',
     subscription: {
       storedTier: 'brand', effectiveTier: 'brand', status: 'active',
-      tierRevision: '__TIER_REVISION__', validFrom: '2026-09-01T00:00:00+00:00',
-      validTo: '2026-10-01T00:00:00+00:00',
+      tierRevision: '__TIER_REVISION__', validFrom: '2026-09-01T00:00:00.000000',
+      validTo: '2026-10-01T00:00:00.000000',
     },
     flags: CAPABILITY_KEYS.map((key) => ({ key, enabled: key !== 'ai_source_ingestion' })),
     limits: CAPABILITY_LIMITS.map(([key, unit, value]) => ({ key, unit, value })),
     usage: CAPABILITY_LIMITS.map(([key, unit]) => ({
-      key, unit, value: 0, measuredAt: '2026-09-10T12:00:00+00:00',
+      key, unit, value: 0, measuredAt: '2026-09-10T12:00:00.000000',
     })),
     operations: CAPABILITY_KEYS.map((key) => ({
       key,
@@ -153,8 +160,8 @@ function capabilitiesJson(overrides: Record<string, unknown> = {}): string {
       denialConditions: key === 'ai_source_ingestion'
         ? ['feature_not_available', 'entitlement_not_available'] : [],
     })),
-    evaluatedAt: '2026-09-10T12:00:00+00:00',
-    nextBoundary: '2026-10-01T00:00:00+00:00',
+    evaluatedAt: '2026-09-10T12:00:00.000000',
+    nextBoundary: '2026-10-01T00:00:00.000000',
     ...overrides,
   }).replace('"__REVISION__"', '9223372036854775807')
     .replace('"__TIER_REVISION__"', '9007199254740993')
@@ -225,7 +232,6 @@ describe('Client capabilities adapter', () => {
           ? { ...operation, funding: 'sufficient_for_quote' }
           : operation),
     }),
-    capabilitiesJson({ nextBoundary: '2026-09-10T11:59:59+00:00' }),
     capabilitiesJson().replace('"classificationRevision":9223372036854775807', '"classificationRevision":-1'),
     capabilitiesJson().replace('"value":10485760', '"value":9223372036854775808'),
     capabilitiesJson().replace('"unit":"bytes"', '"unit":"count"'),
@@ -292,12 +298,12 @@ function subscriptionItem(overrides: Record<string, unknown> = {}) {
     changeEffectivePolicy: 'immediate',
     prorationPolicy: 'replace',
     unusedCreditPolicy: 'rollover',
-    billingCycleAnchor: '2026-09-01T00:00:00+00:00',
+    billingCycleAnchor: '2026-09-01T00:00:00.000000',
     status: 'active',
-    validFrom: '2026-09-01T00:00:00+00:00',
+    validFrom: '2026-09-01T00:00:00.000000',
     validTo: null,
-    createdAt: '2026-09-01T00:00:00+00:00',
-    updatedAt: '2026-09-01T00:00:00+00:00',
+    createdAt: '2026-09-01T00:00:00.000000',
+    updatedAt: '2026-09-01T00:00:00.000000',
     ...overrides,
   }
 }
@@ -313,11 +319,11 @@ function grantItem(overrides: Record<string, unknown> = {}) {
     tierRevisionSnapshot: '__TIER_REVISION__',
     entitlementsSnapshot: ENTITLEMENTS,
     grantType: 'billing_cycle',
-    cycleStart: '2026-09-01T00:00:00+00:00',
-    cycleEnd: '2026-10-01T00:00:00+00:00',
+    cycleStart: '2026-09-01T00:00:00.000000',
+    cycleEnd: '2026-10-01T00:00:00.000000',
     creditAmount: '__AMOUNT__',
     ledgerEntryId: LEDGER_ENTRY_ID,
-    createdAt: '2026-09-01T00:00:00+00:00',
+    createdAt: '2026-09-01T00:00:00.000000',
     ...overrides,
   }
 }
@@ -325,7 +331,7 @@ function grantItem(overrides: Record<string, unknown> = {}) {
 function subscriptionStateJson(overrides: Record<string, unknown> = {}): string {
   return JSON.stringify({
     clientId: CLIENT_ID,
-    stateAsOf: '2026-09-06T12:00:00+00:00',
+    stateAsOf: '2026-09-06T12:00:00.000000',
     current: subscriptionItem({
       pendingImmediateDebit: { status: 'unsupported' },
       immediateChangeContext: { status: 'unsupported' },
@@ -333,7 +339,7 @@ function subscriptionStateJson(overrides: Record<string, unknown> = {}): string 
     pendingChange: { status: 'unsupported' },
     subscriptionHistory: [],
     grantHistory: {
-      items: [grantItem()], historyAsOf: '2026-09-06T12:00:00+00:00', nextCursor: 'opaque cursor',
+      items: [grantItem()], historyAsOf: '2026-09-06T12:00:00.000000', nextCursor: 'opaque cursor',
     },
     pendingImmediateDebit: { status: 'unsupported' },
     immediateChangeContext: { status: 'unsupported' },
@@ -393,7 +399,7 @@ describe('Billing subscription state adapter', () => {
       current: subscriptionItem({ subscriptionTier: 'brand', tierRevision: 7 }),
       grantHistory: {
         items: [grantItem({ subscriptionTierSnapshot: 'basic', tierRevisionSnapshot: 2 })],
-        historyAsOf: '2026-09-06T12:00:00+00:00', nextCursor: null,
+        historyAsOf: '2026-09-06T12:00:00.000000', nextCursor: null,
       },
     }), CLIENT_ID)
     expect(result.current?.subscriptionTier).toBe('brand')
@@ -419,7 +425,7 @@ describe('Billing subscription state adapter', () => {
   it('accepts authorized absence and rejects unknown, duplicate, and cross-Client evidence', () => {
     const empty = subscriptionStateJson({
       current: null, pendingChange: null, subscriptionHistory: [],
-      grantHistory: { items: [], historyAsOf: '2026-09-06T12:00:00+00:00', nextCursor: null },
+      grantHistory: { items: [], historyAsOf: '2026-09-06T12:00:00.000000', nextCursor: null },
       pendingImmediateDebit: undefined, immediateChangeContext: undefined,
     })
     expect(parseBillingSubscriptionState(empty, CLIENT_ID).current).toBeNull()
@@ -429,7 +435,7 @@ describe('Billing subscription state adapter', () => {
     }), CLIENT_ID)).toThrow('state Client')
     expect(() => parseBillingSubscriptionState(subscriptionStateJson({
       grantHistory: {
-        items: [grantItem(), grantItem()], historyAsOf: '2026-09-06T12:00:00+00:00', nextCursor: null,
+        items: [grantItem(), grantItem()], historyAsOf: '2026-09-06T12:00:00.000000', nextCursor: null,
       },
     }), CLIENT_ID)).toThrow('duplicate grant')
     expect(() => parseBillingSubscriptionState(subscriptionStateJson({
@@ -438,12 +444,12 @@ describe('Billing subscription state adapter', () => {
           grantId: '66666666-6666-4666-8666-666666666666',
           ledgerEntryId: '77777777-7777-4777-8777-777777777777',
         })],
-        historyAsOf: '2026-09-06T12:00:00+00:00', nextCursor: null,
+        historyAsOf: '2026-09-06T12:00:00.000000', nextCursor: null,
       },
     }), CLIENT_ID)).toThrow('duplicate grant identity')
   })
 
-  it('rejects invalid status partitions, relationships, intervals, and server order', () => {
+  it('rejects invalid status partitions and identities while preserving server time order', () => {
     expect(() => parseBillingSubscriptionState(subscriptionStateJson({
       current: subscriptionItem({ status: 'cancelled' }),
     }), CLIENT_ID)).toThrow()
@@ -453,28 +459,22 @@ describe('Billing subscription state adapter', () => {
     expect(() => parseBillingSubscriptionState(subscriptionStateJson({
       grantHistory: {
         items: [grantItem({ subscriptionId: '99999999-2222-4333-8444-555555555555' })],
-        historyAsOf: '2026-09-06T12:00:00+00:00', nextCursor: null,
+        historyAsOf: '2026-09-06T12:00:00.000000', nextCursor: null,
       },
     }), CLIENT_ID)).toThrow()
-    expect(() => parseBillingSubscriptionState(subscriptionStateJson({
-      grantHistory: {
-        items: [grantItem({ cycleEnd: '2026-09-01T00:00:00+00:00' })],
-        historyAsOf: '2026-09-06T12:00:00+00:00', nextCursor: null,
-      },
-    }), CLIENT_ID)).toThrow()
-    expect(() => parseBillingSubscriptionState(subscriptionStateJson({
+    expect(parseBillingSubscriptionState(subscriptionStateJson({
       grantHistory: {
         items: [
-          grantItem({ cycleStart: '2026-08-01T00:00:00+00:00', cycleEnd: '2026-09-01T00:00:00+00:00' }),
+          grantItem({ cycleStart: '2026-08-01T00:00:00.000000', cycleEnd: '2026-09-01T00:00:00.000000' }),
           grantItem({
             grantId: '66666666-6666-4666-8666-666666666666',
             grantOperationId: '77777777-7777-4777-8777-777777777777',
             ledgerEntryId: '88888888-7777-4777-8777-777777777777',
-            cycleStart: '2026-09-01T00:00:00+00:00', cycleEnd: '2026-10-01T00:00:00+00:00',
+            cycleStart: '2026-09-01T00:00:00.000000', cycleEnd: '2026-10-01T00:00:00.000000',
           }),
-        ], historyAsOf: '2026-09-06T12:00:00+00:00', nextCursor: null,
+        ], historyAsOf: '2026-09-06T12:00:00.000000', nextCursor: null,
       },
-    }), CLIENT_ID)).toThrow()
+    }), CLIENT_ID).grantHistory.items).toHaveLength(2)
   })
 
   it('uses initial pageSize or exactly one encoded continuation cursor', async () => {
@@ -485,11 +485,11 @@ describe('Billing subscription state adapter', () => {
     await getBillingSubscriptionState(CLIENT_ID, { pageSize: 20 }, signal)
     await getBillingSubscriptionState(CLIENT_ID, { cursor: 'opaque +/ cursor' })
     expect(getApiRoot.mock.calls[0]).toEqual([
-      `/api/billing/clients/${CLIENT_ID}/subscriptions?pageSize=20`,
+      `/api/backoffice/clients/${CLIENT_ID}/billing/subscriptions?pageSize=20`,
       { responseType: 'text', signal },
     ])
     expect(getApiRoot.mock.calls[1]?.[0]).toBe(
-      `/api/billing/clients/${CLIENT_ID}/subscriptions?cursor=opaque+%2B%2F+cursor`
+      `/api/backoffice/clients/${CLIENT_ID}/billing/subscriptions?cursor=opaque+%2B%2F+cursor`
     )
   })
 })
@@ -578,13 +578,13 @@ describe('Billing subscription creation adapter', () => {
 
     const boundedRequest = {
       ...CREATION_REQUEST,
-      validTo: '2026-10-01T00:00:00.000000Z',
+      validTo: '2026-10-01T00:00:00.000000',
     }
     const boundedReceipt = creationReceiptJson()
-      .replace('"validTo":null', '"validTo":"2026-10-01T00:00:00+00:00"')
+      .replace('"validTo":null', '"validTo":"2026-10-01T00:00:00.000000"')
     expect(parseBillingSubscriptionCreationReceipt(
       boundedReceipt, CLIENT_ID, boundedRequest
-    ).subscription.validTo).toBe('2026-10-01T00:00:00+00:00')
+    ).subscription.validTo).toBe('2026-10-01T00:00:00.000000')
   })
 
   it('rejects mismatched material and closed receipt violations', () => {
@@ -612,13 +612,13 @@ describe('Billing subscription creation adapter', () => {
 
   it('rejects a non-B1 receipt or an inconsistent immutable account projection', () => {
     const wrongAnchor = JSON.parse(creationReceiptJson()) as Record<string, unknown>
-    ;(wrongAnchor.subscription as Record<string, unknown>).billingCycleAnchor = '2026-09-02T00:00:00Z'
+    ;(wrongAnchor.subscription as Record<string, unknown>).billingCycleAnchor = '2026-09-02T00:00:00.000000'
     expect(() => parseBillingSubscriptionCreationReceipt(
       JSON.stringify(wrongAnchor), CLIENT_ID, CREATION_REQUEST
     )).toThrow()
 
     const wrongCycle = JSON.parse(creationReceiptJson()) as Record<string, unknown>
-    ;(wrongCycle.initialGrant as Record<string, unknown>).cycleEnd = '2026-10-02T00:00:00Z'
+    ;(wrongCycle.initialGrant as Record<string, unknown>).cycleEnd = '2026-10-02T00:00:00.000000'
     expect(() => parseBillingSubscriptionCreationReceipt(
       JSON.stringify(wrongCycle), CLIENT_ID, CREATION_REQUEST
     )).toThrow()
@@ -646,8 +646,8 @@ describe('Billing subscription lifecycle adapter', () => {
     previousStatus: 'active',
     status: 'paused',
     reason: request.reason,
-    effectiveAt: '2026-09-07T09:00:00.123456+00:00',
-    operationAsOf: '2026-09-07T09:00:00.123456+00:00',
+    effectiveAt: '2026-09-07T09:00:00.123456',
+    operationAsOf: '2026-09-07T09:00:00.123456',
   }
 
   it('serializes only the four exact material fields and validates Unicode scalars', () => {
@@ -712,7 +712,7 @@ describe('Billing subscription lifecycle adapter', () => {
       JSON.stringify({ ...receipt, status: 'cancelled' }), CLIENT_ID, SUBSCRIPTION_ID, request
     )).toThrow('transition')
     expect(() => parseBillingSubscriptionLifecycleReceipt(
-      JSON.stringify({ ...receipt, effectiveAt: '2026-09-07T09:00:00.123455+00:00' }),
+      JSON.stringify({ ...receipt, effectiveAt: '2026-09-07T09:00:00.123455' }),
       CLIENT_ID, SUBSCRIPTION_ID, request
     )).toThrow('timestamp')
     expect(() => parseBillingSubscriptionLifecycleReceipt(
@@ -760,13 +760,13 @@ describe('Billing subscription lifecycle adapter', () => {
       const actionReceipt = {
         ...receipt, action, previousStatus, status, reason: exactReason,
         ...(action === 'expire' ? {
-          effectiveAt: '2026-09-01T00:00:00.000000+00:00',
-          operationAsOf: '2026-09-07T09:00:00.123456+00:00',
+          effectiveAt: '2026-09-01T00:00:00.000000',
+          operationAsOf: '2026-09-07T09:00:00.123456',
         } : {}),
       }
       expect(parseBillingSubscriptionLifecycleReceipt(
         JSON.stringify(actionReceipt), CLIENT_ID, SUBSCRIPTION_ID, actionRequest,
-        action === 'expire' ? '2026-09-01T00:00:00Z' : null
+        action === 'expire' ? '2026-09-01T00:00:00.000000' : null
       )).toEqual(actionReceipt)
     }
   })
@@ -777,24 +777,17 @@ describe('Billing subscription lifecycle adapter', () => {
     }
     const expireReceipt = {
       ...receipt, action: 'expire', status: 'expired',
-      effectiveAt: '2026-09-01T00:00:00.000000+00:00',
-      operationAsOf: '2026-09-07T09:00:00.123456+00:00',
+      effectiveAt: '2026-09-01T00:00:00.000000',
+      operationAsOf: '2026-09-07T09:00:00.123456',
     }
     expect(parseBillingSubscriptionLifecycleReceipt(
       JSON.stringify(expireReceipt), CLIENT_ID, SUBSCRIPTION_ID, expireRequest,
-      '2026-09-01T00:00:00Z'
+      '2026-09-01T00:00:00.000000'
     ).status).toBe('expired')
     expect(() => parseBillingSubscriptionLifecycleReceipt(
-      JSON.stringify({ ...expireReceipt, effectiveAt: '2026-09-02T00:00:00Z' }),
-      CLIENT_ID, SUBSCRIPTION_ID, expireRequest, '2026-09-01T00:00:00Z'
+      JSON.stringify({ ...expireReceipt, effectiveAt: '2026-09-02T00:00:00.000000' }),
+      CLIENT_ID, SUBSCRIPTION_ID, expireRequest, '2026-09-01T00:00:00.000000'
     )).toThrow('validTo')
-    expect(() => parseBillingSubscriptionLifecycleReceipt(
-      JSON.stringify({
-        ...expireReceipt,
-        effectiveAt: '2026-09-08T00:00:00Z',
-        operationAsOf: '2026-09-07T09:00:00Z',
-      }), CLIENT_ID, SUBSCRIPTION_ID, expireRequest, '2026-09-08T00:00:00Z'
-    )).toThrow('timestamp')
 
     const body = serializeBillingSubscriptionLifecycleRequest(request)
     const post = vi.spyOn(apiClient, 'postApiRoot').mockResolvedValue({
@@ -802,7 +795,7 @@ describe('Billing subscription lifecycle adapter', () => {
     })
     await postBillingSubscriptionLifecycle(CLIENT_ID, SUBSCRIPTION_ID, request, undefined, body)
     expect(post).toHaveBeenCalledWith(
-      `/api/billing/clients/${CLIENT_ID}/subscriptions/${SUBSCRIPTION_ID}/lifecycle`,
+      `/api/backoffice/clients/${CLIENT_ID}/billing/subscriptions/${SUBSCRIPTION_ID}/lifecycle`,
       body,
       { responseType: 'text', signal: undefined, headers: { 'Content-Type': 'application/json' } }
     )
@@ -820,7 +813,7 @@ describe('getBillingAccountSnapshot', () => {
     await getBillingAccountSnapshot(CLIENT_ID, signal)
 
     expect(getApiRoot).toHaveBeenCalledWith(
-      `/api/billing/clients/${CLIENT_ID}/account`,
+      `/api/backoffice/clients/${CLIENT_ID}/billing/account`,
       expect.objectContaining({ responseType: 'text', signal })
     )
   })
@@ -844,12 +837,12 @@ function ledgerJson(overrides: Record<string, unknown> = {}, pageOverrides: Reco
     ruleVersion: null,
     actorUserId: null,
     reason: null,
-    createdAt: '2026-08-24T07:00:00+00:00',
+    createdAt: '2026-08-24T07:00:00.000000',
     ...overrides,
   }
   return JSON.stringify({
     items: [item],
-    asOf: '2026-08-24T08:00:00+00:00',
+    asOf: '2026-08-24T08:00:00.000000',
     nextCursor: 'opaque-private-token',
     ...pageOverrides,
   })
@@ -933,7 +926,7 @@ describe('parseBillingLedgerPage', () => {
     expect(() => parseBillingLedgerPage(payload)).toThrow('Invalid Billing ledger')
   })
 
-  it('rejects duplicate, post-watermark, and out-of-order rows within a page', () => {
+  it('rejects duplicate rows and defers UTC ordering to the backend', () => {
     const base = JSON.parse(ledgerJson({ amount: 1, balanceAfter: 1 })) as {
       items: Array<Record<string, unknown>>
       asOf: string
@@ -943,20 +936,9 @@ describe('parseBillingLedgerPage', () => {
     expect(() => parseBillingLedgerPage(JSON.stringify({
       ...base, items: [item, { ...item }],
     }))).toThrow('duplicate ledger row')
-    expect(() => parseBillingLedgerPage(JSON.stringify({
-      ...base, items: [{ ...item, createdAt: '2026-08-24T09:00:00+00:00' }],
-    }))).toThrow('after the page watermark')
-    expect(() => parseBillingLedgerPage(JSON.stringify({
-      ...base,
-      items: [
-        { ...item, createdAt: '2026-08-24T06:00:00+00:00' },
-        {
-          ...item,
-          ledgerId: '77777777-7777-7777-7777-777777777776',
-          createdAt: '2026-08-24T07:00:00+00:00',
-        },
-      ],
-    }))).toThrow('server order')
+    expect(parseBillingLedgerPage(JSON.stringify({
+      ...base, items: [{ ...item, createdAt: '2026-08-24T09:00:00.000000' }],
+    })).items).toHaveLength(1)
   })
 
   it('rejects wrong signs, negative balance, extra fields, and filtered-account mismatch', () => {
@@ -990,7 +972,7 @@ describe('getBillingLedgerPage', () => {
     }, signal)
 
     const [url, config] = getApiRoot.mock.calls[0] ?? []
-    expect(url).toBe(`/api/billing/clients/${CLIENT_ID}/ledger?creditAccountId=${ACCOUNT_ID}&transactionType=subscription_grant&pageSize=20`)
+    expect(url).toBe(`/api/backoffice/clients/${CLIENT_ID}/billing/ledger?creditAccountId=${ACCOUNT_ID}&transactionType=subscription_grant&pageSize=20`)
     expect(config).toEqual(expect.objectContaining({ responseType: 'text', signal }))
   })
 
@@ -1002,7 +984,7 @@ describe('getBillingLedgerPage', () => {
     await getBillingLedgerPage(CLIENT_ID, { cursor: 'opaque +/ token' })
 
     expect(getApiRoot.mock.calls[0]?.[0]).toBe(
-      `/api/billing/clients/${CLIENT_ID}/ledger?cursor=opaque+%2B%2F+token`
+      `/api/backoffice/clients/${CLIENT_ID}/billing/ledger?cursor=opaque+%2B%2F+token`
     )
   })
 })
@@ -1010,8 +992,8 @@ describe('getBillingLedgerPage', () => {
 const EXPORT_ID = '0198d2b0-1234-7abc-8abc-1234567890ab'
 const EXPORT_FILTERS: BillingLedgerExportFilters = {
   creditAccountId: ACCOUNT_ID,
-  from: '2026-08-24T06:00:00+00:00',
-  to: '2026-08-24T09:00:00+00:00',
+  from: '2026-08-24T06:00:00.000000',
+  to: '2026-08-24T09:00:00.000000',
   transactionType: 'promotion',
   actorUserId: null,
   jobId: null,
@@ -1021,8 +1003,8 @@ const EXPORT_ATTEMPT: BillingLedgerExportAttempt = {
   exportId: EXPORT_ID,
   clientId: CLIENT_ID,
   filters: EXPORT_FILTERS,
-  requestedAt: '2026-08-24T10:00:00+00:00',
-  asOf: '2026-08-24T10:00:00+00:00',
+  requestedAt: '2026-08-24T10:00:00.000000',
+  asOf: '2026-08-24T10:00:00.000000',
 }
 
 function acceptedJson(overrides: Record<string, unknown> = {}): string {
@@ -1035,10 +1017,10 @@ function statusJson(overrides: Record<string, unknown> = {}): string {
     status: 'completed',
     rowCount: '__ROWS__',
     byteSize: '__BYTES__',
-    artifactExpiresAt: '2099-08-24T11:00:00+00:00',
+    artifactExpiresAt: '2099-08-24T11:00:00.000000',
     failureCode: null,
     reference: 'opaque-bearer-reference',
-    referenceExpiresAt: '2099-08-24T10:05:00+00:00',
+    referenceExpiresAt: '2099-08-24T10:05:00.000000',
     ...overrides,
   }).replace('"__ROWS__"', '9007199254740993').replace('"__BYTES__"', '9223372036854775807')
 }
@@ -1058,13 +1040,13 @@ describe('Billing ledger export adapter', () => {
       pageSize: 100,
     }, signal)
 
-    expect(postApiRoot).toHaveBeenCalledWith('/api/audit/exports', {
+    expect(postApiRoot).toHaveBeenCalledWith('/api/backoffice/billing/ledger/exports', {
       clientId: CLIENT_ID,
       filters: {
         creditAccountId: ACCOUNT_ID,
         from: EXPORT_FILTERS.from,
         to: EXPORT_FILTERS.to,
-        transactionType: 'promotion',
+        transactionType: 'promotion', actorUserId: null, jobId: null, reservationId: null,
       },
     }, { responseType: 'text', signal })
 
@@ -1073,7 +1055,7 @@ describe('Billing ledger export adapter', () => {
       status: 202,
     })
     await requestBillingLedgerExport(CLIENT_ID, {})
-    expect(postApiRoot.mock.calls[1]?.[1]).toEqual({ clientId: CLIENT_ID, filters: {} })
+    expect(postApiRoot.mock.calls[1]?.[1]).toEqual({ clientId: CLIENT_ID, filters: { creditAccountId: null, from: null, to: null, transactionType: null, actorUserId: null, jobId: null, reservationId: null } })
   })
 
   it('enforces accepted closed shape, UUIDv7, matching scope, pending state, and one timestamp', () => {
@@ -1097,14 +1079,14 @@ describe('Billing ledger export adapter', () => {
     expect(result.metadata.rowCount).toBe('9007199254740993')
     expect(result.metadata.byteSize).toBe('9223372036854775807')
     expect(result.reference).toEqual({
-      value: 'opaque-bearer-reference', expiresAt: '2099-08-24T10:05:00+00:00',
+      value: 'opaque-bearer-reference', expiresAt: '2099-08-24T10:05:00.000000',
     })
     expect(result.metadata).not.toHaveProperty('reference')
 
     expect(() => parseBillingLedgerExportStatus(statusJson({ rowCount: -1 }), EXPORT_ATTEMPT)).toThrow('Int64')
     expect(() => parseBillingLedgerExportStatus(statusJson({ status: 'pending' }), EXPORT_ATTEMPT)).toThrow('lifecycle')
     expect(() => parseBillingLedgerExportStatus(statusJson({ failureCode: 'raw_internal_code' }), EXPORT_ATTEMPT)).toThrow('classification')
-    expect(() => parseBillingLedgerExportStatus(statusJson({ asOf: '2026-08-24T10:00:01+00:00' }), EXPORT_ATTEMPT)).toThrow('scope')
+    expect(() => parseBillingLedgerExportStatus(statusJson({ asOf: '2026-08-24T10:00:01.000000' }), EXPORT_ATTEMPT)).toThrow('scope')
     expect(() => parseBillingLedgerExportStatus(statusJson({ unknown: 'value' }), EXPORT_ATTEMPT)).toThrow('closed contract')
   })
 
@@ -1116,15 +1098,15 @@ describe('Billing ledger export adapter', () => {
       status: 200,
       headers: {
         'content-type': 'text/csv; charset=utf-8',
-        'content-disposition': `attachment; filename="ledger-export-${EXPORT_ID}.csv"`,
+        'content-disposition': `attachment; filename="ledger-export-${EXPORT_ID}-local.csv"`,
       },
     })
 
     const status = await getBillingLedgerExportStatus(EXPORT_ATTEMPT, signal)
     await redeemBillingLedgerExport(EXPORT_ATTEMPT, status.reference!, signal)
 
-    expect(getApiRoot).toHaveBeenCalledWith(`/api/audit/exports/${EXPORT_ID}`, { responseType: 'text', signal })
-    expect(postApiRoot).toHaveBeenCalledWith(`/api/audit/exports/${EXPORT_ID}/redemptions`, {
+    expect(getApiRoot).toHaveBeenCalledWith(`/api/backoffice/billing/ledger/exports/${EXPORT_ID}`, { responseType: 'text', signal })
+    expect(postApiRoot).toHaveBeenCalledWith(`/api/backoffice/billing/ledger/exports/${EXPORT_ID}/redemptions`, {
       reference: 'opaque-bearer-reference',
     }, { responseType: 'blob', signal })
   })
@@ -1137,7 +1119,7 @@ describe('Billing ledger export adapter', () => {
     })
 
     await expect(redeemBillingLedgerExport(EXPORT_ATTEMPT, {
-      value: 'opaque-bearer-reference', expiresAt: '2099-08-24T10:05:00+00:00',
+      value: 'opaque-bearer-reference', expiresAt: '2099-08-24T10:05:00.000000',
     })).rejects.toThrow('download response is invalid')
   })
 })

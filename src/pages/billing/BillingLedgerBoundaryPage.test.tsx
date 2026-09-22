@@ -34,9 +34,9 @@ function page(
       ruleVersion: null,
       actorUserId: null,
       reason: 'A long untrusted reason that must remain visible and safely wrap.',
-      createdAt: '2026-08-24T07:00:00+00:00',
+      createdAt: '2026-08-24T07:00:00.000000',
     }],
-    asOf: '2026-08-24T08:00:00+00:00',
+    asOf: '2026-08-24T08:00:00.000000',
     nextCursor,
   }
 }

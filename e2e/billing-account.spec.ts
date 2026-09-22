@@ -9,7 +9,7 @@ function snapshotBody(clientId: string, ownedBalance = '99999999999999.9999'): s
   const availableBalance = ownedBalance === '99999999999999.9999'
     ? '99999999999979.9999'
     : ownedBalance
-  return `{"creditAccountId":"11111111-2222-3333-4444-555555555555","clientId":"${clientId}","ownedBalance":${ownedBalance},"activelyReservedAmount":20.0000,"availableBalance":${availableBalance},"activeReservationCount":0,"status":"active","asOf":"2026-08-24T07:00:00+00:00","walletVersion":1}`
+  return `{"creditAccountId":"11111111-2222-3333-4444-555555555555","clientId":"${clientId}","ownedBalance":${ownedBalance},"activelyReservedAmount":20.0000,"availableBalance":${availableBalance},"activeReservationCount":0,"status":"active","asOf":"2026-08-24T07:00:00.000000","walletVersion":1}`
 }
 
 async function installAdminSession(page: Page): Promise<void> {
@@ -46,13 +46,16 @@ async function expectNoAxeViolations(page: Page): Promise<void> {
 
 test.beforeEach(async ({ page }) => {
   await installAdminSession(page)
+  await page.route('**/api/backoffice/me/timezone', async (route) => {
+    throw new Error(`Unexpected timezone request: ${route.request().url()}`)
+  })
 })
 
 test('renders exact configured values and preserves Client context through history', async ({ page }) => {
-  await page.route('**/api/billing/clients/*/account', async (route) => {
-    const match = route.request().url().match(/clients\/([^/]+)\/account/)
+  await page.route('**/api/backoffice/clients/*/billing/account', async (route) => {
+    const match = route.request().url().match(/clients\/([^/]+)\/billing\/account/)
     const clientId = match?.[1] ?? CLIENT_A
-    await route.fulfill({
+    await route.fulfill({ headers: { 'x-user-time-zone-revision': '1', 'access-control-expose-headers': 'X-User-Time-Zone-Revision' },
       status: 200,
       contentType: 'application/json',
       body: snapshotBody(clientId, clientId === CLIENT_A ? '99999999999999.9999' : '42.0000'),
@@ -76,9 +79,9 @@ test('renders exact configured values and preserves Client context through histo
 
 test('loading and not-configured states pass automated accessibility scans', async ({ page }) => {
   let releaseLoading: (() => void) | undefined
-  await page.route('**/api/billing/clients/*/account', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/account', async (route) => {
     await new Promise<void>((resolve) => { releaseLoading = resolve })
-    await route.fulfill({
+    await route.fulfill({ headers: { 'x-user-time-zone-revision': '1', 'access-control-expose-headers': 'X-User-Time-Zone-Revision' },
       status: 404,
       contentType: 'application/json',
       body: JSON.stringify({ error: 'Credit account not configured' }),
@@ -97,8 +100,8 @@ test('loading and not-configured states pass automated accessibility scans', asy
 
 test('permission-denied and transient-error states are accessible and expose no values', async ({ page }) => {
   let status = 403
-  await page.route('**/api/billing/clients/*/account', async (route) => {
-    await route.fulfill({
+  await page.route('**/api/backoffice/clients/*/billing/account', async (route) => {
+    await route.fulfill({ headers: { 'x-user-time-zone-revision': '1', 'access-control-expose-headers': 'X-User-Time-Zone-Revision' },
       status,
       contentType: 'application/json',
       body: JSON.stringify({
@@ -121,13 +124,13 @@ test('permission-denied and transient-error states are accessible and expose no 
 
 test('failed refresh keeps same-Client values with a stale warning', async ({ page }) => {
   let requestCount = 0
-  await page.route('**/api/billing/clients/*/account', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/account', async (route) => {
     requestCount += 1
     if (requestCount === 1) {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: snapshotBody(CLIENT_A, '10.0000') })
+      await route.fulfill({ headers: { 'x-user-time-zone-revision': '1', 'access-control-expose-headers': 'X-User-Time-Zone-Revision' }, status: 200, contentType: 'application/json', body: snapshotBody(CLIENT_A, '10.0000') })
       return
     }
-    await route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"Generic server error"}' })
+    await route.fulfill({ headers: { 'x-user-time-zone-revision': '1', 'access-control-expose-headers': 'X-User-Time-Zone-Revision' }, status: 500, contentType: 'application/json', body: '{"error":"Generic server error"}' })
   })
 
   await page.goto(accountPath(CLIENT_A))
@@ -141,8 +144,8 @@ test('failed refresh keeps same-Client values with a stale warning', async ({ pa
 
 test('mobile navigation is keyboard-safe and does not create horizontal page scrolling', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 700 })
-  await page.route('**/api/billing/clients/*/account', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: snapshotBody(CLIENT_A, '10.0000') })
+  await page.route('**/api/backoffice/clients/*/billing/account', async (route) => {
+    await route.fulfill({ headers: { 'x-user-time-zone-revision': '1', 'access-control-expose-headers': 'X-User-Time-Zone-Revision' }, status: 200, contentType: 'application/json', body: snapshotBody(CLIENT_A, '10.0000') })
   })
 
   await page.goto(accountPath(CLIENT_A))
@@ -164,10 +167,10 @@ test('reflow, text spacing, motion, forced colours, targets, and feedback remain
   await page.setViewportSize({ width: 320, height: 700 })
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
   let requestCount = 0
-  await page.route('**/api/billing/clients/*/account', async (route) => {
+  await page.route('**/api/backoffice/clients/*/billing/account', async (route) => {
     requestCount += 1
     if (requestCount === 1) {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: snapshotBody(CLIENT_A, '10.0000') })
+      await route.fulfill({ headers: { 'x-user-time-zone-revision': '1', 'access-control-expose-headers': 'X-User-Time-Zone-Revision' }, status: 200, contentType: 'application/json', body: snapshotBody(CLIENT_A, '10.0000') })
       return
     }
     await new Promise(() => undefined)

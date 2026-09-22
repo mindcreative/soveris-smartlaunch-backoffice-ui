@@ -1,3 +1,4 @@
+import { fulfillLocal, installTimeZoneRoute } from './localPresentationMocks'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { readFileSync } from 'node:fs'
@@ -31,7 +32,7 @@ async function installAdminSession(page: Page): Promise<void> {
 }
 
 async function json(route: Route, body: unknown, status = 200): Promise<void> {
-  await route.fulfill({ status, contentType: status >= 400 ? 'application/problem+json' : 'application/json', body: JSON.stringify(body) })
+  await fulfillLocal(route, { status, contentType: status >= 400 ? 'application/problem+json' : 'application/json', body: JSON.stringify(body) })
 }
 
 async function expectNoAxeViolations(page: Page): Promise<void> {
@@ -41,6 +42,7 @@ async function expectNoAxeViolations(page: Page): Promise<void> {
 
 test.beforeEach(async ({ page }) => {
   await installAdminSession(page)
+  await installTimeZoneRoute(page)
 })
 
 test('creates, edits, saves and publishes through exact commands without AI calls', async ({ page }) => {
@@ -51,6 +53,7 @@ test('creates, edits, saves and publishes through exact commands without AI call
   const requests: Array<{ method: string; path: string; body?: unknown }> = []
 
   await page.route('**/api/backoffice/**', async (route) => {
+    if (route.request().url().endsWith('/api/backoffice/me/timezone')) { await route.fallback(); return }
     const request = route.request()
     const url = new URL(request.url())
     const method = request.method()
@@ -111,6 +114,7 @@ test('preserves a local edit through 422 and stale-revision review', async ({ pa
   let saves = 0
   let currentServerTitle = origin.hero.title
   await page.route('**/api/backoffice/**', async (route) => {
+    if (route.request().url().endsWith('/api/backoffice/me/timezone')) { await route.fallback(); return }
     const request = route.request()
     const path = new URL(request.url()).pathname
     if (path === `/api/backoffice/clients/${CLIENT_ID}/products`) {
@@ -157,6 +161,7 @@ test('passes WCAG scan and remains operable at reflow, text-spacing and alternat
   await page.setViewportSize({ width: 320, height: 700 })
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
   await page.route('**/api/backoffice/**', async (route) => {
+    if (route.request().url().endsWith('/api/backoffice/me/timezone')) { await route.fallback(); return }
     const request = route.request()
     const path = new URL(request.url()).pathname
     if (path === `/api/backoffice/clients/${CLIENT_ID}/products`) {
@@ -209,6 +214,7 @@ test('uploads a private hero image without saving and keeps the workflow accessi
   )
 
   await page.route('**/api/backoffice/**', async (route) => {
+    if (route.request().url().endsWith('/api/backoffice/me/timezone')) { await route.fallback(); return }
     const request = route.request()
     const path = new URL(request.url()).pathname
     requests.push({ method: request.method(), path, body: request.postData() })
@@ -239,7 +245,7 @@ test('uploads a private hero image without saving and keeps the workflow accessi
         storage: { usedBytes: onePixelPng.length, limitBytes: 67108864, remainingBytes: 67108864 - onePixelPng.length },
       }, 201)
     } else if (path === `/api/backoffice/products/${PRODUCT_ID}/assets/images/${assetId}/preview`) {
-      await route.fulfill({
+      await fulfillLocal(route, {
         status: 200,
         contentType: 'image/png',
         headers: { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' },

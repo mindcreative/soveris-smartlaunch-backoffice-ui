@@ -86,14 +86,8 @@ function reminderCopy(
   reminder: ResourceAccessConsequence['reminders'][number], deadline: string | null
 ): string {
   if (!deadline) return 'An access reminder was recorded; its deadline is unavailable.'
-  const minutes = Math.ceil((Date.parse(deadline) - Date.parse(reminder.recordedAt)) / 60_000)
-  if (minutes <= 0) return 'The access deadline had passed when this reminder was recorded.'
-  const hours = Math.floor(minutes / 60)
-  const remainingTime = minutes % 60 === 0
-    ? `${hours} ${hours === 1 ? 'hour' : 'hours'}`
-    : hours > 0 ? `${hours} hours ${minutes % 60} minutes` : `${minutes} minutes`
   const proofCopy = reminder.earliestProofExpiry
     ? ` Earliest known ownership or TLS proof expiry for an affected domain binding is ${reminder.earliestProofExpiry}; that binding may stop serving earlier unless proof is renewed.`
     : ''
-  return `${remainingTime} remain before the policy grace deadline for ${reminder.graceCount} over-limit affected ${reminder.graceCount === 1 ? 'resource' : 'resources'}. They may stop serving earlier if ownership, TLS, or routing evidence becomes invalid. Reduce usage, reactivate, or upgrade to retain access.${proofCopy}`
+  return `The policy grace deadline is ${deadline} for ${reminder.graceCount} over-limit affected ${reminder.graceCount === 1 ? 'resource' : 'resources'}. They may stop serving earlier if ownership, TLS, or routing evidence becomes invalid. Reduce usage, reactivate, or upgrade to retain access.${proofCopy}`
 }

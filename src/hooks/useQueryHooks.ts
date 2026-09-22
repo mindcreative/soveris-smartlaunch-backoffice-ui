@@ -3,6 +3,7 @@ import {
   useMutation,
   useQueryClient,
 } from '@tanstack/react-query'
+import type { LocalInstantValue } from '../timezone/LocalInstant'
 import {
   usersApi,
   submissionsApi,
@@ -25,7 +26,9 @@ import type {
   TrendPoint,
   TrafficSource,
   ProductBreakdown,
-  BackOfficeUser,
+  BackOfficeUserDetail,
+  CreatedBackOfficeUser,
+  UpdatedBackOfficeUser,
   CreateUserRequest,
   UpdateUserRequest,
   OverviewMetrics,
@@ -211,7 +214,7 @@ export function useUsers(params?: {
 }
 
 export function useUser(id: string) {
-  return useQuery<BackOfficeUser>({
+  return useQuery<BackOfficeUserDetail>({
     queryKey: queryKeys.user(id),
     queryFn: () => usersApi.getUser(id),
     enabled: !!id,
@@ -221,7 +224,7 @@ export function useUser(id: string) {
 
 export function useCreateUser() {
   const queryClient = useQueryClient()
-  return useMutation<BackOfficeUser, Error, CreateUserRequest>({
+  return useMutation<CreatedBackOfficeUser, Error, CreateUserRequest>({
     mutationFn: (data) => usersApi.createUser(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.users() })
@@ -232,14 +235,13 @@ export function useCreateUser() {
 export function useUpdateUser() {
   const queryClient = useQueryClient()
   return useMutation<
-    BackOfficeUser,
+    UpdatedBackOfficeUser,
     Error,
     { id: string; data: UpdateUserRequest }
   >({
     mutationFn: ({ id, data }) => usersApi.updateUser(id, data),
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.users() })
-      queryClient.setQueryData(queryKeys.user(data.id), data)
     },
   })
 }
@@ -385,7 +387,7 @@ interface ActivityItem {
   action?: string
   description?: string
   userName?: string
-  createdAt: string
+  createdAt: LocalInstantValue
 }
 
 export function useDashboardStats() {

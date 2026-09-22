@@ -15,8 +15,10 @@ import {
   BillingLedgerContractError,
   BillingSubscriptionContractError,
 } from '../api/billingApi'
+import { legacyBillingApi } from '../api/legacySubscriptionApi'
 import type { ApiError } from '../api/apiClient'
 import { productKeys } from './productQueries'
+import { localInstantDateTime } from '../timezone/LocalInstant'
 import type {
   BillingAccountSnapshot,
   BillingLedgerFilters,
@@ -632,7 +634,7 @@ export function useCreateBillingSubscription(clientId: string) {
   >({
     mutationKey: billingSubscriptionKeys.create(clientId),
     mutationFn: ({ request, serializedBody, signal }) =>
-      billingApi.createSubscription(clientId, request, signal, serializedBody),
+      legacyBillingApi.createSubscription(clientId, request, signal, serializedBody),
     retry: false,
   })
 }
@@ -666,7 +668,7 @@ function validateContinuation(
   page: BillingLedgerPage
 ): void {
   const first = existing?.pages[0]
-  if (!first || page.asOf !== first.asOf) {
+  if (!first || JSON.stringify(page.asOf) !== JSON.stringify(first.asOf)) {
     throw new BillingLedgerContractError('continuation does not match the active snapshot')
   }
   const ids = new Set(existing.pages.flatMap((existingPage) =>
@@ -678,7 +680,8 @@ function validateContinuation(
   const previous = lastPage?.items[lastPage.items.length - 1]
   const next = page.items[0]
   if (previous && next) {
-    const timeOrder = Date.parse(previous.createdAt) - Date.parse(next.createdAt)
+    const timeOrder = Date.parse(localInstantDateTime(previous.createdAt)) -
+      Date.parse(localInstantDateTime(next.createdAt))
     if (timeOrder < 0 || (timeOrder === 0 && previous.ledgerId.localeCompare(next.ledgerId) < 0)) {
       throw new BillingLedgerContractError('continuation is not in server order')
     }

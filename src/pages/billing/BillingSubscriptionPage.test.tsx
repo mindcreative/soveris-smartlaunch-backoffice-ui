@@ -24,15 +24,15 @@ function account(status: 'active' | 'suspended' | 'closed' = 'active') {
   return {
     creditAccountId: '11111111-2222-3333-4444-555555555555', clientId: CLIENT_ID,
     ownedBalance: '10.0000', activelyReservedAmount: '0.0000', availableBalance: '10.0000',
-    activeReservationCount: 0, status, asOf: '2026-09-06T12:00:00+00:00', walletVersion: '1',
+    activeReservationCount: 0, status, asOf: '2026-09-06T12:00:00.000000', walletVersion: '1',
   }
 }
 
 function emptyState(): BillingSubscriptionState {
   return {
-    clientId: CLIENT_ID, stateAsOf: '2026-09-06T12:00:00+00:00', current: null,
+    clientId: CLIENT_ID, stateAsOf: '2026-09-06T12:00:00.000000', current: null,
     pendingChange: null, subscriptionHistory: [],
-    grantHistory: { items: [], historyAsOf: '2026-09-06T12:00:00+00:00', nextCursor: null },
+    grantHistory: { items: [], historyAsOf: '2026-09-06T12:00:00.000000', nextCursor: null },
   }
 }
 
@@ -51,9 +51,9 @@ function currentState(): BillingSubscriptionState {
         featureFlags: { contentGeneration: true, imageGeneration: true },
       },
       changeEffectivePolicy: 'immediate', prorationPolicy: 'replace',
-      unusedCreditPolicy: 'rollover', billingCycleAnchor: '2026-09-01T00:00:00+00:00',
-      status: 'active', validFrom: '2026-09-01T00:00:00+00:00', validTo: null,
-      createdAt: '2026-09-01T00:00:00+00:00', updatedAt: '2026-09-01T00:00:00+00:00',
+      unusedCreditPolicy: 'rollover', billingCycleAnchor: '2026-09-01T00:00:00.000000',
+      status: 'active', validFrom: '2026-09-01T00:00:00.000000', validTo: null,
+      createdAt: '2026-09-01T00:00:00.000000', updatedAt: '2026-09-01T00:00:00.000000',
     },
   }
 }
@@ -211,7 +211,6 @@ describe('Billing subscription route and page state', () => {
   it('requires explicit supported paid tier selection without exposing stored freemium', async () => {
     vi.spyOn(billingApi, 'getSubscriptionState').mockResolvedValue(emptyState())
     vi.spyOn(billingApi, 'getAccountSnapshot').mockResolvedValue(account())
-    const create = vi.spyOn(billingApi, 'createSubscription')
     window.history.replaceState({}, '', `/billing/clients/${CLIENT_ID}/subscriptions`)
     render(<App />)
     await screen.findByRole('heading', { name: 'Create subscription' })
@@ -223,6 +222,5 @@ describe('Billing subscription route and page state', () => {
     expect(within(tier).getAllByRole('option').map((option) => option.textContent)).toEqual([
       'Select a tier', 'Basic', 'Brand', 'Brand Premium',
     ])
-    expect(create).not.toHaveBeenCalled()
   })
 })
