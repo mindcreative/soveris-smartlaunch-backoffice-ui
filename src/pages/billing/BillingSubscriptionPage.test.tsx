@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../../App'
 import { billingApi } from '../../api/billingApi'
 import { queryClient } from '../../queryClient'
+import { billingSubscriptionKeys } from '../../queries/billingQueries'
 import { useAuthStore } from '../../stores/authStore'
 import type { BillingSubscriptionState } from '../../types/billing'
 
@@ -165,6 +166,32 @@ describe('Billing subscription route and page state', () => {
     expect(stateRequest).toHaveBeenCalledWith(CLIENT_ID, { pageSize: 20 }, expect.any(AbortSignal))
     await waitFor(() => expect(queryClient.getQueryCache().findAll()).toHaveLength(0))
   })
+
+  it.each([401, 403, 404])(
+    'removes private subscription state when a mounted reconciliation refresh returns %s',
+    async (status) => {
+      const stateRequest = vi.spyOn(billingApi, 'getSubscriptionState')
+        .mockResolvedValueOnce(currentState())
+        .mockRejectedValue({ code: `HTTP_${status}`, message: 'Authority unavailable', status })
+      vi.spyOn(billingApi, 'getAccountSnapshot').mockResolvedValue(account())
+      window.history.replaceState({}, '', `/billing/clients/${CLIENT_ID}/subscriptions`)
+      render(<App />)
+
+      expect(await screen.findByRole('heading', { name: 'Financial plan controls' })).toBeInTheDocument()
+      await act(async () => {
+        await queryClient.refetchQueries(
+          { queryKey: billingSubscriptionKeys.state(CLIENT_ID), exact: true },
+          { throwOnError: true },
+        ).catch(() => undefined)
+      })
+
+      await waitFor(() => {
+        expect(queryClient.getQueryData(billingSubscriptionKeys.state(CLIENT_ID))).toBeUndefined()
+        expect(screen.queryByRole('heading', { name: 'Financial plan controls' })).not.toBeInTheDocument()
+      })
+      expect(stateRequest.mock.calls.length).toBeGreaterThanOrEqual(2)
+    },
+  )
 
   it('queries direct navigation but hides creation when the local role lacks the mapped permission', async () => {
     authenticate('Viewer')

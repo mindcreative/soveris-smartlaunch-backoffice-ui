@@ -16,6 +16,10 @@ import {
   BillingSubscriptionContractError,
 } from '../api/billingApi'
 import { legacyBillingApi } from '../api/legacySubscriptionApi'
+import {
+  postBillingPlanChange,
+  previewBillingPlanChange,
+} from '../api/billingPlanApi'
 import type { ApiError } from '../api/apiClient'
 import { productKeys } from './productQueries'
 import { localInstantDateTime } from '../timezone/LocalInstant'
@@ -26,6 +30,11 @@ import type {
   BillingSubscriptionCreationReceipt,
   BillingSubscriptionLifecycleReceipt,
   BillingSubscriptionLifecycleRequest,
+  BillingSubscriptionPlanChangeAction,
+  BillingSubscriptionPlanChangeCommandRequest,
+  BillingSubscriptionPlanChangePreview,
+  BillingSubscriptionPlanChangePreviewRequest,
+  BillingSubscriptionPlanChangeReceipt,
   BillingSubscriptionState,
   BillingSubscriptionTierAction,
   BillingSubscriptionTierChangeRequest,
@@ -59,6 +68,10 @@ export const billingSubscriptionKeys = {
   create: (clientId: string) => [...privateRoot, 'billing', 'subscriptions', clientId, 'create'] as const,
   lifecycle: (clientId: string, subscriptionId: string) =>
     [...privateRoot, 'billing', 'subscriptions', clientId, subscriptionId, 'lifecycle'] as const,
+  planChangePreview: (clientId: string, subscriptionId: string, action?: BillingSubscriptionPlanChangeAction) =>
+    [...privateRoot, 'billing', 'subscriptions', clientId, subscriptionId, 'plan-change-preview', action] as const,
+  planChange: (clientId: string, subscriptionId: string) =>
+    [...privateRoot, 'billing', 'subscriptions', clientId, subscriptionId, 'plan-change'] as const,
   tierChange: (clientId: string, subscriptionId: string, action: BillingSubscriptionTierAction) =>
     [...privateRoot, 'billing', 'subscriptions', clientId, subscriptionId, 'tier-change', action] as const,
 }
@@ -142,6 +155,28 @@ export async function invalidateTierChangeScopes(
   queryClient.removeQueries({
     predicate: (query) => startsWithKey(query.queryKey, resourceAccessKeys.client(clientId)) &&
       query.queryKey[query.queryKey.length - 1] === 'preview',
+  })
+}
+
+export async function invalidatePlanChangeScopes(
+  queryClient: QueryClient,
+  clientId: string,
+  includeLedger: boolean
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: billingSubscriptionKeys.client(clientId) }),
+    queryClient.invalidateQueries({ queryKey: billingAccountKeys.account(clientId) }),
+    ...(includeLedger
+      ? [queryClient.invalidateQueries({ queryKey: billingLedgerKeys.client(clientId) })]
+      : []),
+    queryClient.invalidateQueries({ queryKey: clientCapabilityKeys.client(clientId) }),
+    queryClient.invalidateQueries({ queryKey: resourceAccessKeys.consequences(clientId) }),
+    queryClient.invalidateQueries({ queryKey: productKeys.client(clientId) }),
+    queryClient.invalidateQueries({ queryKey: domainClientPrefix(clientId) }),
+  ])
+  queryClient.removeQueries({
+    predicate: (query) => startsWithKey(query.queryKey, billingSubscriptionKeys.client(clientId)) &&
+      query.queryKey.includes('plan-change-preview'),
   })
 }
 
@@ -622,6 +657,43 @@ export function useBillingSubscriptionTierChangeMutation(
       billingApi.postSubscriptionTierChange(
         clientId, subscriptionId, action, request, signal, serializedBody, onAuthReplay
       ),
+    retry: false,
+  })
+}
+
+export function useBillingPlanChangePreviewMutation(
+  clientId: string,
+  subscriptionId: string
+) {
+  return useMutation<
+    BillingSubscriptionPlanChangePreview,
+    Error | ApiError,
+    { request: BillingSubscriptionPlanChangePreviewRequest; signal?: AbortSignal }
+  >({
+    mutationKey: billingSubscriptionKeys.planChangePreview(clientId, subscriptionId),
+    mutationFn: ({ request, signal }) =>
+      previewBillingPlanChange(clientId, subscriptionId, request, signal),
+    retry: false,
+  })
+}
+
+export function useBillingPlanChangeMutation(
+  clientId: string,
+  subscriptionId: string
+) {
+  return useMutation<
+    BillingSubscriptionPlanChangeReceipt,
+    Error | ApiError,
+    {
+      request: BillingSubscriptionPlanChangeCommandRequest
+      serializedBody: string
+      signal?: AbortSignal
+      onAuthReplay?: () => void
+    }
+  >({
+    mutationKey: billingSubscriptionKeys.planChange(clientId, subscriptionId),
+    mutationFn: ({ request, serializedBody, signal, onAuthReplay }) =>
+      postBillingPlanChange(clientId, subscriptionId, request, signal, serializedBody, onAuthReplay),
     retry: false,
   })
 }

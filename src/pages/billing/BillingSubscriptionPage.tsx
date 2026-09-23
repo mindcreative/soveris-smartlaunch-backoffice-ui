@@ -10,6 +10,7 @@ import { SubscriptionLifecycleControlsView } from '../../components/billing/Subs
 import { CapabilityPolicyContext } from '../../components/billing/CapabilityPolicyContext'
 import { ResourceAccessConsequenceTimeline } from '../../components/billing/ResourceAccessConsequenceTimeline'
 import { SubscriptionTierControls } from '../../components/billing/SubscriptionTierControls'
+import { SubscriptionPlanChangeControls } from '../../components/billing/SubscriptionPlanChangeControls'
 import { Breadcrumbs, EmptyState, ErrorDisplay, Forbidden, LoadingSpinner } from '../../components/shared'
 import { useAuth } from '../../hooks/useAuth'
 import { useSubscriptionLifecycle } from '../../hooks/useSubscriptionLifecycle'
@@ -86,12 +87,8 @@ function CurrentSubscription({ subscription, state, hasNextPage, isLoadingMore, 
         <div><dt className="text-sm font-medium text-gray-600">Image generation</dt><dd className="text-gray-950">{subscription.entitlements.featureFlags.imageGeneration ? 'Enabled' : 'Disabled'}</dd></div>
       </dl>
       <p className="mt-4 text-sm text-gray-600">The server derives monthly billing boundaries from the original subscription instant.</p>
-      {(subscription.pendingImmediateDebit || subscription.immediateChangeContext || state.pendingChange ||
-        state.pendingImmediateDebit || state.immediateChangeContext) && (
-        <p role="status" className="state-indicator mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
-          Additional subscription change context is present and is read-only on this page.
-        </p>
-      )}
+      {state.immediateChangeContext && !('status' in state.immediateChangeContext) && <div role="status" className="state-indicator mt-4 rounded-md border border-gray-300 bg-gray-50 p-3 text-sm text-gray-900"><p className="font-semibold">Current immediate-change cycle evidence</p><p>Cycle {state.immediateChangeContext.cycleIndex}, {state.immediateChangeContext.cycleStart} to {state.immediateChangeContext.cycleEnd}; grant operation <span className="break-all font-mono">{state.immediateChangeContext.grantOperationId ?? 'None'}</span>.</p></div>}
+      {state.immediateChangeContext && 'status' in state.immediateChangeContext && <p role="alert" className="state-indicator mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">Immediate-change cycle evidence uses an unsupported schema and remains read-only.</p>}
       {state.pendingTierChange && <div role="status" className="state-indicator mt-4 rounded-md border border-violet-300 bg-violet-50 p-3 text-sm text-violet-950"><p className="font-semibold">Pending tier change</p><p>{state.pendingTierChange.subscriptionTier} at <SavedZoneTime value={state.pendingTierChange.effectiveCycleStart} />; expected revision {state.pendingTierChange.expectedTierRevision}; operation <span className="break-all font-mono">{state.pendingTierChange.operationId}</span>.</p></div>}
       <h3 className="mt-6 font-semibold text-gray-950">Authoritative grant history</h3>
       {state.grantHistory.items.length === 0 ? <p className="mt-2 text-sm text-gray-600">No grant evidence is present in the loaded history.</p> : <ul className="mt-3 space-y-3">{state.grantHistory.items.map((grant) => <li key={grant.grantId} className="min-w-0 rounded-md border border-gray-200 p-3 text-sm"><dl className="grid min-w-0 gap-2 sm:grid-cols-2"><div><dt className="font-medium text-gray-600">Grant ID</dt><dd className="break-all font-mono">{grant.grantId}</dd></div><div><dt className="font-medium text-gray-600">Grant operation ID</dt><dd className="break-all font-mono">{grant.grantOperationId}</dd></div><div><dt className="font-medium text-gray-600">Ledger entry ID</dt><dd className="break-all font-mono">{grant.ledgerEntryId}</dd></div><div><dt className="font-medium text-gray-600">Credit amount</dt><dd className="break-all font-mono">{grant.creditAmount}</dd></div><div><dt className="font-medium text-gray-600">Plan snapshot</dt><dd className="break-words">{grant.planNameSnapshot}</dd></div><div><dt className="font-medium text-gray-600">Tier snapshot</dt><dd>{grant.subscriptionTierSnapshot} at revision <span className="font-mono">{grant.tierRevisionSnapshot}</span></dd></div><div><dt className="font-medium text-gray-600">Created at</dt><dd className="break-all"><SavedZoneTime value={grant.createdAt} /></dd></div></dl></li>)}</ul>}
@@ -145,6 +142,7 @@ function CanonicalSubscriptionPage({ clientId, canCreate, onDurableError }: {
   })
   const [localReceipt, setLocalReceipt] = useState<LocalSubscriptionReceipt | null>(null)
   const [tierAuthorityPending, setTierAuthorityPending] = useState(false)
+  const [planAuthorityPending, setPlanAuthorityPending] = useState(false)
 
   useEffect(() => {
     const clearDraft = () => setLocalReceipt(null)
@@ -178,8 +176,20 @@ function CanonicalSubscriptionPage({ clientId, canCreate, onDurableError }: {
     return subscriptionResult.error || !subscriptionResult.data ? null : subscriptionResult.data
   }, [subscriptionQuery])
 
+  const planPreflight = useCallback(async () => {
+    const [subscriptionResult, accountResult] = await Promise.all([
+      subscriptionQuery.refetch(),
+      canViewAccount ? accountQuery.refetch() : Promise.resolve(null),
+    ])
+    const error = subscriptionResult.error ?? accountResult?.error
+    if (error && [401, 403, 404].includes(errorStatus(error) ?? 0)) throw error
+    if (subscriptionResult.error || !subscriptionResult.data || accountResult?.error) return null
+    return { subscription: subscriptionResult.data, account: accountResult?.data ?? null }
+  }, [accountQuery, canViewAccount, subscriptionQuery])
+
   useEffect(() => { headingRef.current?.focus() }, [clientId])
   useLayoutEffect(() => { setTierAuthorityPending(false) }, [clientId])
+  useLayoutEffect(() => { setPlanAuthorityPending(false) }, [clientId])
   useEffect(() => { setLocalReceipt(null) }, [clientId])
 
   useEffect(() => {
@@ -224,6 +234,7 @@ function CanonicalSubscriptionPage({ clientId, canCreate, onDurableError }: {
   const accountStatus = errorStatus(accountError)
   const subscription = subscriptionQuery.data
   const account = accountQuery.data
+  const authorityPending = tierAuthorityPending || planAuthorityPending
 
   if (subscriptionError && (subscriptionStatus === 401 || subscriptionStatus === 403 ||
       subscriptionStatus === 404 || subscriptionError instanceof BillingSubscriptionContractError)) {
@@ -242,7 +253,7 @@ function CanonicalSubscriptionPage({ clientId, canCreate, onDurableError }: {
   }
 
   if (subscription?.current) {
-    return <SubscriptionFrame clientId={clientId} headingRef={headingRef}><div className="space-y-4">{localReceipt && <LocalSubscriptionCreatedNotice receipt={localReceipt} />}{!tierAuthorityPending && <CapabilityPolicyContext clientId={clientId} capabilities={capabilityQuery.data} isLoading={capabilityQuery.isPending} isFetching={capabilityQuery.isFetching} error={capabilityQuery.error} onRetry={() => void capabilityQuery.refetch()} />}<SubscriptionTierControls clientId={clientId} state={subscription} preflight={tierPreflight} onPermissionDenied={(error) => onDurableError({ source: 'subscription', error })} onAuthorityPending={setTierAuthorityPending} />{tierAuthorityPending && <p role="status" className="state-indicator rounded-md border border-violet-200 bg-violet-50 p-3 text-sm text-violet-950">Current subscription and consequence details are hidden until authoritative reconciliation completes.</p>}{!tierAuthorityPending && <SubscriptionLifecycleControlsView clientId={clientId} state={subscription} preflight={lifecyclePreflight} lifecycle={lifecycle} />}{subscriptionError && <p role="alert" className="state-indicator rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">Refresh failed. This is the last validated subscription state for this Client and may be stale.</p>}{!tierAuthorityPending && <CurrentSubscription subscription={subscription.current} state={subscription} hasNextPage={subscriptionQuery.hasNextPage} isLoadingMore={subscriptionQuery.isLoadingMore} continuationError={subscriptionQuery.continuationError} onLoadMore={subscriptionQuery.loadMore} />}{!tierAuthorityPending && <ResourceAccessConsequenceTimeline consequences={consequenceQuery.data} isLoading={consequenceQuery.isPending} error={consequenceQuery.error} onRetry={() => void consequenceQuery.refetch()} />}</div></SubscriptionFrame>
+    return <SubscriptionFrame clientId={clientId} headingRef={headingRef}><div className="space-y-4">{localReceipt && <LocalSubscriptionCreatedNotice receipt={localReceipt} />}{!authorityPending && <CapabilityPolicyContext clientId={clientId} capabilities={capabilityQuery.data} isLoading={capabilityQuery.isPending} isFetching={capabilityQuery.isFetching} error={capabilityQuery.error} onRetry={() => void capabilityQuery.refetch()} />}<SubscriptionPlanChangeControls clientId={clientId} state={subscription} account={account ?? null} preflight={planPreflight} onPermissionDenied={(error) => onDurableError({ source: 'subscription', error })} onAuthorityPending={setPlanAuthorityPending} /><SubscriptionTierControls clientId={clientId} state={subscription} preflight={tierPreflight} onPermissionDenied={(error) => onDurableError({ source: 'subscription', error })} onAuthorityPending={setTierAuthorityPending} />{authorityPending && <p role="status" className="state-indicator rounded-md border border-violet-200 bg-violet-50 p-3 text-sm text-violet-950">Current subscription, account, and consequence details are hidden until authoritative reconciliation completes.</p>}{!authorityPending && <SubscriptionLifecycleControlsView clientId={clientId} state={subscription} preflight={lifecyclePreflight} lifecycle={lifecycle} />}{subscriptionError && <p role="alert" className="state-indicator rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">Refresh failed. This is the last validated subscription state for this Client and may be stale.</p>}{!authorityPending && <CurrentSubscription subscription={subscription.current} state={subscription} hasNextPage={subscriptionQuery.hasNextPage} isLoadingMore={subscriptionQuery.isLoadingMore} continuationError={subscriptionQuery.continuationError} onLoadMore={subscriptionQuery.loadMore} />}{!authorityPending && <ResourceAccessConsequenceTimeline consequences={consequenceQuery.data} isLoading={consequenceQuery.isPending} error={consequenceQuery.error} onRetry={() => void consequenceQuery.refetch()} />}</div></SubscriptionFrame>
   }
   if (lifecycle.receipt && subscription) {
     return <SubscriptionFrame clientId={clientId} headingRef={headingRef}><div className="space-y-4"><CapabilityPolicyContext clientId={clientId} capabilities={capabilityQuery.data} isLoading={capabilityQuery.isPending} isFetching={capabilityQuery.isFetching} error={capabilityQuery.error} onRetry={() => void capabilityQuery.refetch()} /><SubscriptionLifecycleControlsView clientId={clientId} state={subscription} preflight={lifecyclePreflight} lifecycle={lifecycle} /><TerminalHistory state={subscription} hasNextPage={subscriptionQuery.hasNextPage} isLoadingMore={subscriptionQuery.isLoadingMore} continuationError={subscriptionQuery.continuationError} onLoadMore={subscriptionQuery.loadMore} /></div></SubscriptionFrame>

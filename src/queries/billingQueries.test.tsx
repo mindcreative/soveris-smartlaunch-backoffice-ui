@@ -27,6 +27,7 @@ import {
   domainClientPrefix,
   domainPrivateRoot,
   invalidateTierChangeScopes,
+  invalidatePlanChangeScopes,
   resourceAccessKeys,
   useBillingAccount,
   useBillingLedger,
@@ -158,6 +159,28 @@ describe('private Billing queries', () => {
 
     invalidated.forEach((key) => expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true))
     expect(queryClient.getQueryData(preview)).toBeUndefined()
+  })
+
+  it('invalidates every financial authority and includes ledger only for an immediate effect', async () => {
+    const queryClient = new QueryClient()
+    const always = [
+      billingSubscriptionKeys.state(CLIENT_A), billingAccountKeys.account(CLIENT_A),
+      clientCapabilityKeys.client(CLIENT_A), resourceAccessKeys.consequences(CLIENT_A),
+      productKeys.client(CLIENT_A), [...domainClientPrefix(CLIENT_A), 'detail'],
+    ] as const
+    always.forEach((key) => queryClient.setQueryData(key, { evidence: true }))
+    const ledger = billingLedgerKeys.client(CLIENT_A)
+    queryClient.setQueryData(ledger, { evidence: true })
+    const preview = billingSubscriptionKeys.planChangePreview(CLIENT_A, 'subscription', 'schedule')
+    queryClient.setQueryData(preview, { token: 'opaque' })
+
+    await invalidatePlanChangeScopes(queryClient, CLIENT_A, false)
+
+    always.forEach((key) => expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true))
+    expect(queryClient.getQueryState(ledger)?.isInvalidated).toBe(false)
+    expect(queryClient.getQueryData(preview)).toBeUndefined()
+    await invalidatePlanChangeScopes(queryClient, CLIENT_A, true)
+    expect(queryClient.getQueryState(ledger)?.isInvalidated).toBe(true)
   })
 
   it('cancels and fences late capability and consequence reads on Client change', async () => {

@@ -176,6 +176,18 @@ function scheduledTierReceiptBody(clientId: string, body: string): string {
   })
 }
 
+function financialPreviewBody(targetAmount: string, action = 'schedule'): string {
+  const token = `v1.${'b'.repeat(64)}`
+  const terms = (policy: string, amount: string) => `{"planName":"Lifecycle Pro","cycleCreditAmount":${amount},"entitlements":{"schemaVersion":1,"rateLimits":{"requestsPerMinute":60,"concurrentAiOperations":4},"featureFlags":{"contentGeneration":true,"imageGeneration":true}},"changeEffectivePolicy":"${policy}","prorationPolicy":"replace","unusedCreditPolicy":"rollover"}`
+  return `{"schemaVersion":1,"action":"${action}","previewToken":"${token}","previewedAt":"2026-09-20T12:00:00.000000","currentTerms":${terms('immediate', '100')},"targetTerms":${terms('next_billing_cycle', targetAmount)},"pendingChangeBefore":null,"pendingResult":"created","effectiveCycle":{"cycleIndex":2,"cycleStart":"2026-10-01T00:00:00.000000","cycleEnd":"2026-11-01T00:00:00.000000"},"creditEffect":{"timing":"next_billing_cycle","currentCycleCreditAmount":100,"targetCycleCreditAmount":${targetAmount},"calculation":null,"account":null},"pendingImmediateDebitAfter":null}`
+}
+
+function scheduledFinancialReceiptBody(clientId: string, body: string): string {
+  const request = JSON.parse(body) as { planChangeOperationId: string }
+  const amount = /"cycleCreditAmount":([^,}]+)/.exec(body)?.[1] ?? '1250.0000'
+  return `{"schemaVersion":2,"planChangeOperationId":"${request.planChangeOperationId}","clientId":"${clientId}","subscriptionId":"${TIER_SUBSCRIPTION}","action":"schedule","previousPendingChangeOperationId":null,"pendingChangeOperationId":"${request.planChangeOperationId}","planName":"Lifecycle Pro","cycleCreditAmount":${amount},"entitlements":{"schemaVersion":1,"rateLimits":{"requestsPerMinute":60,"concurrentAiOperations":4},"featureFlags":{"contentGeneration":true,"imageGeneration":true}},"changeEffectivePolicy":"next_billing_cycle","prorationPolicy":"replace","unusedCreditPolicy":"rollover","effectiveCycleIndex":2,"effectiveCycleStart":"2026-10-01T00:00:00.000000","effectiveCycleEnd":"2026-11-01T00:00:00.000000","subscriptionTier":"brand","tierRevision":7,"operationAsOf":"2026-09-20T12:00:01.000000"}`
+}
+
 async function installTierReads(
   page: Page,
   options: {
@@ -683,6 +695,62 @@ test('previews and schedules a tier downgrade while capability evidence is unava
   expect(request.operationId).toMatch(/^\w{8}-\w{4}-7\w{3}-[89ab]\w{3}-\w{12}$/i)
   expect(commands[0]).toBe(`{"operationId":"${request.operationId}","expectedTierRevision":7,"subscriptionTier":"basic","effectivePolicy":"next_billing_cycle","reason":"Administrative tier change","commandAuthorityHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`)
   await expectNoAxeViolations(page)
+})
+
+test('previews and schedules financial terms with exact local bytes at 320px', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 })
+  await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
+  let pendingOperationId: string | undefined
+  const previews: string[] = []
+  const commands: string[] = []
+  await installTierReads(page)
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions/**/changes/preview', async (route) => {
+    const requestBody = route.request().postData() ?? ''
+    previews.push(requestBody)
+    const amount = /"cycleCreditAmount":([^,}]+)/.exec(requestBody)?.[1] ?? '1250.0000'
+    await fulfillLocal(route, { status: 200, contentType: 'application/json',
+      body: financialPreviewBody(amount) })
+  })
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions/**/changes', async (route) => {
+    const body = route.request().postData() ?? ''
+    commands.push(body)
+    pendingOperationId = (JSON.parse(body) as { planChangeOperationId: string }).planChangeOperationId
+    await fulfillLocal(route, { status: 200, contentType: 'application/json',
+      body: scheduledFinancialReceiptBody(CLIENT_A, body) })
+  })
+  await page.route('**/api/backoffice/clients/*/billing/subscriptions**', async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback()
+    let body = tierStateBody(CLIENT_A)
+    if (pendingOperationId) body = body.replace('"pendingChange":null',
+      `"pendingChange":{"schemaVersion":1,"planChangeOperationId":"${pendingOperationId}","planName":"Lifecycle Pro","cycleCreditAmount":1250.0000,"entitlements":{"schemaVersion":1,"rateLimits":{"requestsPerMinute":60,"concurrentAiOperations":4},"featureFlags":{"contentGeneration":true,"imageGeneration":true}},"changeEffectivePolicy":"next_billing_cycle","prorationPolicy":"replace","unusedCreditPolicy":"rollover","effectiveCycleIndex":2,"effectiveCycleStart":"2026-10-01T00:00:00.000000+00:00","effectiveCycleEnd":"2026-11-01T00:00:00.000000+00:00","scheduledAt":"2026-09-20T12:00:01.000000+00:00"}`)
+    await fulfillLocal(route, { status: 200, contentType: 'application/json',
+      body })
+  })
+
+  await page.goto(pathFor(CLIENT_A))
+  const trigger = page.getByRole('button', { name: 'Preview selected financial action' })
+  await expect(trigger).toBeDisabled()
+  await page.getByRole('radio', { name: 'Schedule terms for next billing cycle' }).check()
+  await page.getByRole('textbox', { name: 'Cycle credit amount (exact credits, not currency)' })
+    .fill('1250.0000')
+  await trigger.click()
+  const dialog = page.getByRole('dialog', { name: 'Confirm financial plan change' })
+  await expect(dialog).toContainText('2026-10-01T00:00:00.000000 to 2026-11-01T00:00:00.000000')
+  await expect(dialog).toContainText('No tier, classification, payment, invoice, revenue, or validity change')
+  await expectNoAxeViolations(page)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await dialog.getByRole('button', { name: 'Confirm financial change' }).click()
+  await expect(page.getByRole('heading', { name: 'Immutable financial command receipt' })).toBeVisible()
+  await expect(page.getByText('Authoritative state reconciled.')).toBeVisible()
+  expect(previews).toHaveLength(2)
+  expect(commands).toHaveLength(1)
+  expect(previews[0]).not.toContain('subscriptionTier')
+  expect(previews[0]).not.toContain('planChangeOperationId')
+  expect(commands[0]).toContain('"cycleCreditAmount":1250.0000')
+  expect(commands[0]).toContain('"previewToken":"v1.')
+  expect(commands[0]).not.toContain('subscriptionTier')
+  expect((JSON.parse(commands[0]!) as { planChangeOperationId: string }).planChangeOperationId)
+    .toMatch(/^\w{8}-\w{4}-7\w{3}-[89ab]\w{3}-\w{12}$/i)
 })
 
 test('pending replacement uses the displayed new target and cancellation names the pending change', async ({ page }) => {

@@ -325,6 +325,145 @@ export interface BillingSubscriptionLifecycleReceipt {
   operationAsOf: string
 }
 
+export type BillingSubscriptionPlanChangeAction =
+  | 'schedule'
+  | 'replace'
+  | 'cancel'
+  | 'apply_immediate'
+
+export interface BillingSubscriptionPlanTerms {
+  planName: string
+  cycleCreditAmount: string
+  entitlements: BillingEntitlementsV1
+  changeEffectivePolicy: BillingSubscriptionChangePolicy
+  prorationPolicy: BillingSubscriptionProrationPolicy
+  unusedCreditPolicy: 'rollover'
+}
+
+export type BillingSubscriptionPlanChangePreviewRequest =
+  | { action: 'cancel' }
+  | {
+      action: Exclude<BillingSubscriptionPlanChangeAction, 'cancel'>
+      planName: string
+      cycleCreditAmount: string
+      entitlements: BillingEntitlementsV1
+      prorationPolicy: BillingSubscriptionProrationPolicy
+      unusedCreditPolicy: 'rollover'
+    }
+
+export interface BillingSubscriptionPlanChangeCalculation {
+  policyVersion: string
+  fundingBasis: string
+  cycleIndex: number
+  cycleStart: string
+  cycleEnd: string
+  currentCycleGrantOperationId: string | null
+  totalCycleMicroseconds: string
+  remainingCycleMicroseconds: string
+  delta: string
+  appliedDelta: string
+  outstandingDelta: string
+}
+
+export interface BillingSubscriptionPlanChangeAccountProjection {
+  creditAccountId: string
+  walletVersionBefore: string
+  walletVersionAfter: string
+  balanceBefore: string
+  reservedBalanceBefore: string
+  availableBalanceBefore: string
+  balanceAfter: string
+  reservedBalanceAfter: string
+  availableBalanceAfter: string
+}
+
+export interface BillingSubscriptionPlanChangePreview {
+  schemaVersion: 1
+  action: BillingSubscriptionPlanChangeAction
+  previewToken: string
+  previewedAt: string
+  currentTerms: BillingSubscriptionPlanTerms
+  targetTerms: BillingSubscriptionPlanTerms | null
+  pendingChangeBefore: BillingSubscriptionPendingChange | BillingSubscriptionUnsupportedView | null
+  pendingResult: 'created' | 'replaced' | 'cancelled' | 'preserved' | 'none'
+  effectiveCycle: { cycleIndex: number; cycleStart: string; cycleEnd: string } | null
+  creditEffect: {
+    timing: 'immediate' | 'next_billing_cycle'
+    currentCycleCreditAmount: string
+    targetCycleCreditAmount: string
+    calculation: BillingSubscriptionPlanChangeCalculation | null
+    account: BillingSubscriptionPlanChangeAccountProjection | null
+  }
+  pendingImmediateDebitAfter: {
+    originalDebit: string
+    appliedDebit: string
+    outstandingDebit: string
+  } | null
+}
+
+export type BillingSubscriptionPlanChangeCommandRequest =
+  BillingSubscriptionPlanChangePreviewRequest & {
+    planChangeOperationId: string
+    previewToken: string
+    reason: string
+  }
+
+export interface BillingSubscriptionPlanChangeAttempt {
+  clientId: string
+  subscriptionId: string
+  route: string
+  request: BillingSubscriptionPlanChangeCommandRequest
+  serializedBody: string
+  operationId: string
+}
+
+export interface BillingSubscriptionScheduledPlanChangeReceipt {
+  schemaVersion: 2
+  planChangeOperationId: string
+  clientId: string
+  subscriptionId: string
+  action: 'schedule' | 'cancel'
+  previousPendingChangeOperationId: string | null
+  pendingChangeOperationId: string | null
+  planName: string | null
+  cycleCreditAmount: string | null
+  entitlements: BillingEntitlementsV1 | null
+  changeEffectivePolicy: 'next_billing_cycle' | null
+  prorationPolicy: BillingSubscriptionProrationPolicy | null
+  unusedCreditPolicy: 'rollover' | null
+  effectiveCycleIndex: number | null
+  effectiveCycleStart: string | null
+  effectiveCycleEnd: string | null
+  subscriptionTier: BillingSubscriptionTier
+  tierRevision: string
+  operationAsOf: string
+}
+
+export interface BillingSubscriptionImmediatePlanChangeReceipt {
+  schemaVersion: 2
+  planChangeOperationId: string
+  clientId: string
+  subscriptionId: string
+  action: 'apply_immediate'
+  subscriptionTier: BillingSubscriptionTier
+  tierRevision: string
+  previousPlanTermsOperationId: string
+  planTermsOperationId: string
+  preservedPendingChangeOperationId: string | null
+  oldTerms: BillingSubscriptionPlanTerms
+  newTerms: BillingSubscriptionPlanTerms
+  calculation: BillingSubscriptionPlanChangeCalculation
+  account: BillingSubscriptionPlanChangeAccountProjection
+  initialEffectOperationId: string | null
+  initialLedgerEntryId: string | null
+  immediateRemainderOperationId: string | null
+  operationAsOf: string
+}
+
+export type BillingSubscriptionPlanChangeReceipt =
+  | BillingSubscriptionScheduledPlanChangeReceipt
+  | BillingSubscriptionImmediatePlanChangeReceipt
+
 export type BillingSubscriptionTierAction =
   | 'apply_immediate'
   | 'schedule'
