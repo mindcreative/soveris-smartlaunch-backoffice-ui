@@ -2,13 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { hasRolePermission, ROLE_PERMISSIONS } from './permissions'
 
 describe('role permissions', () => {
-  it('maps Billing view and subscription permissions only to the actual Admin role', () => {
+  it('maps Billing view, subscription, and exact adjustment permissions only to Admin', () => {
     expect(hasRolePermission('Admin', 'billing:view')).toBe(true)
     expect(hasRolePermission('Admin', 'billing:subscription')).toBe(true)
+    expect(hasRolePermission('Admin', 'billing:adjust')).toBe(true)
     expect(hasRolePermission('Editor', 'billing:view')).toBe(false)
     expect(hasRolePermission('Editor', 'billing:subscription')).toBe(false)
+    expect(hasRolePermission('Editor', 'billing:adjust')).toBe(false)
     expect(hasRolePermission('Viewer', 'billing:view')).toBe(false)
     expect(hasRolePermission('Viewer', 'billing:subscription')).toBe(false)
+    expect(hasRolePermission('Viewer', 'billing:adjust')).toBe(false)
+    expect(hasRolePermission('Admin', 'billing:*')).toBe(false)
   })
 
   it('preserves permissions that existed in either former matrix', () => {

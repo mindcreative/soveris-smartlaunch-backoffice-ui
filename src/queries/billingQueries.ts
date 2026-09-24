@@ -20,6 +20,11 @@ import {
   postBillingPlanChange,
   previewBillingPlanChange,
 } from '../api/billingPlanApi'
+import {
+  getCreditAdjustmentOperation,
+  postCreditAdjustment,
+  previewCreditAdjustment,
+} from '../api/billingAdjustmentApi'
 import type { ApiError } from '../api/apiClient'
 import { productKeys } from './productQueries'
 import { localInstantDateTime } from '../timezone/LocalInstant'
@@ -41,6 +46,12 @@ import type {
   BillingSubscriptionTierChangeResponse,
   ClientCapabilities,
   CreateBillingSubscriptionRequest,
+  CreditAdjustmentAttempt,
+  CreditAdjustmentCommandRequest,
+  CreditAdjustmentHistoryPage,
+  CreditAdjustmentMaterial,
+  CreditAdjustmentPreview,
+  CreditAdjustmentReceipt,
   ResourceAccessConsequence,
   ResourceAccessPreview,
   ResourceAccessPreviewRequest,
@@ -59,6 +70,19 @@ export const billingLedgerKeys = {
   client: (clientId: string) => [...privateRoot, 'billing', 'ledger', clientId] as const,
   traversal: (clientId: string, filters: BillingLedgerFilters, traversalId: number) =>
     [...privateRoot, 'billing', 'ledger', clientId, filters, traversalId] as const,
+}
+
+export const billingAdjustmentKeys = {
+  all: [...privateRoot, 'billing', 'adjustments'] as const,
+  client: (clientId: string) => [...privateRoot, 'billing', 'adjustments', clientId] as const,
+  preview: (clientId: string) =>
+    [...privateRoot, 'billing', 'adjustments', clientId, 'preview'] as const,
+  command: (clientId: string) =>
+    [...privateRoot, 'billing', 'adjustments', clientId, 'command'] as const,
+  history: (clientId: string) =>
+    [...privateRoot, 'billing', 'adjustments', clientId, 'history'] as const,
+  operation: (clientId: string, operationId: string) =>
+    [...privateRoot, 'billing', 'adjustments', clientId, 'history', operationId] as const,
 }
 
 export const billingSubscriptionKeys = {
@@ -124,6 +148,7 @@ export async function clearPrivateClientScope(
   const roots = clientId
     ? [
         billingSubscriptionKeys.client(clientId), billingAccountKeys.account(clientId),
+        billingAdjustmentKeys.client(clientId),
         clientCapabilityKeys.client(clientId), resourceAccessKeys.client(clientId),
         productKeys.client(clientId), domainClientPrefix(clientId),
       ]
@@ -178,6 +203,67 @@ export async function invalidatePlanChangeScopes(
     predicate: (query) => startsWithKey(query.queryKey, billingSubscriptionKeys.client(clientId)) &&
       query.queryKey.includes('plan-change-preview'),
   })
+}
+
+export async function invalidateCreditAdjustmentScopes(
+  queryClient: QueryClient,
+  clientId: string
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: billingAccountKeys.account(clientId) }),
+    queryClient.invalidateQueries({ queryKey: billingLedgerKeys.client(clientId), refetchType: 'none' }),
+    queryClient.invalidateQueries({ queryKey: billingAdjustmentKeys.history(clientId), refetchType: 'none' }),
+  ])
+}
+
+export function clearCreditAdjustmentMutationState(
+  queryClient: QueryClient,
+  clientId: string
+): void {
+  for (const mutation of queryClient.getMutationCache().getAll()) {
+    if (startsWithKey(mutation.options.mutationKey, billingAdjustmentKeys.client(clientId))) {
+      queryClient.getMutationCache().remove(mutation)
+    }
+  }
+}
+
+export interface CreditAdjustmentAuthorityRefresh {
+  account: BillingAccountSnapshot | null
+  accountError: unknown | null
+  history: CreditAdjustmentHistoryPage | null
+  historyError: unknown | null
+}
+
+export async function refreshCreditAdjustmentAuthority(
+  queryClient: QueryClient,
+  attempt: CreditAdjustmentAttempt,
+  signal?: AbortSignal,
+  onAuthReplay?: () => void
+): Promise<CreditAdjustmentAuthorityRefresh> {
+  await invalidateCreditAdjustmentScopes(queryClient, attempt.clientId)
+  const [account, history] = await Promise.allSettled([
+    queryClient.fetchQuery({
+      queryKey: billingAccountKeys.account(attempt.clientId),
+      queryFn: ({ signal: querySignal }) =>
+        billingApi.getAccountSnapshot(attempt.clientId, signal ?? querySignal, onAuthReplay),
+      staleTime: 0,
+    }),
+    queryClient.fetchQuery({
+      queryKey: billingAdjustmentKeys.operation(attempt.clientId, attempt.operationId),
+      queryFn: ({ signal: querySignal }) => getCreditAdjustmentOperation(
+        attempt.clientId, attempt.operationId, attempt.actorUserId, attempt.request,
+        attempt.creditAccountId, signal ?? querySignal, onAuthReplay
+      ),
+      staleTime: 0,
+    }),
+  ])
+  clearCreditAdjustmentMutationState(queryClient, attempt.clientId)
+  return {
+    account: account.status === 'fulfilled' ? account.value : null,
+    accountError: account.status === 'rejected' ? account.reason : null,
+    history: history.status === 'fulfilled' ? history.value : null,
+    historyError: history.status === 'rejected' ? history.reason : null,
+  }
 }
 
 export async function cancelAndRemoveBillingExport(
@@ -694,6 +780,37 @@ export function useBillingPlanChangeMutation(
     mutationKey: billingSubscriptionKeys.planChange(clientId, subscriptionId),
     mutationFn: ({ request, serializedBody, signal, onAuthReplay }) =>
       postBillingPlanChange(clientId, subscriptionId, request, signal, serializedBody, onAuthReplay),
+    retry: false,
+  })
+}
+
+export function useCreditAdjustmentPreviewMutation(clientId: string, creditAccountId: string) {
+  return useMutation<
+    CreditAdjustmentPreview,
+    Error | ApiError,
+    { request: CreditAdjustmentMaterial; signal?: AbortSignal; onAuthReplay?: () => void }
+  >({
+    mutationKey: billingAdjustmentKeys.preview(clientId),
+    mutationFn: ({ request, signal, onAuthReplay }) =>
+      previewCreditAdjustment(clientId, creditAccountId, request, signal, onAuthReplay),
+    retry: false,
+  })
+}
+
+export function useCreditAdjustmentCommandMutation(clientId: string, creditAccountId: string) {
+  return useMutation<
+    CreditAdjustmentReceipt,
+    Error | ApiError,
+    {
+      request: CreditAdjustmentCommandRequest
+      serializedBody: string
+      signal?: AbortSignal
+      onAuthReplay?: () => void
+    }
+  >({
+    mutationKey: billingAdjustmentKeys.command(clientId),
+    mutationFn: ({ request, serializedBody, signal, onAuthReplay }) =>
+      postCreditAdjustment(clientId, creditAccountId, request, signal, serializedBody, onAuthReplay),
     retry: false,
   })
 }

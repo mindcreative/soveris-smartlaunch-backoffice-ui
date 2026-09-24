@@ -234,7 +234,8 @@ export function parseBillingAccountSnapshot(
 
 export async function getBillingAccountSnapshot(
   clientId: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onAuthReplay?: () => void
 ): Promise<BillingAccountSnapshot> {
   const canonicalClientId = canonicalizeGuid(clientId)
   if (!canonicalClientId) {
@@ -244,7 +245,7 @@ export async function getBillingAccountSnapshot(
 
   const response = await apiClient.getApiRoot<string>(
     `/api/backoffice/clients/${canonicalClientId}/billing/account`,
-    { responseType: 'text', signal }
+    { responseType: 'text', signal, ...(onAuthReplay ? { onAuthReplay } : {}) }
   )
   if (typeof response.data !== 'string') {
     throw contractError('response must be JSON text')

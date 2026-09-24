@@ -9,25 +9,31 @@ import {
   BillingSubscriptionContractError,
   ClientCapabilitiesContractError,
 } from '../api/billingApi'
+import * as billingAdjustmentApi from '../api/billingAdjustmentApi'
 import type {
   BillingAccountSnapshot,
   BillingLedgerPage,
   BillingSubscriptionState,
   ClientCapabilities,
+  CreditAdjustmentAttempt,
 } from '../types/billing'
 import { productKeys } from './productQueries'
 import {
   billingAccountKeys,
+  billingAdjustmentKeys,
   billingExportKeys,
   billingLedgerKeys,
   billingSubscriptionKeys,
   clearPrivateClientScope,
+  clearCreditAdjustmentMutationState,
   clearPrivateBillingQueries,
   clientCapabilityKeys,
   domainClientPrefix,
   domainPrivateRoot,
   invalidateTierChangeScopes,
   invalidatePlanChangeScopes,
+  invalidateCreditAdjustmentScopes,
+  refreshCreditAdjustmentAuthority,
   resourceAccessKeys,
   useBillingAccount,
   useBillingLedger,
@@ -108,6 +114,12 @@ describe('private Billing queries', () => {
     expect(domainClientPrefix(CLIENT_A)).toEqual([
       'backoffice', 'private', 'domains', CLIENT_A,
     ])
+    expect(billingAdjustmentKeys.operation(CLIENT_A, 'operation-id')).toEqual([
+      'backoffice', 'private', 'billing', 'adjustments', CLIENT_A, 'history', 'operation-id',
+    ])
+    expect(billingAdjustmentKeys.preview(CLIENT_A)).toEqual([
+      'backoffice', 'private', 'billing', 'adjustments', CLIENT_A, 'preview',
+    ])
   })
 
   it('purges every former-Client private owner and leaves another Client intact', async () => {
@@ -116,11 +128,16 @@ describe('private Billing queries', () => {
       billingSubscriptionKeys.state(CLIENT_A), billingAccountKeys.account(CLIENT_A),
       clientCapabilityKeys.client(CLIENT_A), resourceAccessKeys.consequences(CLIENT_A),
       productKeys.client(CLIENT_A), [...domainClientPrefix(CLIENT_A), 'future-detail'],
+      billingAdjustmentKeys.operation(CLIENT_A, 'operation-id'),
     ] as const
     roots.forEach((key) => queryClient.setQueryData(key, { private: true }))
     queryClient.setQueryData(clientCapabilityKeys.client(CLIENT_B), { clientId: CLIENT_B })
     queryClient.getMutationCache().build(queryClient, {
       mutationKey: billingSubscriptionKeys.tierChange(CLIENT_A, 'subscription', 'schedule'),
+      mutationFn: async () => undefined,
+    })
+    queryClient.getMutationCache().build(queryClient, {
+      mutationKey: billingAdjustmentKeys.command(CLIENT_A),
       mutationFn: async () => undefined,
     })
 
@@ -181,6 +198,63 @@ describe('private Billing queries', () => {
     expect(queryClient.getQueryData(preview)).toBeUndefined()
     await invalidatePlanChangeScopes(queryClient, CLIENT_A, true)
     expect(queryClient.getQueryState(ledger)?.isInvalidated).toBe(true)
+  })
+
+  it('invalidates only the adjustment account, ledger, and history authority', async () => {
+    const queryClient = new QueryClient()
+    const account = billingAccountKeys.account(CLIENT_A)
+    const ledger = billingLedgerKeys.client(CLIENT_A)
+    const history = billingAdjustmentKeys.history(CLIENT_A)
+    const otherClient = billingAdjustmentKeys.history(CLIENT_B)
+    ;[account, ledger, history, otherClient].forEach((key) => queryClient.setQueryData(key, {}))
+    queryClient.getMutationCache().build(queryClient, {
+      mutationKey: billingAdjustmentKeys.preview(CLIENT_A),
+      mutationFn: async () => ({ reason: 'private preview' }),
+    })
+    queryClient.getMutationCache().build(queryClient, {
+      mutationKey: billingAdjustmentKeys.command(CLIENT_A),
+      mutationFn: async () => ({ serializedBody: 'private command' }),
+    })
+    queryClient.getMutationCache().build(queryClient, {
+      mutationKey: billingAdjustmentKeys.command(CLIENT_B),
+      mutationFn: async () => ({ preserve: true }),
+    })
+
+    await invalidateCreditAdjustmentScopes(queryClient, CLIENT_A)
+    clearCreditAdjustmentMutationState(queryClient, CLIENT_A)
+
+    expect(queryClient.getQueryState(account)?.isInvalidated).toBe(true)
+    expect(queryClient.getQueryState(ledger)?.isInvalidated).toBe(true)
+    expect(queryClient.getQueryState(history)?.isInvalidated).toBe(true)
+    expect(queryClient.getQueryState(otherClient)?.isInvalidated).toBe(false)
+    expect(queryClient.getMutationCache().getAll().map((mutation) => mutation.options.mutationKey))
+      .toEqual([billingAdjustmentKeys.command(CLIENT_B)])
+  })
+
+  it('reports account refresh failure separately from valid operation reconciliation', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const attempt: CreditAdjustmentAttempt = {
+      actorUserId: '22222222-3333-4444-8555-666666666666', clientId: CLIENT_A,
+      creditAccountId: '11111111-2222-4333-8444-555555555555',
+      route: `/api/billing/clients/${CLIENT_A}/credit-adjustments`,
+      operationId: '0199b9d2-a9b1-7000-8000-000000000001',
+      request: { operationId: '0199b9d2-a9b1-7000-8000-000000000001',
+        expectedWalletVersion: '12', amount: '-1.0000', reason: 'Correction' },
+      serializedBody: '{}', semanticFingerprint: 'private', dispatchedAt: '2026-09-24T12:00:00Z',
+    }
+    vi.spyOn(billingApi, 'getAccountSnapshot').mockRejectedValue(
+      { code: 'HTTP_503', status: 503, message: 'Unavailable' }
+    )
+    vi.spyOn(billingAdjustmentApi, 'getCreditAdjustmentOperation').mockResolvedValue({
+      items: [], asOf: '2026-09-24T12:00:00Z', nextCursor: null,
+    })
+
+    const refreshed = await refreshCreditAdjustmentAuthority(queryClient, attempt)
+
+    expect(refreshed.account).toBeNull()
+    expect(refreshed.accountError).toMatchObject({ status: 503 })
+    expect(refreshed.history).toMatchObject({ items: [] })
+    expect(refreshed.historyError).toBeNull()
   })
 
   it('cancels and fences late capability and consequence reads on Client change', async () => {

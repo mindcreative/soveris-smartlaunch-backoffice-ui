@@ -72,6 +72,20 @@ describe('Billing interactions and private transitions', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('clears an open adjustment form immediately when mapped permission is lost', async () => {
+    vi.spyOn(billingApi, 'getAccountSnapshot').mockResolvedValue(snapshot(CLIENT_A, '10.0000'))
+    window.history.replaceState({}, '', `/billing/clients/${CLIENT_A}/account`)
+    const user = userEvent.setup()
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Adjust credits' }))
+    await user.type(screen.getByLabelText('Reason'), 'Private correction')
+
+    useAuthStore.setState((state) => ({ user: state.user ? { ...state.user, role: 'Viewer' } : null }))
+
+    await waitFor(() => expect(screen.queryByLabelText('Reason')).not.toBeInTheDocument())
+    expect(screen.queryByText('Private correction')).not.toBeInTheDocument()
+  })
+
   it('opens an accessible mobile navigation and restores trigger focus on Escape', async () => {
     vi.spyOn(billingApi, 'getAccountSnapshot').mockResolvedValue(snapshot(CLIENT_A, '10.0000'))
     window.history.replaceState({}, '', `/billing/clients/${CLIENT_A}/account`)

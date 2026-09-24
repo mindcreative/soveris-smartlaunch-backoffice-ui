@@ -4,6 +4,7 @@ import type { ApiError } from '../../api/apiClient'
 import { BillingContractError } from '../../api/billingApi'
 import { AccountSnapshotView } from '../../components/billing/AccountSnapshotView'
 import { BillingWorkspaceNav } from '../../components/billing/BillingWorkspaceNav'
+import { CreditAdjustmentWorkflow } from '../../components/billing/CreditAdjustmentWorkflow'
 import { Breadcrumbs, EmptyState, ErrorDisplay, Forbidden, LoadingSpinner } from '../../components/shared'
 import { useAuth } from '../../hooks/useAuth'
 import { canonicalizeGuid } from '../../lib/guid'
@@ -60,6 +61,7 @@ function CanonicalBillingAccountPage({
   onDurableError: (error: Error | ApiError) => void
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null)
+  const { hasPermission, user } = useAuth()
   const query = useBillingAccount(clientId)
 
   useEffect(() => {
@@ -134,6 +136,15 @@ function CanonicalBillingAccountPage({
       )}
 
       {snapshot && <AccountSnapshotView snapshot={snapshot} />}
+      {snapshot?.status === 'active' && user?.id && hasPermission('billing:adjust') && (
+        <CreditAdjustmentWorkflow
+          clientId={clientId}
+          snapshot={snapshot}
+          accountDataUpdatedAt={query.dataUpdatedAt}
+          actorUserId={user.id}
+          onPermissionDenied={onDurableError}
+        />
+      )}
     </div>
   )
 }

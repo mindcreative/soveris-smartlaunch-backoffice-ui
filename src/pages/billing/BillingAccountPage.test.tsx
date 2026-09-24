@@ -1,6 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../../App'
+import * as adjustmentApi from '../../api/billingAdjustmentApi'
 import { billingApi } from '../../api/billingApi'
 import { queryClient } from '../../queryClient'
 import { useAuthStore } from '../../stores/authStore'
@@ -64,6 +66,38 @@ describe('Billing account routes and states', () => {
       'href',
       `/billing/clients/${CLIENT_ID}/ledger`
     )
+    expect(screen.getByRole('button', { name: 'Adjust credits' })).toBeInTheDocument()
+  })
+
+  it('keeps direct server-authoritative Account access but hides adjustment for Viewer', async () => {
+    authenticate('Viewer')
+    vi.spyOn(billingApi, 'getAccountSnapshot').mockResolvedValue(SNAPSHOT)
+    window.history.replaceState({}, '', `/billing/clients/${CLIENT_ID}/account`)
+
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Account overview' })).toBeInTheDocument()
+    expect(await screen.findByText('99,999,999,999,999.9999')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Adjust credits' })).not.toBeInTheDocument()
+  })
+
+  it('fails the Account page closed when the adjustment endpoint denies live permission', async () => {
+    vi.spyOn(billingApi, 'getAccountSnapshot').mockResolvedValue(SNAPSHOT)
+    vi.spyOn(adjustmentApi, 'previewCreditAdjustment').mockRejectedValue({
+      code: 'HTTP_403', status: 403, message: 'Denied',
+    })
+    window.history.replaceState({}, '', `/billing/clients/${CLIENT_ID}/account`)
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(await screen.findByRole('button', { name: 'Adjust credits' }))
+    await user.type(screen.getByLabelText('Adjustment amount'), '-1.0000')
+    await user.type(screen.getByLabelText('Reason'), 'Permission verification')
+    await user.click(screen.getByRole('button', { name: 'Preview adjustment' }))
+
+    expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Adjust credits' })).not.toBeInTheDocument()
+    expect(screen.queryByText('99,999,999,999,999.9999')).not.toBeInTheDocument()
   })
 
   it('treats a configured all-zero account as a real snapshot', async () => {

@@ -14,6 +14,95 @@ export interface BillingAccountSnapshot {
   walletVersion: string
 }
 
+export interface CreditAdjustmentMaterial {
+  amount: string
+  reason: string
+}
+
+export interface CreditAdjustmentCommandRequest extends CreditAdjustmentMaterial {
+  operationId: string
+  expectedWalletVersion: string
+}
+
+export type CreditAdjustmentIneligibilityCode =
+  | 'insufficient_available_credits'
+  | 'projected_balance_out_of_range'
+
+export interface CreditAdjustmentPreview extends CreditAdjustmentMaterial {
+  schemaVersion: 1
+  clientId: string
+  creditAccountId: string
+  walletVersion: string
+  asOf: string
+  currentOwnedBalance: string
+  currentReservedBalance: string
+  currentAvailableBalance: string
+  projectedOwnedBalance: string
+  projectedReservedBalance: string
+  projectedAvailableBalance: string
+  maximumSafeDebit: string
+  minimumAllowedAmount: string
+  walletInvariantEligible: boolean
+  ineligibilityCode: CreditAdjustmentIneligibilityCode | null
+}
+
+export interface CreditAdjustmentReceipt {
+  schemaVersion: 1
+  operationId: string
+  adjustmentId: string
+  ledgerId: string
+  clientId: string
+  creditAccountId: string
+  amount: string
+  reason: string
+  performedBy: string
+  walletVersionBefore: string
+  walletVersionAfter: string
+  beforeOwnedBalance: string
+  beforeReservedBalance: string
+  beforeAvailableBalance: string
+  afterOwnedBalance: string
+  afterReservedBalance: string
+  afterAvailableBalance: string
+  operationAsOf: string
+}
+
+export interface CreditAdjustmentHistoryItem extends CreditAdjustmentReceipt {
+  operationType: 'original'
+  expectedWalletVersion: string
+  originalAdjustmentId: null
+  reversalAdjustmentId: string | null
+}
+
+export interface CreditAdjustmentHistoryPage {
+  items: CreditAdjustmentHistoryItem[]
+  asOf: string
+  nextCursor: null
+}
+
+export interface CreditAdjustmentAttempt {
+  actorUserId: string
+  clientId: string
+  creditAccountId: string
+  route: string
+  operationId: string
+  request: CreditAdjustmentCommandRequest
+  serializedBody: string
+  semanticFingerprint: string
+  dispatchedAt: string
+}
+
+export type CreditAdjustmentPhase =
+  | 'editing'
+  | 'previewing'
+  | 'review'
+  | 'revalidating'
+  | 'submitting'
+  | 'unknown'
+  | 'reconciling'
+  | 'success'
+  | 'rejected'
+
 export interface BillingEntitlementsV1 {
   schemaVersion: 1
   rateLimits: {

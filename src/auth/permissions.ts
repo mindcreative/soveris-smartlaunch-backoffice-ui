@@ -13,7 +13,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly string[]> = {
     'themes:view', 'themes:edit',
     'theme:view', 'theme:edit',
     'clients:view', 'clients:create', 'clients:edit', 'clients:delete',
-    'billing:view', 'billing:subscription',
+    'billing:view', 'billing:subscription', 'billing:adjust',
   ],
   Editor: [
     'dashboard:view',
