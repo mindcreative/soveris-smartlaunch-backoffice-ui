@@ -4,7 +4,9 @@ import { useAuthStore } from '../stores/authStore'
 import {
   BillingAdjustmentContractError,
   getCreditAdjustmentOperation,
+  getCreditAdjustmentHistoryPage,
   parseCreditAdjustmentHistory,
+  parseCreditAdjustmentHistoryPage,
   parseCreditAdjustmentPreview,
   parseCreditAdjustmentReceipt,
   postCreditAdjustment,
@@ -14,12 +16,16 @@ import {
 } from './billingAdjustmentApi'
 
 const CLIENT = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
-const ACCOUNT = '11111111-2222-4333-8444-555555555555'
+const ACCOUNT = '0199b9d2-a9b1-7000-8000-000000000002'
 const ACTOR = '22222222-3333-4444-8555-666666666666'
 const OPERATION = '0199b9d2-a9b1-7000-8000-000000000001'
 const ADJUSTMENT = '0199b9d2-a9b1-7000-8000-000000000003'
 const LEDGER = '0199b9d2-a9b1-7000-8000-000000000004'
+const REVERSAL_OPERATION = '0199b9d2-a9b1-7000-8000-000000000005'
+const REVERSAL = '0199b9d2-a9b1-7000-8000-000000000006'
+const REVERSAL_LEDGER = '0199b9d2-a9b1-7000-8000-000000000007'
 const AT = '2026-09-24T12:00:00.123456Z'
+const LOCAL_AT = '2026-09-24T14:00:00.123456'
 const REASON = 'Correct duplicate allocation'
 
 const material = { amount: '-25.5000', reason: REASON }
@@ -44,7 +50,20 @@ function historyBody(items = receiptBody()
   .replace('"walletVersionBefore":12,', '"expectedWalletVersion":12,"walletVersionBefore":12,')
   .replace('"operationAsOf":', '"operationAsOf":')
   .replace(/}$/, ',"originalAdjustmentId":null,"reversalAdjustmentId":null}')): string {
-  return `{"items":[${items}],"asOf":"${AT}","nextCursor":null}`
+  return `{"items":[${items.split(AT).join(LOCAL_AT)}],"asOf":"${LOCAL_AT}","nextCursor":null}`
+}
+
+function localOriginal(reversalId: string | null = REVERSAL): string {
+  return `{"schemaVersion":1,"clientId":"${CLIENT}","creditAccountId":"${ACCOUNT}","operationId":"${OPERATION}","adjustmentId":"${ADJUSTMENT}","ledgerId":"${LEDGER}","operationType":"original","amount":-25.5000,"reason":"${REASON}","performedBy":"${ACTOR}","expectedWalletVersion":12,"walletVersionBefore":12,"walletVersionAfter":13,"beforeOwnedBalance":100.0000,"beforeReservedBalance":20.0000,"beforeAvailableBalance":80.0000,"afterOwnedBalance":74.5000,"afterReservedBalance":20.0000,"afterAvailableBalance":54.5000,"operationAsOf":"${LOCAL_AT}","originalAdjustmentId":null,"reversalAdjustmentId":${reversalId === null ? 'null' : `"${reversalId}"`}}`
+}
+
+function localReversal(): string {
+  return `{"schemaVersion":1,"clientId":"${CLIENT}","creditAccountId":"${ACCOUNT}","operationId":"${REVERSAL_OPERATION}","adjustmentId":"${REVERSAL}","ledgerId":"${REVERSAL_LEDGER}","operationType":"reversal","amount":25.5000,"reason":"Compensate correction","performedBy":"${ACTOR}","expectedWalletVersion":13,"walletVersionBefore":13,"walletVersionAfter":14,"beforeOwnedBalance":74.5000,"beforeReservedBalance":20.0000,"beforeAvailableBalance":54.5000,"afterOwnedBalance":100.0000,"afterReservedBalance":20.0000,"afterAvailableBalance":80.0000,"operationAsOf":"2026-09-24T15:00:00.123456","originalAdjustmentId":"${ADJUSTMENT}","reversalAdjustmentId":null}`
+}
+
+function localHistoryBody(items = `${localReversal()},${localOriginal()}`,
+  cursor: string | null = 'opaque+/='): string {
+  return `{"items":[${items}],"asOf":"2026-09-24T16:00:00.123456","nextCursor":${cursor === null ? 'null' : `"${cursor}"`}}`
 }
 
 beforeEach(() => {
@@ -128,6 +147,123 @@ describe('credit adjustment strict adapter', () => {
       .toThrow(BillingAdjustmentContractError)
   })
 
+  it('parses a general local history page losslessly with both relationship directions', () => {
+    const page = parseCreditAdjustmentHistoryPage(localHistoryBody(), CLIENT)
+    expect(page.nextCursor).toBe('opaque+/=')
+    expect(page.asOf).toBe('2026-09-24T16:00:00.123456')
+    expect(page.items.map((item) => item.operationType)).toEqual(['reversal', 'original'])
+    expect(page.items[0]).toMatchObject({ originalAdjustmentId: ADJUSTMENT,
+      reversalAdjustmentId: null, amount: '25.5000', walletVersionAfter: '14' })
+    expect(page.items[1]).toMatchObject({ originalAdjustmentId: null,
+      reversalAdjustmentId: REVERSAL, amount: '-25.5000', beforeOwnedBalance: '100.0000' })
+  })
+
+  it('rejects malformed local pages, UUID kinds, cursor defects and impossible relationships', () => {
+    expect(() => parseCreditAdjustmentHistoryPage(
+      localHistoryBody().replace(LOCAL_AT, AT), CLIENT)).toThrow(BillingAdjustmentContractError)
+    expect(() => parseCreditAdjustmentHistoryPage(
+      localHistoryBody().replace(`"adjustmentId":"${ADJUSTMENT}"`,
+        `"adjustmentId":"${ADJUSTMENT.toUpperCase()}"`), CLIENT))
+      .toThrow(BillingAdjustmentContractError)
+    expect(() => parseCreditAdjustmentHistoryPage(
+      localHistoryBody().replace('"nextCursor":"opaque+/="', '"nextCursor":""'), CLIENT))
+      .toThrow(BillingAdjustmentContractError)
+    expect(() => parseCreditAdjustmentHistoryPage(
+      localHistoryBody().replace('"amount":25.5000', '"amount":-25.5000'), CLIENT))
+      .toThrow(BillingAdjustmentContractError)
+    expect(() => parseCreditAdjustmentHistoryPage(
+      localHistoryBody().replace(`"originalAdjustmentId":"${ADJUSTMENT}"`,
+        `"originalAdjustmentId":"${REVERSAL}"`), CLIENT))
+      .toThrow(BillingAdjustmentContractError)
+    expect(() => parseCreditAdjustmentHistoryPage(
+      localHistoryBody().replace('"schemaVersion":1,', '"schemaVersion":1,"extra":true,'), CLIENT))
+      .toThrow(BillingAdjustmentContractError)
+    expect(() => parseCreditAdjustmentHistoryPage(
+      localHistoryBody().replace('"amount":25.5000', '"amount":25.5000,"amount":25.5000'), CLIENT))
+      .toThrow(BillingAdjustmentContractError)
+    expect(() => parseCreditAdjustmentHistoryPage(
+      localHistoryBody().replace('"amount":25.5000', '"amount":"25.5000"'), CLIENT))
+      .toThrow(BillingAdjustmentContractError)
+    expect(() => parseCreditAdjustmentHistoryPage(
+      localHistoryBody().replace('"amount":25.5000', '"amount":0.0000'), CLIENT))
+      .toThrow(BillingAdjustmentContractError)
+    expect(() => parseCreditAdjustmentHistoryPage(
+      localHistoryBody().replace(`"clientId":"${CLIENT}"`,
+        '"clientId":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"'), CLIENT))
+      .toThrow(BillingAdjustmentContractError)
+    expect(() => parseCreditAdjustmentHistoryPage(
+      localHistoryBody().replace(`"reversalAdjustmentId":"${REVERSAL}"`,
+        `"reversalAdjustmentId":"${ADJUSTMENT}"`), CLIENT))
+      .toThrow(BillingAdjustmentContractError)
+    expect(() => parseCreditAdjustmentHistoryPage(
+      localHistoryBody().replace(`,"reason":"${REASON}"`, ''), CLIENT))
+      .toThrow(BillingAdjustmentContractError)
+    expect(() => parseCreditAdjustmentHistoryPage(
+      `{"items":[${Array(101).fill(localOriginal(null)).join(',')}],"asOf":"${LOCAL_AT}","nextCursor":null}`,
+      CLIENT)).toThrow(BillingAdjustmentContractError)
+    expect(() => parseCreditAdjustmentHistoryPage('{', CLIENT))
+      .toThrow(BillingAdjustmentContractError)
+  })
+
+  it('accepts zero balances and the maximum valid signed-BIGINT successor without IEEE conversion', () => {
+    const item = localOriginal(null)
+      .replace('"amount":-25.5000', '"amount":1.0000')
+      .replace('"expectedWalletVersion":12,"walletVersionBefore":12,"walletVersionAfter":13',
+        '"expectedWalletVersion":9223372036854775806,"walletVersionBefore":9223372036854775806,"walletVersionAfter":9223372036854775807')
+      .replace('"beforeOwnedBalance":100.0000,"beforeReservedBalance":20.0000,"beforeAvailableBalance":80.0000,"afterOwnedBalance":74.5000,"afterReservedBalance":20.0000,"afterAvailableBalance":54.5000',
+        '"beforeOwnedBalance":0.0000,"beforeReservedBalance":0.0000,"beforeAvailableBalance":0.0000,"afterOwnedBalance":1.0000,"afterReservedBalance":0.0000,"afterAvailableBalance":1.0000')
+    const page = parseCreditAdjustmentHistoryPage(localHistoryBody(item, null), CLIENT)
+    expect(page.items[0]?.walletVersionAfter).toBe('9223372036854775807')
+    expect(page.items[0]?.beforeOwnedBalance).toBe('0.0000')
+    expect(() => parseCreditAdjustmentHistoryPage(localHistoryBody(item.replace(
+      '"expectedWalletVersion":9223372036854775806,"walletVersionBefore":9223372036854775806',
+      '"expectedWalletVersion":9223372036854775807,"walletVersionBefore":9223372036854775807'), null), CLIENT))
+      .toThrow(BillingAdjustmentContractError)
+  })
+
+  it('builds initial filters and continuation with URLSearchParams on the local endpoint', async () => {
+    const get = vi.spyOn(apiClient, 'getApiRoot').mockResolvedValue({
+      data: localHistoryBody('', null), status: 200,
+      headers: { 'content-type': 'application/json' } as never,
+    })
+    await getCreditAdjustmentHistoryPage(CLIENT, { filters: {
+      from: '2026-09-24T00:00:00.000000', reason: 'A & B', operationType: 'original',
+      pageSize: '20',
+    } })
+    await getCreditAdjustmentHistoryPage(CLIENT, { cursor: 'opaque+/=' })
+    expect(get).toHaveBeenNthCalledWith(1,
+      `/api/backoffice/clients/${CLIENT}/billing/adjustments?from=2026-09-24T00%3A00%3A00.000000&reason=A+%26+B&operationType=original&pageSize=20`,
+      expect.objectContaining({ responseType: 'text' }))
+    expect(get).toHaveBeenNthCalledWith(2,
+      `/api/backoffice/clients/${CLIENT}/billing/adjustments?cursor=opaque%2B%2F%3D`,
+      expect.objectContaining({ responseType: 'text' }))
+  })
+
+  it('keeps operation reconciliation stricter than the shared local parser', () => {
+    const request = { ...command, expectedWalletVersion: '12' }
+    expect(() => parseCreditAdjustmentHistory(
+      localHistoryBody(localReversal(), null), CLIENT, ACTOR, request, ACCOUNT))
+      .toThrow(BillingAdjustmentContractError)
+    expect(() => parseCreditAdjustmentHistory(
+      localHistoryBody(`${localOriginal(null)},${localOriginal(null)}`, null),
+      CLIENT, ACTOR, request, ACCOUNT)).toThrow(BillingAdjustmentContractError)
+    expect(() => parseCreditAdjustmentHistory(
+      localHistoryBody(localOriginal(null), 'more'), CLIENT, ACTOR, request, ACCOUNT))
+      .toThrow(BillingAdjustmentContractError)
+  })
+
+  it.each([
+    [400, 'credit_adjustment_history_invalid_query'], [401, 'HTTP_401'], [403, 'HTTP_403'],
+    [409, 'time_zone_not_set'], [422, 'local_time_ambiguous'],
+    [500, 'credit_adjustment_history_integrity_failure'],
+    [503, 'credit_adjustment_history_dependency_unavailable'],
+  ])('preserves history HTTP %i failures without fallback or partial parsing', async (status, code) => {
+    const error = { status, code, message: 'safe' } satisfies ApiError
+    const get = vi.spyOn(apiClient, 'getApiRoot').mockRejectedValue(error)
+    await expect(getCreditAdjustmentHistoryPage(CLIENT, { filters: {} })).rejects.toBe(error)
+    expect(get).toHaveBeenCalledTimes(1)
+  })
+
   it('uses only the API-origin routes, exact retained bytes, JSON media type and AbortSignal', async () => {
     const signal = new AbortController().signal
     const post = vi.spyOn(apiClient, 'postApiRoot')
@@ -154,7 +290,7 @@ describe('credit adjustment strict adapter', () => {
       `/api/billing/clients/${CLIENT}/credit-adjustments`, bytes,
       expect.objectContaining({ signal, responseType: 'text' }))
     expect(get).toHaveBeenCalledWith(
-      `/api/billing/clients/${CLIENT}/adjustments?operationId=${OPERATION}&pageSize=1`,
+      `/api/backoffice/clients/${CLIENT}/billing/adjustments?operationId=${OPERATION}&pageSize=1`,
       expect.objectContaining({ signal, responseType: 'text' }))
     await expect(postCreditAdjustment(CLIENT, ACCOUNT, request, signal, `${bytes} `))
       .rejects.toBeInstanceOf(BillingAdjustmentContractError)

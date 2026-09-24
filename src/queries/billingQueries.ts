@@ -21,9 +21,12 @@ import {
   previewBillingPlanChange,
 } from '../api/billingPlanApi'
 import {
+  BillingAdjustmentContractError,
+  getCreditAdjustmentHistoryPage,
   getCreditAdjustmentOperation,
   postCreditAdjustment,
   previewCreditAdjustment,
+  validateCreditAdjustmentHistoryRelationships,
 } from '../api/billingAdjustmentApi'
 import type { ApiError } from '../api/apiClient'
 import { productKeys } from './productQueries'
@@ -49,6 +52,7 @@ import type {
   CreditAdjustmentAttempt,
   CreditAdjustmentCommandRequest,
   CreditAdjustmentHistoryPage,
+  CreditAdjustmentHistoryFilters,
   CreditAdjustmentMaterial,
   CreditAdjustmentPreview,
   CreditAdjustmentReceipt,
@@ -81,6 +85,9 @@ export const billingAdjustmentKeys = {
     [...privateRoot, 'billing', 'adjustments', clientId, 'command'] as const,
   history: (clientId: string) =>
     [...privateRoot, 'billing', 'adjustments', clientId, 'history'] as const,
+  list: (clientId: string, filters: CreditAdjustmentHistoryFilters, traversalId: number) =>
+    [...privateRoot, 'billing', 'adjustments', clientId, 'history',
+      'list', filters, traversalId] as const,
   operation: (clientId: string, operationId: string) =>
     [...privateRoot, 'billing', 'adjustments', clientId, 'history', operationId] as const,
 }
@@ -304,6 +311,15 @@ export async function cancelAndRemoveBillingLedger(
   queryClient.removeQueries({ queryKey, exact })
 }
 
+export async function cancelAndRemoveBillingAdjustmentHistory(
+  queryClient: QueryClient,
+  queryKey: QueryKey = billingAdjustmentKeys.all
+): Promise<void> {
+  const exact = typeof queryKey[queryKey.length - 1] === 'number'
+  await queryClient.cancelQueries({ queryKey, exact })
+  queryClient.removeQueries({ queryKey, exact })
+}
+
 export async function cancelAndRemoveBillingSubscriptions(
   queryClient: QueryClient,
   clientId: string
@@ -327,6 +343,17 @@ function getErrorStatus(error: unknown): number | undefined {
   if (!error || typeof error !== 'object' || !('status' in error)) return undefined
   const status = (error as { status?: unknown }).status
   return typeof status === 'number' ? status : undefined
+}
+
+function getErrorCode(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object' || !('code' in error)) return undefined
+  const code = (error as { code?: unknown }).code
+  return typeof code === 'string' ? code : undefined
+}
+
+function isHistoryIntegrityError(error: unknown): boolean {
+  return error instanceof BillingAdjustmentContractError ||
+    getErrorCode(error) === 'credit_adjustment_history_integrity_failure'
 }
 
 export function useBillingAccount(clientId: string | null) {
@@ -987,6 +1014,153 @@ export function useBillingLedger(
     isError: Boolean(durableError) || query.isError,
     items: suppressPrivateRows ? [] : query.data?.pages.flatMap((page) => page.items) ?? [],
     asOf: suppressPrivateRows ? undefined : query.data?.pages[0]?.asOf,
+    loadMore,
+  }
+}
+
+function validateAdjustmentHistoryContinuation(
+  existing: InfiniteData<CreditAdjustmentHistoryPage, string | null> | undefined,
+  page: CreditAdjustmentHistoryPage,
+  requestedCursor: string
+): void {
+  const first = existing?.pages[0]
+  if (!first || page.asOf !== first.asOf)
+    throw new BillingAdjustmentContractError('continuation does not match the active snapshot')
+  const ids = new Set(existing.pages.flatMap((existingPage) =>
+    existingPage.items.map((item) => item.adjustmentId)))
+  if (page.items.some((item) => ids.has(item.adjustmentId)))
+    throw new BillingAdjustmentContractError('continuation contains a duplicate adjustment row')
+  const priorCursors = new Set(existing.pages
+    .map((existingPage) => existingPage.nextCursor)
+    .filter((cursor): cursor is string => cursor !== null))
+  if (page.nextCursor !== null &&
+      (page.nextCursor === requestedCursor || priorCursors.has(page.nextCursor)))
+    throw new BillingAdjustmentContractError('continuation cursor did not advance')
+  validateCreditAdjustmentHistoryRelationships([
+    ...existing.pages.flatMap((existingPage) => existingPage.items),
+    ...page.items,
+  ])
+}
+
+export function useBillingAdjustmentHistory(
+  clientId: string | null,
+  filters: CreditAdjustmentHistoryFilters,
+  traversalId: number
+) {
+  const queryClient = useQueryClient()
+  const filterIdentity = JSON.stringify(filters)
+  const traversalIdentity = `${clientId ?? 'invalid-client'}:${filterIdentity}:${traversalId}`
+  const stableFilters = useMemo(() => filters, [filterIdentity])
+  const queryKey = useMemo(
+    () => billingAdjustmentKeys.list(clientId ?? 'invalid-client', stableFilters, traversalId),
+    [clientId, stableFilters, traversalId]
+  )
+  const previousKey = useRef<QueryKey | null>(null)
+  const loadingNext = useRef(false)
+  const durableErrorRef = useRef<Error | ApiError | null>(null)
+  const [durableError, setDurableError] = useState<Error | ApiError | null>(null)
+
+  useEffect(() => {
+    const previous = previousKey.current
+    previousKey.current = queryKey
+    setDurableError(null)
+    durableErrorRef.current = null
+    loadingNext.current = false
+    if (previous && JSON.stringify(previous) !== JSON.stringify(queryKey))
+      void cancelAndRemoveBillingAdjustmentHistory(queryClient, previous)
+  }, [queryClient, traversalIdentity])
+
+  useEffect(() => {
+    const clear = () => { void cancelAndRemoveBillingAdjustmentHistory(queryClient, queryKey) }
+    window.addEventListener('auth:cleared', clear)
+    window.addEventListener('auth:refreshed', clear)
+    return () => {
+      window.removeEventListener('auth:cleared', clear)
+      window.removeEventListener('auth:refreshed', clear)
+    }
+  }, [queryClient, queryKey])
+
+  const query = useInfiniteQuery<
+    CreditAdjustmentHistoryPage,
+    Error | ApiError,
+    InfiniteData<CreditAdjustmentHistoryPage, string | null>,
+    typeof queryKey,
+    string | null
+  >({
+    queryKey,
+    initialPageParam: null,
+    staleTime: Infinity,
+    enabled: Boolean(clientId) && !durableError,
+    queryFn: async ({ pageParam, signal }) => {
+      if (!clientId) throw new Error('A valid Client is required')
+      if (durableErrorRef.current) throw durableErrorRef.current
+      try {
+        const page = await getCreditAdjustmentHistoryPage(
+          clientId,
+          pageParam === null ? { filters: stableFilters } : { cursor: pageParam },
+          signal
+        )
+        if (pageParam !== null) {
+          const existing = queryClient.getQueryData<
+            InfiniteData<CreditAdjustmentHistoryPage, string | null>
+          >(queryKey)
+          validateAdjustmentHistoryContinuation(existing, page, pageParam)
+        }
+        return page
+      } catch (error) {
+        if (isHistoryIntegrityError(error) || isDurablePermissionError(error))
+          durableErrorRef.current = error as Error | ApiError
+        throw error
+      }
+    },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    retry: (failureCount, error) => {
+      if (isHistoryIntegrityError(error)) return false
+      const status = getErrorStatus(error)
+      if (status && status >= 400 && status < 500 && status !== 429) return false
+      return failureCount < 1
+    },
+    retryDelay: 250,
+  })
+
+  useEffect(() => {
+    if (isHistoryIntegrityError(query.error)) {
+      setDurableError(query.error as Error | ApiError)
+      return
+    }
+    if (isDurablePermissionError(query.error)) {
+      setDurableError(query.error)
+      if (query.error.status === 401) window.dispatchEvent(new CustomEvent('auth:cleared'))
+    }
+  }, [query.error])
+
+  useEffect(() => {
+    if (isHistoryIntegrityError(durableError))
+      void cancelAndRemoveBillingAdjustmentHistory(queryClient, queryKey)
+    else if (isDurablePermissionError(durableError))
+      void clearPrivateBillingQueries(queryClient)
+  }, [durableError, queryClient, queryKey])
+
+  const loadMore = async (): Promise<void> => {
+    if (loadingNext.current || !query.hasNextPage) return
+    loadingNext.current = true
+    try { await query.fetchNextPage() }
+    finally { loadingNext.current = false }
+  }
+
+  const effectiveError = durableError ?? query.error
+  const suppressPrivateRows = isHistoryIntegrityError(effectiveError) ||
+    isDurablePermissionError(effectiveError)
+  const items = suppressPrivateRows
+    ? [] : query.data?.pages.flatMap((page) => page.items) ?? []
+  return {
+    ...query,
+    data: query.data,
+    error: effectiveError,
+    isError: Boolean(durableError) || query.isError,
+    items,
+    asOf: suppressPrivateRows ? undefined : query.data?.pages[0]?.asOf,
+    isStaleSnapshot: items.length > 0 && query.isStale,
     loadMore,
   }
 }

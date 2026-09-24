@@ -237,6 +237,7 @@ export class ApiClient {
             ...(typeof envelope.currentDraftRevision === 'number' && { currentDraftRevision: envelope.currentDraftRevision }),
             ...(Array.isArray(envelope.errors) && { errors: envelope.errors }),
             ...((envelope.code === 'local_time_ambiguous' ||
+              envelope.code === 'local_time_nonexistent' ||
               typeof envelope.schemaVersion === 'number' || envelope.schemaVersion === null ||
               typeof envelope.currentSchemaVersion === 'number' || envelope.currentSchemaVersion === null ||
               typeof envelope.currentRevision === 'number' ||

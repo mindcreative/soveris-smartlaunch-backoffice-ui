@@ -2,10 +2,14 @@ import { isLosslessNumber, LosslessNumber, parse, stringify } from 'lossless-jso
 import { apiClient, type ApiResponse } from './apiClient'
 import { canonicalizeGuid } from '../lib/guid'
 import { useAuthStore } from '../stores/authStore'
+import { parseLocalInstant } from '../timezone/LocalInstant'
 import type {
   CreditAdjustmentCommandRequest,
   CreditAdjustmentHistoryItem,
+  CreditAdjustmentHistoryFilters,
   CreditAdjustmentHistoryPage,
+  CreditAdjustmentHistoryRequest,
+  CreditAdjustmentReconciliationPage,
   CreditAdjustmentMaterial,
   CreditAdjustmentPreview,
   CreditAdjustmentReceipt,
@@ -50,6 +54,16 @@ const uuid7 = (value: unknown, field: string): string => {
   const candidate = guid(value, field)
   return UUID_V7.test(candidate) ? candidate : fail(`${field} must be RFC 9562 UUIDv7`)
 }
+const canonicalGuid = (value: unknown, field: string): string => {
+  const candidate = text(value, field)
+  return candidate === candidate.toLowerCase() && UUID.test(candidate) &&
+    candidate !== '00000000-0000-0000-0000-000000000000'
+    ? candidate : fail(`${field} must be a non-empty canonical GUID`)
+}
+const canonicalUuid7 = (value: unknown, field: string): string => {
+  const candidate = canonicalGuid(value, field)
+  return UUID_V7.test(candidate) ? candidate : fail(`${field} must be RFC 9562 UUIDv7`)
+}
 const instant = (value: unknown, field: string): string => {
   const candidate = text(value, field)
   const match = UTC_INSTANT.exec(candidate)
@@ -88,8 +102,10 @@ const int64 = (value: unknown, field: string): string => {
   if (!UINT64.test(candidate) || BigInt(candidate) > INT64_MAX) fail(`${field} is outside signed BIGINT`)
   return candidate
 }
-const nullableGuid = (value: unknown, field: string): string | null =>
-  value === null ? null : guid(value, field)
+const localInstant = (value: unknown, field: string): string => {
+  try { return parseLocalInstant(value) }
+  catch { return fail(`${field} must be a local six-microsecond timestamp`) }
+}
 
 function scaled(value: string): bigint {
   const negative = value.startsWith('-')
@@ -336,32 +352,122 @@ const HISTORY_KEYS = ['schemaVersion', 'clientId', 'creditAccountId', 'operation
   'beforeReservedBalance', 'beforeAvailableBalance', 'afterOwnedBalance', 'afterReservedBalance',
   'afterAvailableBalance', 'operationAsOf', 'originalAdjustmentId', 'reversalAdjustmentId'] as const
 
-export function parseCreditAdjustmentHistory(source: string, clientIdValue: string,
-  actorIdValue: string, request: CreditAdjustmentCommandRequest,
-  creditAccountIdValue: string): CreditAdjustmentHistoryPage {
+function parseHistoryItem(entry: unknown, expectedClient: string): CreditAdjustmentHistoryItem {
+  const item = record(entry, 'history item')
+  exact(item, HISTORY_KEYS, 'history item')
+  const clientId = canonicalGuid(item.clientId, 'clientId')
+  const amount = decimal(item.amount, 'amount')
+  const expectedWalletVersion = int64(item.expectedWalletVersion, 'expectedWalletVersion')
+  const walletVersionBefore = int64(item.walletVersionBefore, 'walletVersionBefore')
+  const walletVersionAfter = int64(item.walletVersionAfter, 'walletVersionAfter')
+  const base = {
+    schemaVersion: schemaVersion(item.schemaVersion, 'schemaVersion'),
+    clientId,
+    creditAccountId: canonicalUuid7(item.creditAccountId, 'creditAccountId'),
+    operationId: canonicalUuid7(item.operationId, 'operationId'),
+    adjustmentId: canonicalUuid7(item.adjustmentId, 'adjustmentId'),
+    ledgerId: canonicalUuid7(item.ledgerId, 'ledgerId'),
+    amount,
+    reason: validReason(item.reason),
+    performedBy: canonicalGuid(item.performedBy, 'performedBy'),
+    expectedWalletVersion,
+    walletVersionBefore,
+    walletVersionAfter,
+    beforeOwnedBalance: decimal(item.beforeOwnedBalance, 'beforeOwnedBalance'),
+    beforeReservedBalance: decimal(item.beforeReservedBalance, 'beforeReservedBalance'),
+    beforeAvailableBalance: decimal(item.beforeAvailableBalance, 'beforeAvailableBalance'),
+    afterOwnedBalance: decimal(item.afterOwnedBalance, 'afterOwnedBalance'),
+    afterReservedBalance: decimal(item.afterReservedBalance, 'afterReservedBalance'),
+    afterAvailableBalance: decimal(item.afterAvailableBalance, 'afterAvailableBalance'),
+    operationAsOf: localInstant(item.operationAsOf, 'operationAsOf'),
+  }
+  if (clientId !== expectedClient || scaled(amount) === 0n ||
+      expectedWalletVersion !== walletVersionBefore || BigInt(walletVersionBefore) === INT64_MAX ||
+      BigInt(walletVersionAfter) !== BigInt(walletVersionBefore) + 1n)
+    fail('history item identity, amount, or wallet versions are invalid')
+  validateStoredEquations(base)
+
+  if (item.operationType === 'original' && item.originalAdjustmentId === null) {
+    const reversalAdjustmentId = item.reversalAdjustmentId === null
+      ? null : canonicalUuid7(item.reversalAdjustmentId, 'reversalAdjustmentId')
+    if (reversalAdjustmentId === base.adjustmentId)
+      fail('history original cannot link to itself')
+    return { ...base, operationType: 'original', originalAdjustmentId: null,
+      reversalAdjustmentId }
+  }
+  if (item.operationType === 'reversal' && item.reversalAdjustmentId === null) {
+    const originalAdjustmentId = canonicalUuid7(
+      item.originalAdjustmentId, 'originalAdjustmentId')
+    if (originalAdjustmentId === base.adjustmentId)
+      fail('history reversal cannot link to itself')
+    return { ...base, operationType: 'reversal', originalAdjustmentId,
+      reversalAdjustmentId: null }
+  }
+  return fail('history relationship shape is invalid')
+}
+
+export function validateCreditAdjustmentHistoryRelationships(
+  items: CreditAdjustmentHistoryItem[]
+): void {
+  const byId = new Map<string, CreditAdjustmentHistoryItem>()
+  for (const item of items) {
+    if (byId.has(item.adjustmentId)) fail('history contains duplicate adjustmentId')
+    byId.set(item.adjustmentId, item)
+  }
+  for (const item of items) {
+    const linkedId = item.operationType === 'original'
+      ? item.reversalAdjustmentId : item.originalAdjustmentId
+    if (linkedId === null) continue
+    const linked = byId.get(linkedId)
+    if (!linked) continue
+    const reciprocal = item.operationType === 'original'
+      ? linked.operationType === 'reversal' && linked.originalAdjustmentId === item.adjustmentId
+      : linked.operationType === 'original' && linked.reversalAdjustmentId === item.adjustmentId
+    if (!reciprocal || linked.clientId !== item.clientId ||
+        linked.creditAccountId !== item.creditAccountId ||
+        scaled(linked.amount) !== -scaled(item.amount))
+      fail('history relationship evidence is inconsistent')
+  }
+}
+
+export function parseCreditAdjustmentHistoryPage(
+  source: string,
+  clientIdValue: string
+): CreditAdjustmentHistoryPage {
   const root = payload(source)
   exact(root, ['items', 'asOf', 'nextCursor'], 'history')
-  if (!Array.isArray(root.items) || root.items.length > 1 || root.nextCursor !== null)
+  if (!Array.isArray(root.items) || root.items.length > 100)
     fail('history envelope is invalid')
-  const rawItems = root.items as unknown[]
+  const expectedClient = canonicalizeGuid(clientIdValue) ?? fail('route clientId is invalid')
+  const nextCursor = root.nextCursor === null ? null : text(root.nextCursor, 'nextCursor')
+  if (nextCursor !== null && nextCursor.trim().length === 0)
+    fail('nextCursor must be nonblank')
+  const items = (root.items as unknown[]).map((entry) => parseHistoryItem(entry, expectedClient))
+  validateCreditAdjustmentHistoryRelationships(items)
+  return { items, asOf: localInstant(root.asOf, 'asOf'), nextCursor }
+}
+
+export function parseCreditAdjustmentHistory(source: string, clientIdValue: string,
+  actorIdValue: string, request: CreditAdjustmentCommandRequest,
+  creditAccountIdValue: string): CreditAdjustmentReconciliationPage {
+  const page = parseCreditAdjustmentHistoryPage(source, clientIdValue)
+  if (page.items.length > 1 || page.nextCursor !== null)
+    fail('reconciliation history envelope is invalid')
   const expectedAccount = canonicalizeGuid(creditAccountIdValue) ?? fail('account is invalid')
-  const items = rawItems.map((entry): CreditAdjustmentHistoryItem => {
-    const item = record(entry, 'history item')
-    exact(item, HISTORY_KEYS, 'history item')
-    if (item.operationType !== 'original' || item.originalAdjustmentId !== null)
-      fail('history item is not original adjustment evidence')
-    const receiptRoot: JsonRecord = Object.fromEntries(RECEIPT_KEYS.map((key) => [key, item[key]]))
-    const parsedReceipt = receipt(receiptRoot, clientIdValue, creditAccountIdValue, actorIdValue, request)
-    const expectedWalletVersion = int64(item.expectedWalletVersion, 'expectedWalletVersion')
-    if (parsedReceipt.creditAccountId !== expectedAccount ||
-        expectedWalletVersion !== request.expectedWalletVersion ||
-        expectedWalletVersion !== parsedReceipt.walletVersionBefore)
-      fail('history item does not match retained command evidence')
-    return { ...parsedReceipt, operationType: 'original', expectedWalletVersion,
-      originalAdjustmentId: null,
-      reversalAdjustmentId: nullableGuid(item.reversalAdjustmentId, 'reversalAdjustmentId') }
-  })
-  return { items, asOf: instant(root.asOf, 'asOf'), nextCursor: null }
+  const expectedActor = canonicalizeGuid(actorIdValue) ?? fail('actor is invalid')
+  const expectedOperation = uuid7(request.operationId, 'operationId')
+  const item = page.items[0]
+  if (!item) return { items: [], asOf: page.asOf, nextCursor: null }
+  const original = item.operationType === 'original'
+    ? item : fail('history item is not original adjustment evidence')
+  if (original.creditAccountId !== expectedAccount || original.performedBy !== expectedActor ||
+      original.operationId !== expectedOperation ||
+      original.reason !== validReason(request.reason) ||
+      !sameDecimal(original.amount, requestAmount(request.amount)) ||
+      original.expectedWalletVersion !== requestVersion(request.expectedWalletVersion) ||
+      original.walletVersionBefore !== request.expectedWalletVersion)
+    fail('history item does not match retained command evidence')
+  return { items: [original], asOf: page.asOf, nextCursor: null }
 }
 
 function requireActor(): string {
@@ -413,16 +519,52 @@ export async function postCreditAdjustment(clientIdValue: string,
 
 export async function getCreditAdjustmentOperation(clientIdValue: string, operationIdValue: string,
   actorIdValue: string, request: CreditAdjustmentCommandRequest, creditAccountIdValue: string,
-  signal?: AbortSignal, onAuthReplay?: () => void): Promise<CreditAdjustmentHistoryPage> {
+  signal?: AbortSignal, onAuthReplay?: () => void): Promise<CreditAdjustmentReconciliationPage> {
   const clientId = canonicalizeGuid(clientIdValue) ?? fail('route clientId is invalid')
   const operationId = uuid7(operationIdValue, 'operationId')
   const actor = requireActor()
   if (actor !== canonicalizeGuid(actorIdValue)) fail('retained actor does not match active actor')
+  const query = new URLSearchParams()
+  query.set('operationId', operationId)
+  query.set('pageSize', '1')
   const response = await apiClient.getApiRoot<string>(
-    `/api/billing/clients/${encodeURIComponent(clientId)}/adjustments?operationId=${encodeURIComponent(operationId)}&pageSize=1`,
+    `/api/backoffice/clients/${encodeURIComponent(clientId)}/billing/adjustments?${query.toString()}`,
     { responseType: 'text', signal, headers: { Accept: 'application/json' },
       ...(onAuthReplay ? { onAuthReplay } : {}) })
   verifyActor(actor)
   return parseCreditAdjustmentHistory(requireJson(response, 'history'), clientId, actor,
     request, creditAccountIdValue)
+}
+
+const HISTORY_FILTER_KEYS = [
+  'from', 'to', 'actorUserId', 'reason', 'operationId', 'originalAdjustmentId',
+  'reversalAdjustmentId', 'operationType', 'pageSize',
+] as const satisfies readonly (keyof CreditAdjustmentHistoryFilters)[]
+
+export async function getCreditAdjustmentHistoryPage(
+  clientIdValue: string,
+  request: CreditAdjustmentHistoryRequest,
+  signal?: AbortSignal,
+  onAuthReplay?: () => void
+): Promise<CreditAdjustmentHistoryPage> {
+  const clientId = canonicalizeGuid(clientIdValue) ?? fail('route clientId is invalid')
+  const actor = requireActor()
+  const query = new URLSearchParams()
+  if ('cursor' in request) {
+    if (typeof request.cursor !== 'string' || request.cursor.trim().length === 0)
+      fail('cursor must be nonblank')
+    query.set('cursor', request.cursor)
+  } else {
+    for (const key of HISTORY_FILTER_KEYS) {
+      const value = request.filters[key]
+      if (value !== undefined && value !== '') query.set(key, value)
+    }
+  }
+  const suffix = query.size === 0 ? '' : `?${query.toString()}`
+  const response = await apiClient.getApiRoot<string>(
+    `/api/backoffice/clients/${encodeURIComponent(clientId)}/billing/adjustments${suffix}`,
+    { responseType: 'text', signal, headers: { Accept: 'application/json' },
+      ...(onAuthReplay ? { onAuthReplay } : {}) })
+  verifyActor(actor)
+  return parseCreditAdjustmentHistoryPage(requireJson(response, 'history'), clientId)
 }

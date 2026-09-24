@@ -131,6 +131,15 @@ describe('ApiClient error normalization', () => {
     })
   })
 
+  it.each(['local_time_ambiguous', 'local_time_nonexistent'])(
+    'preserves %s field evidence for linked saved-zone recovery', (code) => {
+      const problem = {
+        title: 'Invalid local time', status: 422, code, field: 'from',
+      }
+      expect(apiClient.normalizeError({ response: { status: 422, data: problem } }))
+        .toMatchObject({ code, status: 422, problemDetails: problem })
+    })
+
   it('normalizes an Axios-shaped error before considering its transport code', () => {
     expect(apiClient.normalizeError({
       code: 'ERR_BAD_REQUEST',

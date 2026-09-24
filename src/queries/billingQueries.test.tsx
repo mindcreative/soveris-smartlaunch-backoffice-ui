@@ -16,6 +16,8 @@ import type {
   BillingSubscriptionState,
   ClientCapabilities,
   CreditAdjustmentAttempt,
+  CreditAdjustmentHistoryFilters,
+  CreditAdjustmentHistoryPage,
 } from '../types/billing'
 import { productKeys } from './productQueries'
 import {
@@ -26,6 +28,7 @@ import {
   billingSubscriptionKeys,
   clearPrivateClientScope,
   clearCreditAdjustmentMutationState,
+  cancelAndRemoveBillingAdjustmentHistory,
   clearPrivateBillingQueries,
   clientCapabilityKeys,
   domainClientPrefix,
@@ -37,6 +40,7 @@ import {
   resourceAccessKeys,
   useBillingAccount,
   useBillingLedger,
+  useBillingAdjustmentHistory,
   useBillingSubscriptions,
   useClientCapabilities,
   useResourceAccessConsequences,
@@ -843,5 +847,180 @@ describe('private Billing ledger traversal', () => {
     await waitFor(() => expect(queryClient.getQueryCache().findAll({
       queryKey: billingAccountKeys.billing,
     })).toHaveLength(0))
+  })
+})
+
+function adjustmentHistoryPage(
+  adjustmentId: string,
+  nextCursor: string | null,
+  asOf = '2026-10-25T02:30:00.000000'
+): CreditAdjustmentHistoryPage {
+  return {
+    items: [{
+      schemaVersion: 1, clientId: CLIENT_A,
+      creditAccountId: '0199c000-0000-7000-8000-000000000001',
+      operationId: '0199c000-0000-7000-8000-000000000002',
+      adjustmentId, ledgerId: '0199c000-0000-7000-8000-000000000003',
+      operationType: 'original', amount: '1.0000', reason: 'Exact',
+      performedBy: '22222222-3333-4444-8555-666666666666',
+      expectedWalletVersion: '1', walletVersionBefore: '1', walletVersionAfter: '2',
+      beforeOwnedBalance: '1.0000', beforeReservedBalance: '0.0000',
+      beforeAvailableBalance: '1.0000', afterOwnedBalance: '2.0000',
+      afterReservedBalance: '0.0000', afterAvailableBalance: '2.0000',
+      operationAsOf: '2026-10-25T02:30:00.000000',
+      originalAdjustmentId: null, reversalAdjustmentId: null,
+    }],
+    asOf,
+    nextCursor,
+  }
+}
+
+describe('private adjustment-history traversal', () => {
+  const FILTERS: CreditAdjustmentHistoryFilters = { operationType: 'original', pageSize: '20' }
+
+  it('uses the history prefix with a distinct list/filter/traversal identity', () => {
+    expect(billingAdjustmentKeys.list(CLIENT_A, FILTERS, 7)).toEqual([
+      'backoffice', 'private', 'billing', 'adjustments', CLIENT_A, 'history',
+      'list', FILTERS, 7,
+    ])
+    expect(billingAdjustmentKeys.operation(CLIENT_A, 'operation-id')).not.toEqual(
+      billingAdjustmentKeys.list(CLIENT_A, FILTERS, 7))
+  })
+
+  it('uses initial filters then cursor alone and preserves server order across repeated local walls', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const request = vi.spyOn(billingAdjustmentApi, 'getCreditAdjustmentHistoryPage')
+      .mockResolvedValueOnce(adjustmentHistoryPage(
+        '0199c000-0000-7000-8000-000000000010', 'opaque'))
+      .mockResolvedValueOnce({ ...adjustmentHistoryPage(
+        '0199c000-0000-7000-8000-000000000011', null),
+      items: [{ ...adjustmentHistoryPage(
+        '0199c000-0000-7000-8000-000000000011', null).items[0]!,
+      operationAsOf: '2026-10-25T01:30:00.000000' }] })
+    const { result } = renderHook(
+      () => useBillingAdjustmentHistory(CLIENT_A, FILTERS, 1),
+      { wrapper: createWrapper(queryClient) }
+    )
+    await waitFor(() => expect(result.current.items).toHaveLength(1))
+    await result.current.loadMore()
+    await waitFor(() => expect(result.current.items).toHaveLength(2))
+
+    expect(request.mock.calls[0]?.[1]).toEqual({ filters: FILTERS })
+    expect(request.mock.calls[1]?.[1]).toEqual({ cursor: 'opaque' })
+    expect(result.current.items.map((item) => item.adjustmentId)).toEqual([
+      '0199c000-0000-7000-8000-000000000010',
+      '0199c000-0000-7000-8000-000000000011',
+    ])
+  })
+
+  it('rejects changed snapshots, duplicate rows and repeated cursors as durable contract failures', async () => {
+    for (const continuation of [
+      { ...adjustmentHistoryPage('0199c000-0000-7000-8000-000000000011', null),
+        asOf: '2026-10-25T03:30:00.000000' },
+      adjustmentHistoryPage('0199c000-0000-7000-8000-000000000010', null),
+      adjustmentHistoryPage('0199c000-0000-7000-8000-000000000011', 'opaque'),
+    ]) {
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      vi.spyOn(billingAdjustmentApi, 'getCreditAdjustmentHistoryPage')
+        .mockResolvedValueOnce(adjustmentHistoryPage(
+          '0199c000-0000-7000-8000-000000000010', 'opaque'))
+        .mockResolvedValueOnce(continuation)
+      const { result, unmount } = renderHook(
+        () => useBillingAdjustmentHistory(CLIENT_A, {}, 2),
+        { wrapper: createWrapper(queryClient) }
+      )
+      await waitFor(() => expect(result.current.items).toHaveLength(1))
+      await result.current.loadMore()
+      await waitFor(() => expect(result.current.items).toEqual([]))
+      expect(result.current.isError).toBe(true)
+      await waitFor(() => expect(queryClient.getQueryData(
+        billingAdjustmentKeys.list(CLIENT_A, {}, 2))).toBeUndefined())
+      unmount()
+      vi.restoreAllMocks()
+    }
+  })
+
+  it('retains validated rows for a transient continuation and retries the exact cursor', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const failure = { status: 503, code: 'credit_adjustment_history_dependency_unavailable',
+      message: 'Unavailable' }
+    const request = vi.spyOn(billingAdjustmentApi, 'getCreditAdjustmentHistoryPage')
+      .mockResolvedValueOnce(adjustmentHistoryPage(
+        '0199c000-0000-7000-8000-000000000010', 'same'))
+      .mockRejectedValueOnce(failure).mockRejectedValueOnce(failure)
+    const { result } = renderHook(
+      () => useBillingAdjustmentHistory(CLIENT_A, {}, 3),
+      { wrapper: createWrapper(queryClient) }
+    )
+    await waitFor(() => expect(result.current.items).toHaveLength(1))
+    await result.current.loadMore()
+    await waitFor(() => expect(result.current.isFetchNextPageError).toBe(true))
+    expect(result.current.items).toHaveLength(1)
+    expect(request.mock.calls.slice(1).map((call) => call[1])).toEqual([
+      { cursor: 'same' }, { cursor: 'same' },
+    ])
+  })
+
+  it('cancels and removes a superseded traversal before its late response can merge', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    let resolveOld: ((page: CreditAdjustmentHistoryPage) => void) | undefined
+    let oldSignal: AbortSignal | undefined
+    vi.spyOn(billingAdjustmentApi, 'getCreditAdjustmentHistoryPage').mockImplementation(
+      (_clientId, request, signal) => {
+        if ('filters' in request && request.filters.operationType !== 'reversal') {
+          oldSignal = signal
+          return new Promise((resolve) => { resolveOld = resolve })
+        }
+        return Promise.resolve(adjustmentHistoryPage(
+          '0199c000-0000-7000-8000-000000000011', null))
+      }
+    )
+    const { result, rerender } = renderHook(
+      ({ filters, traversalId }) => useBillingAdjustmentHistory(CLIENT_A, filters, traversalId),
+      { initialProps: { filters: {}, traversalId: 10 }, wrapper: createWrapper(queryClient) }
+    )
+    await waitFor(() => expect(oldSignal).toBeDefined())
+    rerender({ filters: { operationType: 'reversal' as const }, traversalId: 11 })
+    await waitFor(() => expect(result.current.items[0]?.adjustmentId).toBe(
+      '0199c000-0000-7000-8000-000000000011'))
+    expect(oldSignal?.aborted).toBe(true)
+    expect(queryClient.getQueryData(billingAdjustmentKeys.list(CLIENT_A, {}, 10))).toBeUndefined()
+    resolveOld?.(adjustmentHistoryPage('0199c000-0000-7000-8000-000000000010', null))
+    await Promise.resolve()
+    expect(result.current.items).toHaveLength(1)
+  })
+
+  it('suppresses rows and clears the private Billing root on continuation authorization loss', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    queryClient.setQueryData(billingAccountKeys.account(CLIENT_B), snapshot(CLIENT_B))
+    vi.spyOn(billingAdjustmentApi, 'getCreditAdjustmentHistoryPage')
+      .mockResolvedValueOnce(adjustmentHistoryPage(
+        '0199c000-0000-7000-8000-000000000010', 'next'))
+      .mockRejectedValueOnce({ status: 403, code: 'HTTP_403', message: 'Forbidden' })
+    const { result } = renderHook(
+      () => useBillingAdjustmentHistory(CLIENT_A, {}, 12),
+      { wrapper: createWrapper(queryClient) }
+    )
+    await waitFor(() => expect(result.current.items).toHaveLength(1))
+    await result.current.loadMore()
+    await waitFor(() => expect(result.current.items).toEqual([]))
+    await waitFor(() => expect(queryClient.getQueryCache().findAll({
+      queryKey: billingAccountKeys.billing,
+    })).toHaveLength(0))
+  })
+
+  it('marks the list stale on Story 3.5 invalidation and removes only the active list traversal', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const listKey = billingAdjustmentKeys.list(CLIENT_A, {}, 4)
+    const operationKey = billingAdjustmentKeys.operation(CLIENT_A, 'operation-id')
+    queryClient.setQueryData(listKey, { pages: [adjustmentHistoryPage(
+      '0199c000-0000-7000-8000-000000000010', null)], pageParams: [null] })
+    queryClient.setQueryData(operationKey, { retained: true })
+
+    await invalidateCreditAdjustmentScopes(queryClient, CLIENT_A)
+    expect(queryClient.getQueryState(listKey)?.isInvalidated).toBe(true)
+    await cancelAndRemoveBillingAdjustmentHistory(queryClient, listKey)
+    expect(queryClient.getQueryData(listKey)).toBeUndefined()
+    expect(queryClient.getQueryData(operationKey)).toEqual({ retained: true })
   })
 })

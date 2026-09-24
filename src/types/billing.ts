@@ -67,18 +67,70 @@ export interface CreditAdjustmentReceipt {
   operationAsOf: string
 }
 
-export interface CreditAdjustmentHistoryItem extends CreditAdjustmentReceipt {
-  operationType: 'original'
+export interface CreditAdjustmentHistoryItemBase {
+  schemaVersion: 1
+  clientId: string
+  creditAccountId: string
+  operationId: string
+  adjustmentId: string
+  ledgerId: string
+  amount: string
+  reason: string
+  performedBy: string
   expectedWalletVersion: string
+  walletVersionBefore: string
+  walletVersionAfter: string
+  beforeOwnedBalance: string
+  beforeReservedBalance: string
+  beforeAvailableBalance: string
+  afterOwnedBalance: string
+  afterReservedBalance: string
+  afterAvailableBalance: string
+  operationAsOf: LocalInstantValue
+}
+
+export interface CreditAdjustmentHistoryOriginalItem extends CreditAdjustmentHistoryItemBase {
+  operationType: 'original'
   originalAdjustmentId: null
   reversalAdjustmentId: string | null
 }
 
+export interface CreditAdjustmentHistoryReversalItem extends CreditAdjustmentHistoryItemBase {
+  operationType: 'reversal'
+  originalAdjustmentId: string
+  reversalAdjustmentId: null
+}
+
+export type CreditAdjustmentHistoryItem =
+  | CreditAdjustmentHistoryOriginalItem
+  | CreditAdjustmentHistoryReversalItem
+
 export interface CreditAdjustmentHistoryPage {
   items: CreditAdjustmentHistoryItem[]
-  asOf: string
+  asOf: LocalInstantValue
+  nextCursor: string | null
+}
+
+export interface CreditAdjustmentReconciliationPage extends CreditAdjustmentHistoryPage {
+  items: CreditAdjustmentHistoryOriginalItem[]
   nextCursor: null
 }
+
+export interface CreditAdjustmentHistoryFilters {
+  from?: LocalInstantValue
+  to?: LocalInstantValue
+  actorUserId?: string
+  reason?: string
+  operationId?: string
+  originalAdjustmentId?: string
+  reversalAdjustmentId?: string
+  operationType?: 'original' | 'reversal'
+  pageSize?: string
+}
+
+export type CreditAdjustmentHistoryRequest =
+  | { filters: CreditAdjustmentHistoryFilters }
+  | { cursor: string }
 
 export interface CreditAdjustmentAttempt {
   actorUserId: string
