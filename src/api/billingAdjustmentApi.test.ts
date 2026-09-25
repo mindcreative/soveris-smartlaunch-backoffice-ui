@@ -1,17 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient, type ApiError } from './apiClient'
 import { useAuthStore } from '../stores/authStore'
+import type { CreditAdjustmentHistoryOriginalItem } from '../types/billing'
 import {
   BillingAdjustmentContractError,
+  calculateCreditAdjustmentReversalProjection,
+  classifyCreditAdjustmentReversalError,
+  getCreditAdjustmentFamily,
+  getCreditAdjustmentReversalOperation,
   getCreditAdjustmentOperation,
   getCreditAdjustmentHistoryPage,
   parseCreditAdjustmentHistory,
   parseCreditAdjustmentHistoryPage,
   parseCreditAdjustmentPreview,
   parseCreditAdjustmentReceipt,
+  parseCreditAdjustmentFamily,
+  parseCreditAdjustmentReversalReceipt,
+  parseCreditAdjustmentReversalReconciliation,
   postCreditAdjustment,
+  postCreditAdjustmentReversal,
   previewCreditAdjustment,
   serializeCreditAdjustmentCommandRequest,
+  serializeCreditAdjustmentReversalRequest,
   serializeCreditAdjustmentPreviewRequest,
 } from './billingAdjustmentApi'
 
@@ -27,6 +37,7 @@ const REVERSAL_LEDGER = '0199b9d2-a9b1-7000-8000-000000000007'
 const AT = '2026-09-24T12:00:00.123456Z'
 const LOCAL_AT = '2026-09-24T14:00:00.123456'
 const REASON = 'Correct duplicate allocation'
+const REVERSAL_REASON = 'Compensate correction'
 
 const material = { amount: '-25.5000', reason: REASON }
 const command = {
@@ -64,6 +75,19 @@ function localReversal(): string {
 function localHistoryBody(items = `${localReversal()},${localOriginal()}`,
   cursor: string | null = 'opaque+/='): string {
   return `{"items":[${items}],"asOf":"2026-09-24T16:00:00.123456","nextCursor":${cursor === null ? 'null' : `"${cursor}"`}}`
+}
+
+function reversalReceiptBody(overrides = ''): string {
+  return `{"schemaVersion":1,"operationId":"${REVERSAL_OPERATION}","originalAdjustmentId":"${ADJUSTMENT}","reversalAdjustmentId":"${REVERSAL}","reversalLedgerId":"${REVERSAL_LEDGER}","clientId":"${CLIENT}","creditAccountId":"${ACCOUNT}","compensatingAmount":25.5000,"reason":"${REVERSAL_REASON}","performedBy":"${ACTOR}","walletVersionBefore":13,"walletVersionAfter":14,"beforeOwnedBalance":74.5000,"beforeReservedBalance":20.0000,"beforeAvailableBalance":54.5000,"afterOwnedBalance":100.0000,"afterReservedBalance":20.0000,"afterAvailableBalance":80.0000,"operationAsOf":"${LOCAL_AT}"${overrides}}`
+}
+
+function currentAccount() {
+  return {
+    creditAccountId: ACCOUNT, clientId: CLIENT, ownedBalance: '74.5000',
+    activelyReservedAmount: '20.0000', availableBalance: '54.5000',
+    activeReservationCount: 1, status: 'active' as const,
+    asOf: LOCAL_AT, walletVersion: '13',
+  }
 }
 
 beforeEach(() => {
@@ -314,5 +338,153 @@ describe('credit adjustment strict adapter', () => {
     })
     await expect(previewCreditAdjustment(CLIENT, ACCOUNT, material))
       .rejects.toBeInstanceOf(BillingAdjustmentContractError)
+  })
+})
+
+describe('credit adjustment reversal strict adapter', () => {
+  const reversalRequest = {
+    operationId: REVERSAL_OPERATION,
+    expectedWalletVersion: '13',
+    reason: REVERSAL_REASON,
+  }
+  const original = (): CreditAdjustmentHistoryOriginalItem => {
+    const item = parseCreditAdjustmentHistoryPage(
+      localHistoryBody(localOriginal(null), null), CLIENT
+    ).items[0]!
+    if (item.operationType !== 'original') throw new Error('fixture is not an original')
+    return item
+  }
+
+  it('serializes exactly three fields with an unquoted lossless BIGINT', () => {
+    expect(serializeCreditAdjustmentReversalRequest(reversalRequest)).toBe(
+      `{"operationId":"${REVERSAL_OPERATION}","expectedWalletVersion":13,"reason":"${REVERSAL_REASON}"}`)
+    expect(serializeCreditAdjustmentReversalRequest({
+      ...reversalRequest, expectedWalletVersion: '9223372036854775807',
+    })).toContain('"expectedWalletVersion":9223372036854775807')
+    expect(() => serializeCreditAdjustmentReversalRequest({
+      ...reversalRequest, expectedWalletVersion: '9223372036854775808',
+    })).toThrow(BillingAdjustmentContractError)
+    expect(() => serializeCreditAdjustmentReversalRequest({
+      ...reversalRequest, reason: ' line\nbreak ',
+    })).toThrow(BillingAdjustmentContractError)
+  })
+
+  it('validates all nineteen receipt fields, local time, inverse, identity and equations', () => {
+    const receipt = parseCreditAdjustmentReversalReceipt(
+      reversalReceiptBody(), CLIENT, currentAccount(), ACTOR, original(), reversalRequest)
+    expect(receipt.compensatingAmount).toBe('25.5000')
+    expect(receipt.operationAsOf).toBe(LOCAL_AT)
+    for (const defect of [
+      [LOCAL_AT, AT],
+      ['"compensatingAmount":25.5000', '"compensatingAmount":25.5001'],
+      ['"walletVersionAfter":14', '"walletVersionAfter":15'],
+      [`"originalAdjustmentId":"${ADJUSTMENT}"`, `"originalAdjustmentId":"${REVERSAL}"`],
+      ['"operationAsOf"', '"unknown"'],
+      ['"walletVersionBefore":13', '"walletVersionBefore":9007199254740992.0'],
+    ] as const) {
+      expect(() => parseCreditAdjustmentReversalReceipt(
+        reversalReceiptBody().replace(defect[0], defect[1]),
+        CLIENT, currentAccount(), ACTOR, original(), reversalRequest
+      )).toThrow(BillingAdjustmentContractError)
+    }
+  })
+
+  it('closes selected families to one unlinked original or two reciprocal rows', () => {
+    const open = parseCreditAdjustmentFamily(
+      localHistoryBody(localOriginal(null), null), CLIENT, ADJUSTMENT)
+    expect(open).toMatchObject({ original: { adjustmentId: ADJUSTMENT }, reversal: null })
+    const linked = parseCreditAdjustmentFamily(
+      localHistoryBody(`${localReversal()},${localOriginal()}`, null), CLIENT, ADJUSTMENT)
+    expect(linked.reversal?.adjustmentId).toBe(REVERSAL)
+    expect(() => parseCreditAdjustmentFamily(
+      localHistoryBody(localReversal(), null), CLIENT, ADJUSTMENT
+    )).toThrow(BillingAdjustmentContractError)
+    expect(() => parseCreditAdjustmentFamily(
+      localHistoryBody(localOriginal(null), 'more'), CLIENT, ADJUSTMENT
+    )).toThrow(BillingAdjustmentContractError)
+  })
+
+  it('projects debit equality and credit extremes with scaled bigint only', () => {
+    const debitOriginal = { ...original(), amount: '25.5000',
+      beforeOwnedBalance: '49.0000', beforeReservedBalance: '20.0000',
+      beforeAvailableBalance: '29.0000', afterOwnedBalance: '74.5000',
+      afterReservedBalance: '20.0000', afterAvailableBalance: '54.5000' }
+    const equality = calculateCreditAdjustmentReversalProjection({
+      creditAccountId: ACCOUNT, clientId: CLIENT, ownedBalance: '45.5000',
+      activelyReservedAmount: '20.0000', availableBalance: '25.5000',
+      activeReservationCount: 1, status: 'active', asOf: LOCAL_AT, walletVersion: '13',
+    }, debitOriginal)
+    expect(equality).toMatchObject({ advisoryEligible: true,
+      inverseAmount: '-25.5000', projectedAvailableBalance: '0.0000' })
+    const overflow = calculateCreditAdjustmentReversalProjection({
+      creditAccountId: ACCOUNT, clientId: CLIENT, ownedBalance: '99999999999999.9999',
+      activelyReservedAmount: '0.0000', availableBalance: '99999999999999.9999',
+      activeReservationCount: 0, status: 'active', asOf: LOCAL_AT,
+      walletVersion: '9223372036854775806',
+    }, original())
+    expect(overflow).toMatchObject({ advisoryEligible: false,
+      ineligibilityCode: 'credit_balance_overflow' })
+  })
+
+  it('uses exact local command, family and operation routes with retained bytes and signals', async () => {
+    const signal = new AbortController().signal
+    const bytes = serializeCreditAdjustmentReversalRequest(reversalRequest)
+    const post = vi.spyOn(apiClient, 'postApiRoot').mockResolvedValue({
+      data: reversalReceiptBody(), status: 200,
+      headers: { 'content-type': 'application/json' } as never,
+    })
+    const get = vi.spyOn(apiClient, 'getApiRoot')
+      .mockResolvedValueOnce({ data: localHistoryBody(localOriginal(null), null), status: 200,
+        headers: { 'content-type': 'application/json' } as never })
+      .mockResolvedValueOnce({ data: localHistoryBody(localReversal(), null), status: 200,
+        headers: { 'content-type': 'application/json' } as never })
+    await getCreditAdjustmentFamily(CLIENT, ADJUSTMENT, signal)
+    await postCreditAdjustmentReversal(
+      CLIENT, ADJUSTMENT, currentAccount(), original(), reversalRequest, signal, bytes)
+    await getCreditAdjustmentReversalOperation(
+      CLIENT, ADJUSTMENT, currentAccount(), ACTOR, original(), reversalRequest, signal)
+    expect(get).toHaveBeenNthCalledWith(1,
+      `/api/backoffice/clients/${CLIENT}/billing/adjustments?originalAdjustmentId=${ADJUSTMENT}&pageSize=2`,
+      expect.objectContaining({ signal, responseType: 'text' }))
+    expect(post).toHaveBeenCalledWith(
+      `/api/backoffice/clients/${CLIENT}/billing/adjustments/${ADJUSTMENT}/reversal`, bytes,
+      expect.objectContaining({ signal, responseType: 'text' }))
+    expect(get).toHaveBeenNthCalledWith(2,
+      `/api/backoffice/clients/${CLIENT}/billing/adjustments?operationId=${REVERSAL_OPERATION}&pageSize=1`,
+      expect.objectContaining({ signal, responseType: 'text' }))
+    await expect(postCreditAdjustmentReversal(
+      CLIENT, ADJUSTMENT, currentAccount(), original(), reversalRequest, signal, `${bytes} `
+    )).rejects.toBeInstanceOf(BillingAdjustmentContractError)
+  })
+
+  it('reconciles only the exact reciprocal reversal', () => {
+    const landed = parseCreditAdjustmentReversalReconciliation(
+      localHistoryBody(localReversal(), null), CLIENT, ADJUSTMENT, currentAccount(),
+      ACTOR, original(), reversalRequest)
+    expect(landed.items[0]?.adjustmentId).toBe(REVERSAL)
+    expect(parseCreditAdjustmentReversalReconciliation(
+      localHistoryBody('', null), CLIENT, ADJUSTMENT, currentAccount(),
+      ACTOR, original(), reversalRequest).items).toEqual([])
+    expect(() => parseCreditAdjustmentReversalReconciliation(
+      localHistoryBody(localReversal().replace(REVERSAL_REASON, 'Another operation'), null),
+      CLIENT, ADJUSTMENT, currentAccount(), ACTOR, original(), reversalRequest
+    )).toThrow(BillingAdjustmentContractError)
+  })
+
+  it.each([
+    [400, 'credit_adjustment_reversal_invalid_request', 'invalid_request'],
+    [401, 'HTTP_401', 'session_lost'],
+    [403, 'HTTP_403', 'permission_lost'],
+    [404, 'credit_adjustment_reversal_original_not_found', 'original_not_found'],
+    [409, 'credit_adjustment_already_reversed', 'already_reversed'],
+    [409, 'credit_adjustment_reversal_stale_wallet_version', 'stale_wallet_version'],
+    [409, 'time_zone_not_set', 'time_zone_not_set'],
+    [503, 'authorization_dependency_unavailable', 'dependency_unavailable'],
+    [503, 'credit_adjustment_reversal_outcome_unknown', 'ambiguous'],
+    [500, 'HTTP_500', 'ambiguous'],
+    [418, 'unknown', 'ambiguous'],
+  ])('classifies closed response %i/%s as %s', (status, code, expected) => {
+    expect(classifyCreditAdjustmentReversalError({ status, code, message: 'safe' }))
+      .toBe(expected)
   })
 })

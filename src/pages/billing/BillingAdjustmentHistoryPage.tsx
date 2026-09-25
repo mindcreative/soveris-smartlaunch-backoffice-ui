@@ -5,6 +5,7 @@ import type { ApiError } from '../../api/apiClient'
 import { BillingAdjustmentContractError } from '../../api/billingAdjustmentApi'
 import { AdjustmentHistoryFilters } from '../../components/billing/AdjustmentHistoryFilters'
 import { AdjustmentHistoryResults } from '../../components/billing/AdjustmentHistoryResults'
+import { CreditAdjustmentReversalWorkflow } from '../../components/billing/CreditAdjustmentReversalWorkflow'
 import { BillingWorkspaceNav } from '../../components/billing/BillingWorkspaceNav'
 import { Breadcrumbs, EmptyState, ErrorDisplay, Forbidden, LoadingSpinner } from '../../components/shared'
 import { useAuth } from '../../hooks/useAuth'
@@ -16,7 +17,10 @@ import {
   useBillingAdjustmentHistory,
 } from '../../queries/billingQueries'
 import { LocalInstant, localInstantLabel } from '../../timezone/LocalInstant'
-import type { CreditAdjustmentHistoryFilters } from '../../types/billing'
+import type {
+  CreditAdjustmentHistoryFilters,
+  CreditAdjustmentHistoryOriginalItem,
+} from '../../types/billing'
 
 let traversalSequence = 0
 const nextTraversalId = () => ++traversalSequence
@@ -78,7 +82,11 @@ function HistoryPageFrame({ clientId, children, headingRef }: {
 }
 
 function CanonicalAdjustmentHistoryPage({ clientId }: { clientId: string }) {
+  const { hasPermission, user } = useAuth()
+  const canView = hasPermission('billing:view')
+  const canAdjust = hasPermission('billing:adjust')
   const headingRef = useRef<HTMLHeadingElement>(null)
+  const reversalReturnFocusRef = useRef<HTMLElement | null>(null)
   const endRef = useRef<HTMLParagraphElement>(null)
   const finalLoadRequested = useRef(false)
   const previousPageCount = useRef(0)
@@ -88,6 +96,8 @@ function CanonicalAdjustmentHistoryPage({ clientId }: { clientId: string }) {
   const [traversalId, setTraversalId] = useState(nextTraversalId)
   const [transitionBusy, setTransitionBusy] = useState(false)
   const [announcement, setAnnouncement] = useState('')
+  const [selectedReversal, setSelectedReversal] =
+    useState<CreditAdjustmentHistoryOriginalItem | null>(null)
   const query = useBillingAdjustmentHistory(clientId, filters, traversalId)
   const activeKeyRef = useRef(billingAdjustmentKeys.list(clientId, filters, traversalId))
   activeKeyRef.current = billingAdjustmentKeys.list(clientId, filters, traversalId)
@@ -171,6 +181,21 @@ function CanonicalAdjustmentHistoryPage({ clientId }: { clientId: string }) {
           nextFilters, 'Filters applied. Loading a fresh adjustment history snapshot.')}
         onClear={clearFilters} serverFieldError={fieldError} />
       <div aria-live="polite" aria-atomic="true" className="sr-only">{announcement}</div>
+      <CreditAdjustmentReversalWorkflow clientId={clientId} actorUserId={user?.id ?? ''}
+        canAdjust={canAdjust} canView={canView} selected={selectedReversal}
+        returnFocusRef={reversalReturnFocusRef}
+        onClose={() => setSelectedReversal(null)}
+        onPermissionDenied={() => {
+          reversalReturnFocusRef.current = headingRef.current
+          setSelectedReversal(null)
+          setAnnouncement('Reversal permission is no longer available. Refreshing readable history.')
+          void startTraversal(filters, 'Reversal permission changed. Loading fresh adjustment history.')
+        }}
+        onResolved={(message) => {
+          reversalReturnFocusRef.current = headingRef.current
+          setAnnouncement(message)
+          void startTraversal(filters, `${message} Loading a fresh adjustment history snapshot.`)
+        }} />
 
       {query.isPending && !rowsPresent &&
         <LoadingSpinner message="Loading adjustment history…" />}
@@ -239,7 +264,12 @@ function CanonicalAdjustmentHistoryPage({ clientId }: { clientId: string }) {
               Refresh
             </button>
           </div>}
-        <AdjustmentHistoryResults items={query.items} />
+        <AdjustmentHistoryResults items={query.items} canAdjust={canAdjust}
+          onReviewReversal={(item, trigger) => {
+            reversalReturnFocusRef.current = trigger
+            setSelectedReversal(item)
+            setAnnouncement(`Loading fresh reversal evidence for original adjustment ${item.adjustmentId}.`)
+          }} />
         {laterError &&
           <div role="alert"
             className="state-indicator mt-4 rounded-md border border-red-500 bg-red-50 p-4 text-sm text-red-950">

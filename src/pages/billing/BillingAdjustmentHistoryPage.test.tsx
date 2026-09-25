@@ -3,12 +3,16 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../../App'
 import * as adjustmentApi from '../../api/billingAdjustmentApi'
+import { billingApi } from '../../api/billingApi'
 import { BillingAdjustmentContractError } from '../../api/billingAdjustmentApi'
 import { authApi } from '../../api/endpoints'
 import { queryClient } from '../../queryClient'
 import { invalidateCreditAdjustmentScopes } from '../../queries/billingQueries'
 import { useAuthStore } from '../../stores/authStore'
-import type { CreditAdjustmentHistoryPage } from '../../types/billing'
+import type {
+  CreditAdjustmentHistoryOriginalItem,
+  CreditAdjustmentHistoryPage,
+} from '../../types/billing'
 
 const CLIENT_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
 const CLIENT_B = 'ffffffff-1111-4222-8333-444444444444'
@@ -75,6 +79,46 @@ describe('Billing adjustment history experience', () => {
     expect(screen.getByRole('table', {
       name: 'Newest-first immutable Billing adjustment history',
     })).toBeInTheDocument()
+  })
+
+  it('opens reversal review from an exact Admin-only history action while view-only history stays unchanged', async () => {
+    const validPage = page(null, ADJUSTMENT_ID, '10.0000')
+    const original = { ...validPage.items[0]!,
+      beforeOwnedBalance: '100.0000', beforeReservedBalance: '20.0000',
+      beforeAvailableBalance: '80.0000', afterOwnedBalance: '110.0000',
+      afterReservedBalance: '20.0000', afterAvailableBalance: '90.0000',
+    } as CreditAdjustmentHistoryOriginalItem
+    validPage.items = [original]
+    vi.spyOn(adjustmentApi, 'getCreditAdjustmentHistoryPage').mockResolvedValue(validPage)
+    vi.spyOn(billingApi, 'getAccountSnapshot').mockResolvedValue({
+      clientId: CLIENT_ID, creditAccountId: original.creditAccountId,
+      ownedBalance: '110.0000', activelyReservedAmount: '20.0000',
+      availableBalance: '90.0000', activeReservationCount: 1, status: 'active',
+      asOf: '2026-09-24T10:00:00.000001', walletVersion: '41',
+    })
+    vi.spyOn(adjustmentApi, 'getCreditAdjustmentFamily').mockResolvedValue({
+      original, reversal: null, asOf: '2026-09-24T10:00:01.000001',
+    })
+    const user = userEvent.setup()
+    const admin = render(<App />)
+    const actions = await screen.findAllByRole('button', {
+      name: `Review reversal for original adjustment ${ADJUSTMENT_ID}`,
+    })
+    await user.click(actions[0]!)
+    expect(await screen.findByRole('dialog', { name: 'Review adjustment reversal' }))
+      .toBeInTheDocument()
+    expect(billingApi.getAccountSnapshot).toHaveBeenCalledWith(CLIENT_ID, expect.any(AbortSignal))
+    expect(adjustmentApi.getCreditAdjustmentFamily).toHaveBeenCalledWith(
+      CLIENT_ID, ADJUSTMENT_ID, expect.any(AbortSignal))
+
+    admin.unmount()
+    queryClient.clear()
+    authenticate('Viewer')
+    window.history.replaceState({}, '', `/billing/clients/${CLIENT_ID}/adjustments`)
+    render(<App />)
+    await screen.findByRole('table')
+    expect(screen.queryByRole('columnheader', { name: 'Action' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Review reversal/ })).not.toBeInTheDocument()
   })
 
   it('canonicalizes uppercase routes and rejects invalid Client routes without requesting', async () => {

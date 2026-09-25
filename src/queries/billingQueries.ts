@@ -22,9 +22,12 @@ import {
 } from '../api/billingPlanApi'
 import {
   BillingAdjustmentContractError,
+  getCreditAdjustmentFamily,
   getCreditAdjustmentHistoryPage,
   getCreditAdjustmentOperation,
+  getCreditAdjustmentReversalOperation,
   postCreditAdjustment,
+  postCreditAdjustmentReversal,
   previewCreditAdjustment,
   validateCreditAdjustmentHistoryRelationships,
 } from '../api/billingAdjustmentApi'
@@ -56,6 +59,12 @@ import type {
   CreditAdjustmentMaterial,
   CreditAdjustmentPreview,
   CreditAdjustmentReceipt,
+  CreditAdjustmentFamily,
+  CreditAdjustmentReversalAttempt,
+  CreditAdjustmentHistoryOriginalItem,
+  CreditAdjustmentReversalReceipt,
+  CreditAdjustmentReversalRequest,
+  CreditAdjustmentReversalReconciliationPage,
   ResourceAccessConsequence,
   ResourceAccessPreview,
   ResourceAccessPreviewRequest,
@@ -90,6 +99,20 @@ export const billingAdjustmentKeys = {
       'list', filters, traversalId] as const,
   operation: (clientId: string, operationId: string) =>
     [...privateRoot, 'billing', 'adjustments', clientId, 'history', operationId] as const,
+  reversal: (clientId: string) =>
+    [...privateRoot, 'billing', 'adjustments', clientId, 'reversal'] as const,
+  reversalFamily: (clientId: string, originalAdjustmentId: string) =>
+    [...privateRoot, 'billing', 'adjustments', clientId, 'reversal',
+      'family', originalAdjustmentId] as const,
+  reversalOperation: (clientId: string, operationId: string) =>
+    [...privateRoot, 'billing', 'adjustments', clientId, 'reversal',
+      'operation', operationId] as const,
+  reversalCommand: (clientId: string, originalAdjustmentId: string) =>
+    [...privateRoot, 'billing', 'adjustments', clientId, 'reversal',
+      'command', originalAdjustmentId] as const,
+  reversalRecovery: (clientId: string, originalAdjustmentId: string) =>
+    [...privateRoot, 'billing', 'adjustments', clientId, 'reversal',
+      'recovery', originalAdjustmentId] as const,
 }
 
 export const billingSubscriptionKeys = {
@@ -231,6 +254,69 @@ export function clearCreditAdjustmentMutationState(
     if (startsWithKey(mutation.options.mutationKey, billingAdjustmentKeys.client(clientId))) {
       queryClient.getMutationCache().remove(mutation)
     }
+  }
+}
+
+export function clearCreditAdjustmentReversalMutationState(
+  queryClient: QueryClient,
+  clientId: string
+): void {
+  const prefix = billingAdjustmentKeys.reversal(clientId)
+  for (const mutation of queryClient.getMutationCache().getAll()) {
+    if (startsWithKey(mutation.options.mutationKey, prefix))
+      queryClient.getMutationCache().remove(mutation)
+  }
+}
+
+export interface CreditAdjustmentReversalAuthorityRefresh {
+  account: BillingAccountSnapshot | null
+  accountError: unknown | null
+  family: CreditAdjustmentFamily | null
+  familyError: unknown | null
+  operation: CreditAdjustmentReversalReconciliationPage | null
+  operationError: unknown | null
+}
+
+export async function refreshCreditAdjustmentReversalAuthority(
+  queryClient: QueryClient,
+  attempt: CreditAdjustmentReversalAttempt,
+  signal?: AbortSignal,
+  onAuthReplay?: () => void
+): Promise<CreditAdjustmentReversalAuthorityRefresh> {
+  await invalidateCreditAdjustmentScopes(queryClient, attempt.clientId)
+  const [account, family, operation] = await Promise.allSettled([
+    queryClient.fetchQuery({
+      queryKey: billingAccountKeys.account(attempt.clientId),
+      queryFn: ({ signal: querySignal }) => billingApi.getAccountSnapshot(
+        attempt.clientId, signal ?? querySignal, onAuthReplay),
+      staleTime: 0,
+    }),
+    queryClient.fetchQuery({
+      queryKey: billingAdjustmentKeys.reversalFamily(
+        attempt.clientId, attempt.originalAdjustmentId),
+      queryFn: ({ signal: querySignal }) => getCreditAdjustmentFamily(
+        attempt.clientId, attempt.originalAdjustmentId,
+        signal ?? querySignal, onAuthReplay),
+      staleTime: 0,
+    }),
+    queryClient.fetchQuery({
+      queryKey: billingAdjustmentKeys.reversalOperation(
+        attempt.clientId, attempt.operationId),
+      queryFn: ({ signal: querySignal }) => getCreditAdjustmentReversalOperation(
+        attempt.clientId, attempt.originalAdjustmentId, attempt.account,
+        attempt.actorUserId, attempt.original, attempt.request,
+        signal ?? querySignal, onAuthReplay),
+      staleTime: 0,
+    }),
+  ])
+  clearCreditAdjustmentReversalMutationState(queryClient, attempt.clientId)
+  return {
+    account: account.status === 'fulfilled' ? account.value : null,
+    accountError: account.status === 'rejected' ? account.reason : null,
+    family: family.status === 'fulfilled' ? family.value : null,
+    familyError: family.status === 'rejected' ? family.reason : null,
+    operation: operation.status === 'fulfilled' ? operation.value : null,
+    operationError: operation.status === 'rejected' ? operation.reason : null,
   }
 }
 
@@ -838,6 +924,31 @@ export function useCreditAdjustmentCommandMutation(clientId: string, creditAccou
     mutationKey: billingAdjustmentKeys.command(clientId),
     mutationFn: ({ request, serializedBody, signal, onAuthReplay }) =>
       postCreditAdjustment(clientId, creditAccountId, request, signal, serializedBody, onAuthReplay),
+    retry: false,
+  })
+}
+
+export function useCreditAdjustmentReversalMutation(
+  clientId: string,
+  originalAdjustmentId: string
+) {
+  return useMutation<
+    CreditAdjustmentReversalReceipt,
+    Error | ApiError,
+    {
+      account: BillingAccountSnapshot
+      original: CreditAdjustmentHistoryOriginalItem
+      request: CreditAdjustmentReversalRequest
+      serializedBody: string
+      signal?: AbortSignal
+      onAuthReplay?: () => void
+    }
+  >({
+    mutationKey: billingAdjustmentKeys.reversalCommand(clientId, originalAdjustmentId),
+    mutationFn: ({ account, original, request, serializedBody, signal, onAuthReplay }) =>
+      postCreditAdjustmentReversal(
+        clientId, originalAdjustmentId, account, original, request,
+        signal, serializedBody, onAuthReplay),
     retry: false,
   })
 }

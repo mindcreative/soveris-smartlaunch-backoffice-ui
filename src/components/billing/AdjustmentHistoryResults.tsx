@@ -101,7 +101,37 @@ function NarrowField({ label, children }: { label: string; children: ReactNode }
   )
 }
 
-export function AdjustmentHistoryResults({ items }: { items: CreditAdjustmentHistoryItem[] }) {
+interface AdjustmentHistoryResultsProps {
+  items: CreditAdjustmentHistoryItem[]
+  canAdjust?: boolean
+  onReviewReversal?: (item: CreditAdjustmentHistoryItem & { operationType: 'original' },
+    trigger: HTMLButtonElement) => void
+}
+
+function canReviewReversal(item: CreditAdjustmentHistoryItem): item is
+  CreditAdjustmentHistoryItem & { operationType: 'original' } {
+  return item.operationType === 'original' && item.reversalAdjustmentId === null
+}
+
+function ReversalAction({ item, onReviewReversal }: {
+  item: CreditAdjustmentHistoryItem & { operationType: 'original' }
+  onReviewReversal?: AdjustmentHistoryResultsProps['onReviewReversal']
+}) {
+  return (
+    <button type="button"
+      aria-label={`Review reversal for original adjustment ${item.adjustmentId}`}
+      onClick={(event) => onReviewReversal?.(item, event.currentTarget)}
+      className="min-h-11 rounded-md border border-gray-400 bg-white px-3 py-2 text-sm font-semibold text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-700">
+      Review reversal
+    </button>
+  )
+}
+
+export function AdjustmentHistoryResults({
+  items,
+  canAdjust = false,
+  onReviewReversal,
+}: AdjustmentHistoryResultsProps) {
   return (
     <section aria-labelledby="adjustment-history-results-heading" className="min-w-0">
       <h2 id="adjustment-history-results-heading" className="mb-2 text-lg font-semibold text-gray-950">
@@ -121,6 +151,10 @@ export function AdjustmentHistoryResults({ items }: { items: CreditAdjustmentHis
               <th scope="col" className="w-80 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700">Reason and actor</th>
               <th scope="col" className="w-80 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700">Balances before and after</th>
               <th scope="col" className="w-96 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700">Immutable identifiers and wallet versions</th>
+              {canAdjust && <th scope="col"
+                className="w-48 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700">
+                Action
+              </th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-300">
@@ -132,6 +166,10 @@ export function AdjustmentHistoryResults({ items }: { items: CreditAdjustmentHis
                 <td className="px-3 py-4"><ReasonAndActor item={item} /></td>
                 <td className="px-3 py-4"><Balances item={item} /></td>
                 <td className="px-3 py-4"><IdentifiersAndVersions item={item} /></td>
+                {canAdjust && <td className="px-3 py-4">
+                  {canReviewReversal(item) && <ReversalAction item={item}
+                    onReviewReversal={onReviewReversal} />}
+                </td>}
               </tr>
             ))}
           </tbody>
@@ -149,6 +187,10 @@ export function AdjustmentHistoryResults({ items }: { items: CreditAdjustmentHis
               <NarrowField label="Reason and actor"><ReasonAndActor item={item} /></NarrowField>
               <NarrowField label="Balances before and after"><Balances item={item} /></NarrowField>
               <NarrowField label="Immutable identifiers and wallet versions"><IdentifiersAndVersions item={item} /></NarrowField>
+              {canAdjust && canReviewReversal(item) &&
+                <NarrowField label="Available action">
+                  <ReversalAction item={item} onReviewReversal={onReviewReversal} />
+                </NarrowField>}
             </dl>
           </li>
         ))}

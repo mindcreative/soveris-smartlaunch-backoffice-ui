@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 import type { CreditAdjustmentHistoryItem } from '../../types/billing'
 import { AdjustmentHistoryResults } from './AdjustmentHistoryResults'
 
@@ -123,5 +124,37 @@ describe('AdjustmentHistoryResults', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
     expect(screen.queryByRole('link')).not.toBeInTheDocument()
     expect(container).not.toHaveTextContent(/\b(?:currency|revenue|money|eligible|edit(?:ed)?|delet(?:e|ed)|replac(?:e|ed))\b/i)
+  })
+
+  it('adds truthful wide and narrow reversal actions only for adjust-authorized unlinked originals', async () => {
+    const user = userEvent.setup()
+    const onReviewReversal = vi.fn()
+    const { container } = render(<AdjustmentHistoryResults items={items} canAdjust
+      onReviewReversal={onReviewReversal} />)
+    const table = screen.getByRole('table')
+    expect(within(table).getAllByRole('columnheader').map((header) => header.textContent).slice(-1)[0])
+      .toBe('Action')
+    const buttons = screen.getAllByRole('button', {
+      name: `Review reversal for original adjustment ${UNLINKED_ID}`,
+    })
+    expect(buttons).toHaveLength(2)
+    expect(buttons.every((button) => button.classList.contains('min-h-11'))).toBe(true)
+    expect(screen.getAllByText('Available action')).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: new RegExp(ORIGINAL_ID) })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: new RegExp(REVERSAL_ID) })).not.toBeInTheDocument()
+    expect(container).not.toHaveTextContent(/\beligible\b/i)
+
+    await user.click(buttons[0]!)
+    expect(onReviewReversal).toHaveBeenCalledOnce()
+    expect(onReviewReversal.mock.calls[0]?.[0]).toEqual(items[2])
+    expect(onReviewReversal.mock.calls[0]?.[1]).toBe(buttons[0])
+  })
+
+  it('omits the entire action column and narrow field for view-only actors', () => {
+    render(<AdjustmentHistoryResults items={items} canAdjust={false}
+      onReviewReversal={vi.fn()} />)
+    expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).not.toContain('Action')
+    expect(screen.queryByText('Available action')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Review reversal/ })).not.toBeInTheDocument()
   })
 })

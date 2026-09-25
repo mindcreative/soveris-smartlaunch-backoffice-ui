@@ -16,6 +16,7 @@ import type {
   BillingSubscriptionState,
   ClientCapabilities,
   CreditAdjustmentAttempt,
+  CreditAdjustmentReversalAttempt,
   CreditAdjustmentHistoryFilters,
   CreditAdjustmentHistoryPage,
 } from '../types/billing'
@@ -28,6 +29,7 @@ import {
   billingSubscriptionKeys,
   clearPrivateClientScope,
   clearCreditAdjustmentMutationState,
+  clearCreditAdjustmentReversalMutationState,
   cancelAndRemoveBillingAdjustmentHistory,
   clearPrivateBillingQueries,
   clientCapabilityKeys,
@@ -36,6 +38,7 @@ import {
   invalidateTierChangeScopes,
   invalidatePlanChangeScopes,
   invalidateCreditAdjustmentScopes,
+  refreshCreditAdjustmentReversalAuthority,
   refreshCreditAdjustmentAuthority,
   resourceAccessKeys,
   useBillingAccount,
@@ -60,6 +63,45 @@ function snapshot(clientId: string): BillingAccountSnapshot {
     status: 'active',
     asOf: '2026-08-24T07:00:00.000000',
     walletVersion: '1',
+  }
+}
+
+function reversalAttempt(): CreditAdjustmentReversalAttempt {
+  const creditAccountId = '0199b9d2-a9b1-7000-8000-000000000002'
+  const originalAdjustmentId = '0199b9d2-a9b1-7000-8000-000000000003'
+  return {
+    actorUserId: '22222222-3333-4444-8555-666666666666',
+    clientId: CLIENT_A,
+    originalAdjustmentId,
+    creditAccountId,
+    route: `/api/backoffice/clients/${CLIENT_A}/billing/adjustments/${originalAdjustmentId}/reversal`,
+    operationId: '0199b9d2-a9b1-7000-8000-000000000005',
+    request: {
+      operationId: '0199b9d2-a9b1-7000-8000-000000000005',
+      expectedWalletVersion: '13', reason: 'Compensate correction',
+    },
+    serializedBody: '{}', semanticFingerprint: 'private',
+    dispatchedAt: '2026-09-24T12:00:00Z',
+    account: {
+      creditAccountId, clientId: CLIENT_A, ownedBalance: '74.5000',
+      activelyReservedAmount: '20.0000', availableBalance: '54.5000',
+      activeReservationCount: 1, status: 'active',
+      asOf: '2026-09-24T14:00:00.123456', walletVersion: '13',
+    },
+    original: {
+      schemaVersion: 1, clientId: CLIENT_A, creditAccountId,
+      operationId: '0199b9d2-a9b1-7000-8000-000000000001',
+      adjustmentId: originalAdjustmentId,
+      ledgerId: '0199b9d2-a9b1-7000-8000-000000000004',
+      operationType: 'original', amount: '-25.5000', reason: 'Original',
+      performedBy: '22222222-3333-4444-8555-666666666666',
+      expectedWalletVersion: '12', walletVersionBefore: '12', walletVersionAfter: '13',
+      beforeOwnedBalance: '100.0000', beforeReservedBalance: '20.0000',
+      beforeAvailableBalance: '80.0000', afterOwnedBalance: '74.5000',
+      afterReservedBalance: '20.0000', afterAvailableBalance: '54.5000',
+      operationAsOf: '2026-09-24T13:00:00.123456',
+      originalAdjustmentId: null, reversalAdjustmentId: null,
+    },
   }
 }
 
@@ -124,6 +166,60 @@ describe('private Billing queries', () => {
     expect(billingAdjustmentKeys.preview(CLIENT_A)).toEqual([
       'backoffice', 'private', 'billing', 'adjustments', CLIENT_A, 'preview',
     ])
+    expect(billingAdjustmentKeys.reversalFamily(CLIENT_A, 'original-id')).toEqual([
+      'backoffice', 'private', 'billing', 'adjustments', CLIENT_A,
+      'reversal', 'family', 'original-id',
+    ])
+    expect(billingAdjustmentKeys.reversalOperation(CLIENT_A, 'operation-id')).toEqual([
+      'backoffice', 'private', 'billing', 'adjustments', CLIENT_A,
+      'reversal', 'operation', 'operation-id',
+    ])
+    expect(billingAdjustmentKeys.reversalCommand(CLIENT_A, 'original-id')).toEqual([
+      'backoffice', 'private', 'billing', 'adjustments', CLIENT_A,
+      'reversal', 'command', 'original-id',
+    ])
+  })
+
+  it('refreshes exact reversal authority and leaves ledger invalidated without refetch', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const attempt = reversalAttempt()
+    const refreshedAccount = { ...attempt.account, walletVersion: '14',
+      ownedBalance: '100.0000', availableBalance: '80.0000' }
+    const family = { original: { ...attempt.original, reversalAdjustmentId:
+      '0199b9d2-a9b1-7000-8000-000000000006' }, reversal: null,
+    asOf: '2026-09-24T15:00:00.123456' as const }
+    vi.spyOn(billingApi, 'getAccountSnapshot').mockResolvedValue(refreshedAccount)
+    vi.spyOn(billingAdjustmentApi, 'getCreditAdjustmentFamily').mockResolvedValue(family)
+    vi.spyOn(billingAdjustmentApi, 'getCreditAdjustmentReversalOperation').mockResolvedValue({
+      items: [], asOf: '2026-09-24T15:00:00.123456', nextCursor: null,
+    })
+    const ledgerKey = billingLedgerKeys.client(CLIENT_A)
+    queryClient.setQueryData(ledgerKey, { evidence: true })
+    let ledgerFetches = 0
+    queryClient.setQueryDefaults(ledgerKey, { queryFn: async () => { ledgerFetches++; return {} } })
+    queryClient.getMutationCache().build(queryClient, {
+      mutationKey: billingAdjustmentKeys.command(CLIENT_A), mutationFn: async () => undefined,
+    })
+    queryClient.getMutationCache().build(queryClient, {
+      mutationKey: billingAdjustmentKeys.reversalCommand(CLIENT_A, attempt.originalAdjustmentId),
+      mutationFn: async () => undefined,
+    })
+
+    const result = await refreshCreditAdjustmentReversalAuthority(queryClient, attempt)
+    clearCreditAdjustmentReversalMutationState(queryClient, CLIENT_A)
+
+    expect(result.account).toEqual(refreshedAccount)
+    expect(result.family).toEqual(family)
+    expect(result.operation?.items).toEqual([])
+    expect(billingAdjustmentApi.getCreditAdjustmentFamily).toHaveBeenCalledWith(
+      CLIENT_A, attempt.originalAdjustmentId, expect.any(AbortSignal), undefined)
+    expect(billingAdjustmentApi.getCreditAdjustmentReversalOperation).toHaveBeenCalledWith(
+      CLIENT_A, attempt.originalAdjustmentId, attempt.account, attempt.actorUserId,
+      attempt.original, attempt.request, expect.any(AbortSignal), undefined)
+    expect(queryClient.getQueryState(ledgerKey)?.isInvalidated).toBe(true)
+    expect(ledgerFetches).toBe(0)
+    expect(queryClient.getMutationCache().getAll().map((mutation) => mutation.options.mutationKey))
+      .toEqual([billingAdjustmentKeys.command(CLIENT_A)])
   })
 
   it('purges every former-Client private owner and leaves another Client intact', async () => {

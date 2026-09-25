@@ -67,6 +67,34 @@ export interface CreditAdjustmentReceipt {
   operationAsOf: string
 }
 
+export interface CreditAdjustmentReversalRequest {
+  operationId: string
+  expectedWalletVersion: string
+  reason: string
+}
+
+export interface CreditAdjustmentReversalReceipt {
+  schemaVersion: 1
+  operationId: string
+  originalAdjustmentId: string
+  reversalAdjustmentId: string
+  reversalLedgerId: string
+  clientId: string
+  creditAccountId: string
+  compensatingAmount: string
+  reason: string
+  performedBy: string
+  walletVersionBefore: string
+  walletVersionAfter: string
+  beforeOwnedBalance: string
+  beforeReservedBalance: string
+  beforeAvailableBalance: string
+  afterOwnedBalance: string
+  afterReservedBalance: string
+  afterAvailableBalance: string
+  operationAsOf: LocalInstantValue
+}
+
 export interface CreditAdjustmentHistoryItemBase {
   schemaVersion: 1
   clientId: string
@@ -104,6 +132,81 @@ export interface CreditAdjustmentHistoryReversalItem extends CreditAdjustmentHis
 export type CreditAdjustmentHistoryItem =
   | CreditAdjustmentHistoryOriginalItem
   | CreditAdjustmentHistoryReversalItem
+
+export interface CreditAdjustmentFamily {
+  original: CreditAdjustmentHistoryOriginalItem
+  reversal: CreditAdjustmentHistoryReversalItem | null
+  asOf: LocalInstantValue
+}
+
+export interface CreditAdjustmentReversalReconciliationPage {
+  items: CreditAdjustmentHistoryReversalItem[]
+  asOf: LocalInstantValue
+  nextCursor: null
+}
+
+export type CreditAdjustmentReversalIneligibilityCode =
+  | 'credit_account_inactive'
+  | 'credit_account_version_exhausted'
+  | 'credit_adjustment_reversal_insufficient_available_credits'
+  | 'credit_balance_overflow'
+
+export interface CreditAdjustmentReversalProjection {
+  inverseAmount: string
+  currentOwnedBalance: string
+  currentReservedBalance: string
+  currentAvailableBalance: string
+  projectedOwnedBalance: string
+  projectedReservedBalance: string
+  projectedAvailableBalance: string
+  expectedWalletVersion: string
+  advisoryEligible: boolean
+  ineligibilityCode: CreditAdjustmentReversalIneligibilityCode | null
+}
+
+export interface CreditAdjustmentReversalAttempt {
+  actorUserId: string
+  clientId: string
+  originalAdjustmentId: string
+  creditAccountId: string
+  route: string
+  operationId: string
+  request: CreditAdjustmentReversalRequest
+  serializedBody: string
+  semanticFingerprint: string
+  dispatchedAt: string
+  account: BillingAccountSnapshot
+  original: CreditAdjustmentHistoryOriginalItem
+}
+
+export type CreditAdjustmentReversalErrorDisposition =
+  | 'invalid_request'
+  | 'session_lost'
+  | 'permission_lost'
+  | 'original_not_found'
+  | 'already_reversed'
+  | 'stale_wallet_version'
+  | 'insufficient_available_credits'
+  | 'balance_overflow'
+  | 'account_inactive'
+  | 'version_exhausted'
+  | 'invalid_original'
+  | 'operation_conflict'
+  | 'contract_defect'
+  | 'time_zone_not_set'
+  | 'dependency_unavailable'
+  | 'ambiguous'
+
+export type CreditAdjustmentReversalPhase =
+  | 'idle'
+  | 'opening'
+  | 'review'
+  | 'revalidating'
+  | 'submitting'
+  | 'reconciling'
+  | 'success'
+  | 'rejected'
+  | 'unknown'
 
 export interface CreditAdjustmentHistoryPage {
   items: CreditAdjustmentHistoryItem[]

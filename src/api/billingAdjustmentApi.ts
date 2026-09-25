@@ -4,6 +4,7 @@ import { canonicalizeGuid } from '../lib/guid'
 import { useAuthStore } from '../stores/authStore'
 import { parseLocalInstant } from '../timezone/LocalInstant'
 import type {
+  BillingAccountSnapshot,
   CreditAdjustmentCommandRequest,
   CreditAdjustmentHistoryItem,
   CreditAdjustmentHistoryFilters,
@@ -13,6 +14,13 @@ import type {
   CreditAdjustmentMaterial,
   CreditAdjustmentPreview,
   CreditAdjustmentReceipt,
+  CreditAdjustmentFamily,
+  CreditAdjustmentHistoryOriginalItem,
+  CreditAdjustmentReversalErrorDisposition,
+  CreditAdjustmentReversalProjection,
+  CreditAdjustmentReversalReceipt,
+  CreditAdjustmentReversalReconciliationPage,
+  CreditAdjustmentReversalRequest,
 } from '../types/billing'
 
 const REQUEST_DECIMAL = /^-?(?:0|[1-9]\d{0,13})(?:\.\d{1,4})?$/
@@ -116,6 +124,13 @@ function scaled(value: string): bigint {
 }
 const abs = (value: bigint): bigint => value < 0n ? -value : value
 const sameDecimal = (left: string, right: string): boolean => scaled(left) === scaled(right)
+const formatScaled = (value: bigint): string => {
+  const negative = value < 0n
+  const absolute = negative ? -value : value
+  const whole = absolute / 10_000n
+  const fraction = (absolute % 10_000n).toString().padStart(4, '0')
+  return `${negative ? '-' : ''}${whole}.${fraction}`
+}
 
 function validReason(value: unknown): string {
   const reason = text(value, 'reason')
@@ -123,6 +138,10 @@ function validReason(value: unknown): string {
       /\p{Cc}/u.test(reason) || /[\uD800-\uDFFF]/u.test(reason))
     fail('reason must be trimmed, contain 1–512 Unicode scalars, and contain no controls')
   return reason
+}
+
+export function validateCreditAdjustmentReversalReason(value: string): string {
+  return validReason(value)
 }
 
 function requestAmount(value: unknown): string {
@@ -244,6 +263,21 @@ export function serializeCreditAdjustmentCommandRequest(request: CreditAdjustmen
   return ensureBodySize(stringify({ operationId,
     expectedWalletVersion: new LosslessNumber(expectedWalletVersion),
     amount: new LosslessNumber(amount), reason }) as string)
+}
+
+export function serializeCreditAdjustmentReversalRequest(
+  request: CreditAdjustmentReversalRequest
+): string {
+  exact(record(request, 'reversal request'),
+    ['operationId', 'expectedWalletVersion', 'reason'], 'reversal request')
+  const operationId = uuid7(request.operationId, 'operationId')
+  const expectedWalletVersion = requestVersion(request.expectedWalletVersion)
+  const reason = validReason(request.reason)
+  return ensureBodySize(stringify({
+    operationId,
+    expectedWalletVersion: new LosslessNumber(expectedWalletVersion),
+    reason,
+  }) as string)
 }
 
 const PREVIEW_KEYS = ['schemaVersion', 'clientId', 'creditAccountId', 'walletVersion', 'asOf',
@@ -470,6 +504,254 @@ export function parseCreditAdjustmentHistory(source: string, clientIdValue: stri
   return { items: [original], asOf: page.asOf, nextCursor: null }
 }
 
+const REVERSAL_RECEIPT_KEYS = [
+  'schemaVersion', 'operationId', 'originalAdjustmentId', 'reversalAdjustmentId',
+  'reversalLedgerId', 'clientId', 'creditAccountId', 'compensatingAmount', 'reason',
+  'performedBy', 'walletVersionBefore', 'walletVersionAfter', 'beforeOwnedBalance',
+  'beforeReservedBalance', 'beforeAvailableBalance', 'afterOwnedBalance',
+  'afterReservedBalance', 'afterAvailableBalance', 'operationAsOf',
+] as const
+
+function storedDecimalText(value: unknown, field: string): string {
+  const candidate = text(value, field)
+  if (!RESPONSE_DECIMAL.test(candidate) || abs(scaled(candidate)) > DECIMAL_MAX_SCALED)
+    fail(`${field} is not a stored credit value`)
+  return candidate
+}
+
+function assertOriginalEvidence(
+  original: CreditAdjustmentHistoryOriginalItem,
+  expectedClient: string,
+  expectedAccount: string
+): void {
+  if (original.operationType !== 'original' || original.originalAdjustmentId !== null ||
+      original.reversalAdjustmentId !== null || original.clientId !== expectedClient ||
+      original.creditAccountId !== expectedAccount || scaled(original.amount) === 0n ||
+      original.expectedWalletVersion !== original.walletVersionBefore ||
+      BigInt(requestVersion(original.walletVersionBefore)) === INT64_MAX ||
+      BigInt(requestVersion(original.walletVersionAfter)) !==
+        BigInt(original.walletVersionBefore) + 1n)
+    fail('original adjustment evidence is invalid or linked')
+  validateStoredEquations(original)
+}
+
+export function calculateCreditAdjustmentReversalProjection(
+  account: BillingAccountSnapshot,
+  original: CreditAdjustmentHistoryOriginalItem
+): CreditAdjustmentReversalProjection {
+  const clientId = canonicalizeGuid(account.clientId) ?? fail('account clientId is invalid')
+  const accountId = canonicalizeGuid(account.creditAccountId) ?? fail('account identity is invalid')
+  assertOriginalEvidence(original, clientId, accountId)
+  const currentOwnedBalance = storedDecimalText(account.ownedBalance, 'ownedBalance')
+  const currentReservedBalance = storedDecimalText(
+    account.activelyReservedAmount, 'activelyReservedAmount')
+  const currentAvailableBalance = storedDecimalText(account.availableBalance, 'availableBalance')
+  const currentOwned = scaled(currentOwnedBalance)
+  const currentReserved = scaled(currentReservedBalance)
+  const currentAvailable = scaled(currentAvailableBalance)
+  if (currentReserved < 0n || currentOwned < currentReserved ||
+      currentAvailable !== currentOwned - currentReserved)
+    fail('current account balance evidence is invalid')
+  const expectedWalletVersion = requestVersion(account.walletVersion)
+  const inverse = -scaled(original.amount)
+  const projectedOwned = currentOwned + inverse
+  const projectedAvailable = projectedOwned - currentReserved
+  let ineligibilityCode: CreditAdjustmentReversalProjection['ineligibilityCode'] = null
+  if (account.status !== 'active') ineligibilityCode = 'credit_account_inactive'
+  else if (BigInt(expectedWalletVersion) === INT64_MAX)
+    ineligibilityCode = 'credit_account_version_exhausted'
+  else if (inverse < 0n && projectedAvailable < 0n)
+    ineligibilityCode = 'credit_adjustment_reversal_insufficient_available_credits'
+  else if (abs(projectedOwned) > DECIMAL_MAX_SCALED ||
+      abs(projectedAvailable) > DECIMAL_MAX_SCALED)
+    ineligibilityCode = 'credit_balance_overflow'
+  return {
+    inverseAmount: formatScaled(inverse),
+    currentOwnedBalance,
+    currentReservedBalance,
+    currentAvailableBalance,
+    projectedOwnedBalance: formatScaled(projectedOwned),
+    projectedReservedBalance: currentReservedBalance,
+    projectedAvailableBalance: formatScaled(projectedAvailable),
+    expectedWalletVersion,
+    advisoryEligible: ineligibilityCode === null,
+    ineligibilityCode,
+  }
+}
+
+export function parseCreditAdjustmentFamily(
+  source: string,
+  clientIdValue: string,
+  originalAdjustmentIdValue: string
+): CreditAdjustmentFamily {
+  const clientId = canonicalizeGuid(clientIdValue) ?? fail('route clientId is invalid')
+  const selectedId = canonicalUuid7(originalAdjustmentIdValue, 'originalAdjustmentId')
+  const page = parseCreditAdjustmentHistoryPage(source, clientId)
+  if (page.nextCursor !== null || page.items.length < 1 || page.items.length > 2)
+    fail('adjustment family envelope is invalid')
+  const originals = page.items.filter((item) => item.operationType === 'original')
+  const reversals = page.items.filter((item) => item.operationType === 'reversal')
+  if (originals.length !== 1 || originals[0]!.adjustmentId !== selectedId ||
+      reversals.length !== page.items.length - 1)
+    fail('adjustment family does not contain the selected original')
+  const original = originals[0]!
+  if (reversals.length === 0) {
+    if (original.reversalAdjustmentId !== null)
+      fail('adjustment family is partial')
+    return { original, reversal: null, asOf: page.asOf }
+  }
+  const reversal = reversals[0]!
+  if (original.reversalAdjustmentId !== reversal.adjustmentId ||
+      reversal.originalAdjustmentId !== original.adjustmentId ||
+      reversal.clientId !== original.clientId ||
+      reversal.creditAccountId !== original.creditAccountId ||
+      scaled(reversal.amount) !== -scaled(original.amount))
+    fail('adjustment family relationship is not reciprocal')
+  return { original, reversal, asOf: page.asOf }
+}
+
+function assertReversalResultEvidence(
+  values: {
+    clientId: string
+    creditAccountId: string
+    operationId: string
+    originalAdjustmentId: string
+    compensatingAmount: string
+    reason: string
+    performedBy: string
+    walletVersionBefore: string
+    walletVersionAfter: string
+    beforeOwnedBalance: string
+    beforeReservedBalance: string
+    beforeAvailableBalance: string
+    afterOwnedBalance: string
+    afterReservedBalance: string
+    afterAvailableBalance: string
+  },
+  expectedClient: string,
+  account: BillingAccountSnapshot,
+  expectedActor: string,
+  original: CreditAdjustmentHistoryOriginalItem,
+  request: CreditAdjustmentReversalRequest
+): void {
+  const projection = calculateCreditAdjustmentReversalProjection(account, original)
+  if (!projection.advisoryEligible || values.clientId !== expectedClient ||
+      values.creditAccountId !== account.creditAccountId ||
+      values.operationId !== uuid7(request.operationId, 'operationId') ||
+      values.originalAdjustmentId !== original.adjustmentId ||
+      values.performedBy !== expectedActor || values.reason !== validReason(request.reason) ||
+      !sameDecimal(values.compensatingAmount, projection.inverseAmount) ||
+      values.walletVersionBefore !== requestVersion(request.expectedWalletVersion) ||
+      values.walletVersionBefore !== projection.expectedWalletVersion ||
+      BigInt(values.walletVersionBefore) === INT64_MAX ||
+      BigInt(values.walletVersionAfter) !== BigInt(values.walletVersionBefore) + 1n ||
+      !sameDecimal(values.beforeOwnedBalance, projection.currentOwnedBalance) ||
+      !sameDecimal(values.beforeReservedBalance, projection.currentReservedBalance) ||
+      !sameDecimal(values.beforeAvailableBalance, projection.currentAvailableBalance) ||
+      !sameDecimal(values.afterOwnedBalance, projection.projectedOwnedBalance) ||
+      !sameDecimal(values.afterReservedBalance, projection.projectedReservedBalance) ||
+      !sameDecimal(values.afterAvailableBalance, projection.projectedAvailableBalance))
+    fail('reversal evidence does not match the sealed command')
+  validateStoredEquations({ ...values, amount: values.compensatingAmount })
+}
+
+export function parseCreditAdjustmentReversalReceipt(
+  source: string,
+  clientIdValue: string,
+  account: BillingAccountSnapshot,
+  actorIdValue: string,
+  original: CreditAdjustmentHistoryOriginalItem,
+  request: CreditAdjustmentReversalRequest
+): CreditAdjustmentReversalReceipt {
+  const root = payload(source)
+  exact(root, REVERSAL_RECEIPT_KEYS, 'reversal receipt')
+  const expectedClient = canonicalizeGuid(clientIdValue) ?? fail('route clientId is invalid')
+  const expectedActor = canonicalizeGuid(actorIdValue) ?? fail('actor is invalid')
+  const result: CreditAdjustmentReversalReceipt = {
+    schemaVersion: schemaVersion(root.schemaVersion, 'schemaVersion'),
+    operationId: canonicalUuid7(root.operationId, 'operationId'),
+    originalAdjustmentId: canonicalUuid7(root.originalAdjustmentId, 'originalAdjustmentId'),
+    reversalAdjustmentId: canonicalUuid7(root.reversalAdjustmentId, 'reversalAdjustmentId'),
+    reversalLedgerId: canonicalUuid7(root.reversalLedgerId, 'reversalLedgerId'),
+    clientId: canonicalGuid(root.clientId, 'clientId'),
+    creditAccountId: canonicalUuid7(root.creditAccountId, 'creditAccountId'),
+    compensatingAmount: decimal(root.compensatingAmount, 'compensatingAmount'),
+    reason: validReason(root.reason),
+    performedBy: canonicalGuid(root.performedBy, 'performedBy'),
+    walletVersionBefore: int64(root.walletVersionBefore, 'walletVersionBefore'),
+    walletVersionAfter: int64(root.walletVersionAfter, 'walletVersionAfter'),
+    beforeOwnedBalance: decimal(root.beforeOwnedBalance, 'beforeOwnedBalance'),
+    beforeReservedBalance: decimal(root.beforeReservedBalance, 'beforeReservedBalance'),
+    beforeAvailableBalance: decimal(root.beforeAvailableBalance, 'beforeAvailableBalance'),
+    afterOwnedBalance: decimal(root.afterOwnedBalance, 'afterOwnedBalance'),
+    afterReservedBalance: decimal(root.afterReservedBalance, 'afterReservedBalance'),
+    afterAvailableBalance: decimal(root.afterAvailableBalance, 'afterAvailableBalance'),
+    operationAsOf: localInstant(root.operationAsOf, 'operationAsOf'),
+  }
+  if (result.reversalAdjustmentId === result.originalAdjustmentId)
+    fail('reversal cannot be its own original')
+  assertReversalResultEvidence(result, expectedClient, account, expectedActor, original, request)
+  return result
+}
+
+export function parseCreditAdjustmentReversalReconciliation(
+  source: string,
+  clientIdValue: string,
+  originalAdjustmentIdValue: string,
+  account: BillingAccountSnapshot,
+  actorIdValue: string,
+  original: CreditAdjustmentHistoryOriginalItem,
+  request: CreditAdjustmentReversalRequest
+): CreditAdjustmentReversalReconciliationPage {
+  const expectedClient = canonicalizeGuid(clientIdValue) ?? fail('route clientId is invalid')
+  const expectedOriginal = canonicalUuid7(
+    originalAdjustmentIdValue, 'originalAdjustmentId')
+  const expectedActor = canonicalizeGuid(actorIdValue) ?? fail('actor is invalid')
+  const page = parseCreditAdjustmentHistoryPage(source, expectedClient)
+  if (page.nextCursor !== null || page.items.length > 1)
+    fail('reversal reconciliation envelope is invalid')
+  const item = page.items[0]
+  if (!item) return { items: [], asOf: page.asOf, nextCursor: null }
+  const reversal = item.operationType === 'reversal'
+    ? item : fail('reversal reconciliation item is not a reversal')
+  assertReversalResultEvidence({
+    ...reversal,
+    originalAdjustmentId: reversal.originalAdjustmentId,
+    compensatingAmount: reversal.amount,
+  }, expectedClient, account, expectedActor, original, request)
+  if (reversal.originalAdjustmentId !== expectedOriginal)
+    fail('reversal reconciliation original does not match')
+  return { items: [reversal], asOf: page.asOf, nextCursor: null }
+}
+
+export function classifyCreditAdjustmentReversalError(
+  error: unknown
+): CreditAdjustmentReversalErrorDisposition {
+  if (!error || typeof error !== 'object') return 'ambiguous'
+  const status = 'status' in error && typeof error.status === 'number' ? error.status : undefined
+  const code = 'code' in error && typeof error.code === 'string' ? error.code : undefined
+  if (status === 401) return 'session_lost'
+  if (status === 403) return 'permission_lost'
+  const known = new Map<string, CreditAdjustmentReversalErrorDisposition>([
+    ['400:credit_adjustment_reversal_invalid_request', 'invalid_request'],
+    ['404:credit_adjustment_reversal_original_not_found', 'original_not_found'],
+    ['409:credit_adjustment_already_reversed', 'already_reversed'],
+    ['409:credit_adjustment_reversal_stale_wallet_version', 'stale_wallet_version'],
+    ['409:credit_adjustment_reversal_insufficient_available_credits',
+      'insufficient_available_credits'],
+    ['409:credit_balance_overflow', 'balance_overflow'],
+    ['409:credit_account_inactive', 'account_inactive'],
+    ['409:credit_account_version_exhausted', 'version_exhausted'],
+    ['409:credit_adjustment_reversal_invalid_original', 'invalid_original'],
+    ['409:credit_adjustment_reversal_operation_conflict', 'operation_conflict'],
+    ['409:time_zone_not_set', 'time_zone_not_set'],
+    ['413:request_body_too_large', 'contract_defect'],
+    ['415:unsupported_media_type', 'contract_defect'],
+    ['503:authorization_dependency_unavailable', 'dependency_unavailable'],
+  ])
+  return known.get(`${status}:${code}`) ?? 'ambiguous'
+}
+
 function requireActor(): string {
   return useAuthStore.getState().user?.id ?? fail('authenticated actor is unavailable')
 }
@@ -534,6 +816,87 @@ export async function getCreditAdjustmentOperation(clientIdValue: string, operat
   verifyActor(actor)
   return parseCreditAdjustmentHistory(requireJson(response, 'history'), clientId, actor,
     request, creditAccountIdValue)
+}
+
+export async function getCreditAdjustmentFamily(
+  clientIdValue: string,
+  originalAdjustmentIdValue: string,
+  signal?: AbortSignal,
+  onAuthReplay?: () => void
+): Promise<CreditAdjustmentFamily> {
+  const clientId = canonicalizeGuid(clientIdValue) ?? fail('route clientId is invalid')
+  const originalAdjustmentId = canonicalUuid7(
+    originalAdjustmentIdValue, 'originalAdjustmentId')
+  const actor = requireActor()
+  const query = new URLSearchParams()
+  query.set('originalAdjustmentId', originalAdjustmentId)
+  query.set('pageSize', '2')
+  const response = await apiClient.getApiRoot<string>(
+    `/api/backoffice/clients/${encodeURIComponent(clientId)}/billing/adjustments?${query.toString()}`,
+    { responseType: 'text', signal, headers: { Accept: 'application/json' },
+      ...(onAuthReplay ? { onAuthReplay } : {}) })
+  verifyActor(actor)
+  return parseCreditAdjustmentFamily(
+    requireJson(response, 'adjustment family'), clientId, originalAdjustmentId)
+}
+
+export async function postCreditAdjustmentReversal(
+  clientIdValue: string,
+  originalAdjustmentIdValue: string,
+  account: BillingAccountSnapshot,
+  original: CreditAdjustmentHistoryOriginalItem,
+  request: CreditAdjustmentReversalRequest,
+  signal?: AbortSignal,
+  retainedBody?: string,
+  onAuthReplay?: () => void
+): Promise<CreditAdjustmentReversalReceipt> {
+  const clientId = canonicalizeGuid(clientIdValue) ?? fail('route clientId is invalid')
+  const originalAdjustmentId = canonicalUuid7(
+    originalAdjustmentIdValue, 'originalAdjustmentId')
+  if (original.adjustmentId !== originalAdjustmentId)
+    fail('selected original does not match the command route')
+  const serialized = serializeCreditAdjustmentReversalRequest(request)
+  if (retainedBody !== undefined && retainedBody !== serialized)
+    fail('retained reversal bytes changed')
+  const actor = requireActor()
+  const response = await apiClient.postApiRoot<string>(
+    `/api/backoffice/clients/${encodeURIComponent(clientId)}/billing/adjustments/${encodeURIComponent(originalAdjustmentId)}/reversal`,
+    retainedBody ?? serialized,
+    { responseType: 'text', signal, headers: { 'Content-Type': 'application/json' },
+      ...(onAuthReplay ? { onAuthReplay } : {}) })
+  verifyActor(actor)
+  return parseCreditAdjustmentReversalReceipt(
+    requireJson(response, 'reversal command'), clientId, account, actor, original, request)
+}
+
+export async function getCreditAdjustmentReversalOperation(
+  clientIdValue: string,
+  originalAdjustmentIdValue: string,
+  account: BillingAccountSnapshot,
+  actorIdValue: string,
+  original: CreditAdjustmentHistoryOriginalItem,
+  request: CreditAdjustmentReversalRequest,
+  signal?: AbortSignal,
+  onAuthReplay?: () => void
+): Promise<CreditAdjustmentReversalReconciliationPage> {
+  const clientId = canonicalizeGuid(clientIdValue) ?? fail('route clientId is invalid')
+  const originalAdjustmentId = canonicalUuid7(
+    originalAdjustmentIdValue, 'originalAdjustmentId')
+  const operationId = uuid7(request.operationId, 'operationId')
+  const actor = requireActor()
+  if (actor !== canonicalizeGuid(actorIdValue))
+    fail('retained actor does not match active actor')
+  const query = new URLSearchParams()
+  query.set('operationId', operationId)
+  query.set('pageSize', '1')
+  const response = await apiClient.getApiRoot<string>(
+    `/api/backoffice/clients/${encodeURIComponent(clientId)}/billing/adjustments?${query.toString()}`,
+    { responseType: 'text', signal, headers: { Accept: 'application/json' },
+      ...(onAuthReplay ? { onAuthReplay } : {}) })
+  verifyActor(actor)
+  return parseCreditAdjustmentReversalReconciliation(
+    requireJson(response, 'reversal operation'), clientId, originalAdjustmentId,
+    account, actor, original, request)
 }
 
 const HISTORY_FILTER_KEYS = [
