@@ -17,6 +17,7 @@ export interface ApiError {
   currentDraftRevision?: number
   errors?: ApiProblemValidationIssue[]
   problemDetails?: ApiErrorResponse
+  retryAfterSeconds?: number
 }
 
 export interface ApiProblemValidationIssue {
@@ -193,6 +194,15 @@ export class ApiClient {
       const responseData = decodeErrorBody(axiosError.response?.data)
       const status = axiosError.response?.status
       const fallbackCode = status ? `HTTP_${status}` : 'API_ERROR'
+      const rawRetryAfter = axiosError.response?.headers?.['retry-after']
+      const retryAfterSeconds = (() => {
+        if (typeof rawRetryAfter === 'number' && Number.isFinite(rawRetryAfter) && rawRetryAfter >= 0)
+          return rawRetryAfter
+        if (typeof rawRetryAfter !== 'string' || !rawRetryAfter.trim()) return undefined
+        if (/^\d+$/.test(rawRetryAfter.trim())) return Number(rawRetryAfter.trim())
+        const at = Date.parse(rawRetryAfter)
+        return Number.isFinite(at) ? Math.max(0, Math.ceil((at - Date.now()) / 1000)) : undefined
+      })()
 
       if (responseData && typeof responseData === 'object') {
         const envelope = responseData as ApiErrorResponse
@@ -230,6 +240,7 @@ export class ApiClient {
               : fallbackCode,
             message: problemDetail || problemTitle,
             status,
+            ...(retryAfterSeconds !== undefined && { retryAfterSeconds }),
             ...((typeof envelope.schemaVersion === 'number' || envelope.schemaVersion === null) && { schemaVersion: envelope.schemaVersion }),
             ...((typeof envelope.currentSchemaVersion === 'number' || envelope.currentSchemaVersion === null) && { currentSchemaVersion: envelope.currentSchemaVersion }),
             ...(typeof envelope.currentRevision === 'number' && { currentRevision: envelope.currentRevision }),

@@ -33,6 +33,7 @@ import {
 } from '../api/billingAdjustmentApi'
 import type { ApiError } from '../api/apiClient'
 import { productKeys } from './productQueries'
+import { aiContentKeys } from './aiContentKeys'
 import { localInstantDateTime } from '../timezone/LocalInstant'
 import type {
   BillingAccountSnapshot,
@@ -180,11 +181,11 @@ export async function clearPrivateClientScope(
         billingSubscriptionKeys.client(clientId), billingAccountKeys.account(clientId),
         billingAdjustmentKeys.client(clientId),
         clientCapabilityKeys.client(clientId), resourceAccessKeys.client(clientId),
-        productKeys.client(clientId), domainClientPrefix(clientId),
+        productKeys.client(clientId), domainClientPrefix(clientId), aiContentKeys.client(clientId),
       ]
     : [
         billingAccountKeys.billing, clientCapabilityKeys.all, resourceAccessKeys.all,
-        productKeys.all, domainPrivateRoot,
+        productKeys.all, domainPrivateRoot, aiContentKeys.all,
       ]
   const cancellations = roots.map((queryKey) => queryClient.cancelQueries({ queryKey }))
   roots.forEach((queryKey) => queryClient.removeQueries({ queryKey }))

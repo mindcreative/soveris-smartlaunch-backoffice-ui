@@ -21,6 +21,7 @@ import type {
   CreditAdjustmentHistoryPage,
 } from '../types/billing'
 import { productKeys } from './productQueries'
+import { aiContentKeys } from './aiContentKeys'
 import {
   billingAccountKeys,
   billingAdjustmentKeys,
@@ -228,6 +229,7 @@ describe('private Billing queries', () => {
       billingSubscriptionKeys.state(CLIENT_A), billingAccountKeys.account(CLIENT_A),
       clientCapabilityKeys.client(CLIENT_A), resourceAccessKeys.consequences(CLIENT_A),
       productKeys.client(CLIENT_A), [...domainClientPrefix(CLIENT_A), 'future-detail'],
+      aiContentKeys.job(CLIENT_A, 'actor-a', 'product-a', 'job-a'),
       billingAdjustmentKeys.operation(CLIENT_A, 'operation-id'),
     ] as const
     roots.forEach((key) => queryClient.setQueryData(key, { private: true }))
@@ -253,6 +255,7 @@ describe('private Billing queries', () => {
     queryClient.setQueryData(clientCapabilityKeys.client(CLIENT_A), { private: true })
     queryClient.setQueryData(resourceAccessKeys.consequences(CLIENT_A), { private: true })
     queryClient.setQueryData([...domainPrivateRoot, CLIENT_A, 'future-detail'], { private: true })
+    queryClient.setQueryData(aiContentKeys.job(CLIENT_A, 'actor-a', 'product-a', 'job-a'), { private: true })
     queryClient.setQueryData(['backoffice', 'public'], 'preserve')
 
     await clearPrivateClientScope(queryClient)

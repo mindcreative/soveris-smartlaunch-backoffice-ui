@@ -20,6 +20,7 @@ import type { CompletedProductImageUpload } from '../../types/productImages'
 import { Badge } from '../shared/Badge'
 import { Modal } from '../shared/Modal'
 import { ProductContentFields } from './ProductContentFields'
+import { ProductAiGenerationPanel } from './ProductAiGenerationPanel'
 import { ProductErrorSummary } from './ProductErrorSummary'
 import { cloneProductContent, issueMessage, pointerToFieldId, selectEditorContent } from './productEditorModel'
 
@@ -374,7 +375,7 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
   </div> : undefined
 
   return <Modal isOpen={Boolean(product)} onClose={onClose} closeDisabled={pending} title={product ? `Edit ${product.name}` : 'Edit product'} size="2xl" footer={footer}>
-    {detailError ? <div role="alert" className="space-y-3 rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-900"><p>{commandError(detailError)}</p><button type="button" onClick={() => void Promise.all([detailQuery.refetch(), contentQuery.refetch()])} className="min-h-11 rounded-md border border-red-400 px-3 font-medium">Retry loading product</button></div> : detailQuery.isLoading || contentQuery.isLoading || !working || !currentProduct || !authoritativeContent ? <p role="status" className="text-sm text-gray-600">Loading product editor…</p> : <div className="space-y-5">
+    {detailError && !working ? <div role="alert" className="space-y-3 rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-900"><p>{commandError(detailError)}</p><button type="button" onClick={() => void Promise.all([detailQuery.refetch(), contentQuery.refetch()])} className="min-h-11 rounded-md border border-red-400 px-3 font-medium">Retry loading product</button></div> : !working || !currentProduct || !authoritativeContent ? <p role="status" className="text-sm text-gray-600">Loading product editor…</p> : <div className="space-y-5">
       <section aria-labelledby="product-state-heading" className="rounded-lg bg-gray-50 p-4">
         <h3 id="product-state-heading" className="font-semibold">Product state</h3>
         <div className="mt-2 flex flex-wrap gap-2"><Badge variant={currentProduct.status === 'active' ? 'success' : 'neutral'}>{currentProduct.status === 'active' ? 'Active' : 'Archived'}</Badge><Badge variant={currentProduct.publicationStatus === 'published' ? 'success' : 'info'}>{currentProduct.publicationStatus === 'published' ? 'Published' : 'Unpublished'}</Badge><Badge variant={currentProduct.completeness.isComplete ? 'success' : 'warning'}>{currentProduct.completeness.isComplete ? 'Complete' : 'Incomplete'}</Badge></div>
@@ -393,6 +394,7 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
       <ProductErrorSummary ref={summaryRef} errors={validationErrors} />
       {warningText.length > 0 && <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"><p className="font-medium">Draft guidance</p><ul className="list-disc pl-5">{warningText.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>}
       <div aria-live="polite" role="status" className="min-h-6 text-sm font-medium text-gray-700">{pending ? saveDraft.isPending ? 'Saving draft…' : publish.isPending ? 'Publishing…' : 'Updating product…' : statusText}</div>
+      <ProductAiGenerationPanel clientId={clientId} product={currentProduct} working={working} />
       <ProductContentFields
         value={working}
         errors={validationErrors}

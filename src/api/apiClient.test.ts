@@ -90,6 +90,19 @@ describe('ApiClient error normalization', () => {
     })
   })
 
+  it('preserves numeric Retry-After evidence on ProblemDetails', () => {
+    expect(apiClient.normalizeError({
+      response: {
+        status: 429,
+        headers: { 'retry-after': '8' },
+        data: { title: 'Admission limit reached', status: 429, code: 'limit_reached' },
+      },
+    })).toEqual({
+      code: 'limit_reached', message: 'Admission limit reached', status: 429,
+      retryAfterSeconds: 8,
+    })
+  })
+
   it('preserves content ProblemDetails revision evidence, validation issues, and extensions', () => {
     const problem = {
       type: 'about:blank',

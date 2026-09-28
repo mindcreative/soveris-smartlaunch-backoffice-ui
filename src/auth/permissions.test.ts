@@ -35,4 +35,13 @@ describe('role permissions', () => {
       expect.arrayContaining(['content:view', 'content:edit', 'content:update'])
     )
   })
+
+  it('authorizes AI creation and lookup with delivered tokens only', () => {
+    for (const role of ['Admin', 'Editor'] as const) {
+      expect(ROLE_PERMISSIONS[role]).toEqual(expect.arrayContaining(['ai:create', 'ai:view']))
+    }
+    expect(ROLE_PERMISSIONS.Viewer).not.toContain('ai:create')
+    expect(ROLE_PERMISSIONS.Viewer).not.toContain('ai:view')
+    expect(Object.values(ROLE_PERMISSIONS).flat()).not.toContain('ai:use')
+  })
 })
