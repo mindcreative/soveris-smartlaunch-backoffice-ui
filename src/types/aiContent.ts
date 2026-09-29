@@ -143,6 +143,9 @@ export type AiGenerationTarget =
 export interface AiGenerationMaterial {
   target: AiGenerationTarget
   currentValue: string
+  targetPointer: string | null
+  targetValue: string
+  draftRevision: number
   productSlug: string
   productName: string
   targetAudience: string

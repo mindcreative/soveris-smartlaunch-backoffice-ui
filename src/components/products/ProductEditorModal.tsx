@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ApiError } from '../../api/apiClient'
 import { validateProductContent, type ContractIssue, type ContractTarget } from '../../contracts/product-content/validator'
+import { useAuth } from '../../hooks/useAuth'
 import { createUuidV7 } from '../../lib/uuidV7'
 import { useProductImageUploads } from '../../queries/productImageQueries'
 import {
@@ -9,6 +10,7 @@ import {
   usePublishProductContent,
   useSaveProductDraft,
   useUpdateProduct,
+  useValidateProductContent,
 } from '../../queries/productQueries'
 import type {
   Product,
@@ -22,6 +24,7 @@ import { Modal } from '../shared/Modal'
 import { ProductContentFields } from './ProductContentFields'
 import { ProductAiGenerationPanel } from './ProductAiGenerationPanel'
 import { ProductErrorSummary } from './ProductErrorSummary'
+import { aiApplyTargets, mergeAiVariation, readAiScalar, type AiApplyOutcome, type VerifiedAiApplySelection } from './productAiApply'
 import { cloneProductContent, issueMessage, pointerToFieldId, selectEditorContent } from './productEditorModel'
 
 interface ProductEditorModalProps {
@@ -88,10 +91,12 @@ function imagePointerForSource(pointer: string): string | null {
 }
 
 export function ProductEditorModal({ clientId, product, onClose }: ProductEditorModalProps) {
+  const { user, hasPermission } = useAuth()
   const productId = product?.id ?? ''
   const detailQuery = useProduct(clientId, productId)
   const contentQuery = useProductContent(clientId, productId)
   const saveDraft = useSaveProductDraft(clientId, productId)
+  const validateDraft = useValidateProductContent(clientId, productId)
   const publish = usePublishProductContent(clientId, productId)
   const updateProduct = useUpdateProduct(clientId, productId)
   const [authoritativeProduct, setAuthoritativeProduct] = useState<Product | null>(null)
@@ -106,6 +111,7 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
   const [dirty, setDirty] = useState(false)
   const [needsReview, setNeedsReview] = useState(false)
   const [serverCandidate, setServerCandidate] = useState<ServerCandidate | null>(null)
+  const [applyBusy, setApplyBusy] = useState(false)
   const initializedKey = useRef('')
   const generation = useRef(0)
   const summaryRef = useRef<HTMLDivElement>(null)
@@ -127,7 +133,7 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
   const imageUploads = useProductImageUploads(clientId, productId, onImageCompleted)
 
   const editorKey = product ? `${clientId}:${product.id}` : ''
-  const pending = saveDraft.isPending || publish.isPending || updateProduct.isPending
+  const pending = applyBusy || validateDraft.isPending || saveDraft.isPending || publish.isPending || updateProduct.isPending
   const identityValid = Boolean(name.trim() && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug.trim()))
   const secondaryButton = 'min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:opacity-50'
   const primaryButton = 'min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:opacity-50'
@@ -146,6 +152,7 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
     setDirty(false)
     setNeedsReview(false)
     setServerCandidate(null)
+    setApplyBusy(false)
     identityOperationId.current = createUuidV7()
     lifecycleOperationId.current = createUuidV7()
   }, [editorKey])
@@ -211,6 +218,141 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
       if (currentGeneration === generation.current) fail(error)
     }
   }, [authoritativeContent, authoritativeProduct, pending, product, saveDraft, validate, working])
+
+  const handleApplyGenerated = useCallback(async (selection: VerifiedAiApplySelection): Promise<AiApplyOutcome> => {
+    if (!working || !authoritativeContent || !authoritativeProduct || pending || dirty) {
+      setCommandErrorText(dirty
+        ? 'Save or resolve unrelated working-draft edits before Apply. Nothing was written.'
+        : 'Apply is unavailable while another editor action is running.')
+      return { kind: 'review' }
+    }
+    if (!user?.id || selection.actorId !== user.id || selection.clientId !== clientId ||
+      selection.productId !== productId || authoritativeProduct.clientId !== clientId ||
+      !hasPermission('ai:view') || !hasPermission('products:view') || !hasPermission('products:update') ||
+      selection.job.status !== 'completed' || selection.job.guidance.code !== 'complete' ||
+      selection.job.guidance.poll || selection.job.guidance.action !== 'view_result' ||
+      selection.job.jobId !== selection.jobId || selection.job.result?.resultId !== selection.resultId ||
+      (selection.job.submittedByUserId !== null && selection.job.submittedByUserId !== user.id) ||
+      selection.job.result.variations[selection.variationIndex] !== selection.variation) {
+      setCommandErrorText('Apply authorization, scope, or durable result evidence is no longer valid. Nothing was written.')
+      return { kind: 'permission_lost' }
+    }
+
+    setApplyBusy(true)
+    setCommandErrorText('')
+    setStatusText('Rechecking the current product and draft before Apply…')
+    const currentGeneration = generation.current
+    let mergedForRecovery: ProductContentV1 | null = null
+    let expectedRevisionForRecovery: number | null = null
+    let draftPutAttempted = false
+    try {
+      const [detailResult, contentResult] = await Promise.all([detailQuery.refetch(), contentQuery.refetch()])
+      if (currentGeneration !== generation.current) return { kind: 'review' }
+      if (detailResult.error || contentResult.error || !detailResult.data || !contentResult.data) {
+        const error = detailResult.error ?? contentResult.error
+        const apiError = error as unknown as ApiError | undefined
+        setCommandErrorText(commandError(error))
+        return { kind: apiError?.status === 401 || apiError?.status === 403 || apiError?.status === 404 ? 'permission_lost' : 'review' }
+      }
+      const freshProduct = detailResult.data
+      const freshContent = contentResult.data
+      if (freshProduct.id !== productId || freshProduct.clientId !== clientId || freshContent.productId !== productId) {
+        setCommandErrorText('The selected Client or product changed. Generated private content was cleared and nothing was written.')
+        return { kind: 'permission_lost' }
+      }
+      const freshRevision = freshContent.draft?.revision ?? 0
+      const freshDraft = selectEditorContent(freshProduct, freshContent)
+      const freshTarget = readAiScalar(freshDraft, selection.targetPointer)
+      const targetIsEligible = aiApplyTargets(freshDraft, selection.target).some(({ pointer }) => pointer === selection.targetPointer)
+      if (freshRevision !== selection.draftRevision || !targetIsEligible || freshTarget === null || freshTarget !== selection.targetValue) {
+        setServerCandidate({ product: freshProduct, content: freshContent })
+        setNeedsReview(true)
+        setCommandErrorText(`Apply is stale: it captured draft revision ${selection.draftRevision}, the server reports ${freshRevision}, or the selected target changed. Review and reselect before a new Apply.`)
+        setStatusText('No generated content was saved.')
+        return { kind: 'review' }
+      }
+
+      const merged = mergeAiVariation(freshDraft, selection.targetPointer, selection.variation)
+      mergedForRecovery = merged
+      expectedRevisionForRecovery = freshRevision
+      setWorking(merged)
+      setDirty(true)
+      const local = validateProductContent(merged, 'draft', 1)
+      const localErrors = issues(local.errors)
+      setValidationErrors(localErrors)
+      setWarningText(local.warnings.map(issueMessage))
+      if (!local.valid) {
+        setCommandErrorText('The merged draft needs correction before it can be saved. The generated change remains in your working copy.')
+        focusSummary()
+        return { kind: 'review' }
+      }
+
+      const serverReport = await validateDraft.mutateAsync({ schemaVersion: 1, content: cloneProductContent(merged), target: 'draft' })
+      if (currentGeneration !== generation.current) return { kind: 'review' }
+      setWarningText(serverReport.warnings.map((warning) => warning.message))
+      if (!serverReport.isValid || serverReport.errors.length > 0) {
+        setValidationErrors(serverReport.errors)
+        setCommandErrorText('The server found fields that need correction. The merged working copy and selected result were preserved.')
+        focusSummary()
+        return { kind: 'review' }
+      }
+      draftPutAttempted = true
+      const saved = await saveDraft.mutateAsync({ schemaVersion: 1, expectedRevision: freshRevision, content: cloneProductContent(merged) })
+      if (currentGeneration !== generation.current) return { kind: 'review' }
+      if (saved.productId !== productId || saved.draft?.schemaVersion !== 1 ||
+        saved.draft.revision !== freshRevision + 1 || JSON.stringify(saved.draft.content) !== JSON.stringify(merged)) {
+        setNeedsReview(true)
+        setCommandErrorText('The save response could not be verified. Your merged working copy and selected result were preserved; review the server version before any retry.')
+        return { kind: 'review' }
+      }
+      setAuthoritativeProduct(freshProduct)
+      setAuthoritativeContent(saved)
+      setWorking(selectEditorContent(freshProduct, saved))
+      setDirty(false)
+      setNeedsReview(false)
+      setServerCandidate(null)
+      setStatusText(`Generated ${selection.targetLabel} applied and draft saved at revision ${saved.draft?.revision ?? 0}. Live content and credits were unchanged.`)
+      return { kind: 'saved' }
+    } catch (error) {
+      if (currentGeneration !== generation.current) return { kind: 'review' }
+      const apiError = error as ApiError | undefined
+      if (apiError?.status === 422 && apiError.errors?.length) {
+        setValidationErrors(apiError.errors)
+        setCommandErrorText('The server found fields that need correction. The merged working copy and selected result were preserved.')
+        focusSummary()
+        return { kind: 'review' }
+      }
+      if (apiError?.status === 409 || apiError?.code?.includes('stale')) {
+        setNeedsReview(true)
+        setCommandErrorText(`The draft changed on the server. Current live revision ${apiError.currentRevision ?? 'unknown'}; current draft revision ${apiError.currentDraftRevision ?? 'unknown'}. Review before another Apply.`)
+        return { kind: 'review' }
+      }
+      if (draftPutAttempted && (apiError?.code === 'NETWORK_ERROR' || apiError?.status === 503) && mergedForRecovery && expectedRevisionForRecovery !== null) {
+        setStatusText('The Apply save outcome is uncertain. Verifying the authorized draft before any retry…')
+        try {
+          const verification = await contentQuery.refetch()
+          if (currentGeneration === generation.current && verification.data?.draft?.revision === expectedRevisionForRecovery + 1 &&
+            JSON.stringify(verification.data.draft.content) === JSON.stringify(mergedForRecovery)) {
+            setAuthoritativeContent(verification.data)
+            setWorking(verification.data.draft.content)
+            setDirty(false)
+            setNeedsReview(false)
+            setStatusText(`Generated ${selection.targetLabel} was verified at draft revision ${verification.data.draft.revision}. Live content and credits were unchanged.`)
+            return { kind: 'saved' }
+          }
+        } catch {
+          // Preserve the merged working copy and require review below.
+        }
+        setNeedsReview(true)
+        setCommandErrorText('The save outcome could not be verified. Your working copy and selected result are preserved; review the server version before any retry.')
+        return { kind: 'review' }
+      }
+      setCommandErrorText(commandError(error))
+      return { kind: apiError?.status === 401 || apiError?.status === 403 || apiError?.status === 404 ? 'permission_lost' : 'review' }
+    } finally {
+      if (currentGeneration === generation.current) setApplyBusy(false)
+    }
+  }, [authoritativeContent, authoritativeProduct, clientId, contentQuery, detailQuery, dirty, hasPermission, pending, productId, saveDraft, user?.id, validateDraft, working])
 
   useEffect(() => {
     if (!product) return
@@ -393,8 +535,8 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
       {needsReview && <div className="space-y-3 rounded-md border border-amber-400 bg-amber-50 p-3 text-sm"><p>Your working copy has not been replaced.</p>{!serverCandidate ? <button type="button" disabled={pending} onClick={() => void reviewServer()} className="min-h-11 rounded-md border border-amber-600 px-3 font-medium">Refresh and review server version</button> : <div className="flex flex-wrap gap-2"><button type="button" onClick={acceptServer} className="min-h-11 rounded-md border border-amber-600 px-3 font-medium">Use server version</button><button type="button" onClick={keepLocal} className="min-h-11 rounded-md border border-amber-600 px-3 font-medium">Keep local edits</button></div>}</div>}
       <ProductErrorSummary ref={summaryRef} errors={validationErrors} />
       {warningText.length > 0 && <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"><p className="font-medium">Draft guidance</p><ul className="list-disc pl-5">{warningText.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>}
-      <div aria-live="polite" role="status" className="min-h-6 text-sm font-medium text-gray-700">{pending ? saveDraft.isPending ? 'Saving draft…' : publish.isPending ? 'Publishing…' : 'Updating product…' : statusText}</div>
-      <ProductAiGenerationPanel clientId={clientId} product={currentProduct} working={working} />
+      <div aria-live="polite" role="status" className="min-h-6 text-sm font-medium text-gray-700">{applyBusy || validateDraft.isPending ? 'Applying generated content…' : pending ? saveDraft.isPending ? 'Saving draft…' : publish.isPending ? 'Publishing…' : 'Updating product…' : statusText}</div>
+      <ProductAiGenerationPanel clientId={clientId} product={currentProduct} working={working} draftRevision={authoritativeContent.draft?.revision ?? 0} dirty={dirty} applyPending={applyBusy || validateDraft.isPending || saveDraft.isPending} onApply={handleApplyGenerated} />
       <ProductContentFields
         value={working}
         errors={validationErrors}

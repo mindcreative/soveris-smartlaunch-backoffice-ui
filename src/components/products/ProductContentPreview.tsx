@@ -4,9 +4,11 @@ interface ProductContentPreviewProps {
   attempt: AiRetainedAttempt
   job: AiJobStatusDto
   draftMoved: boolean
+  selectedIndex: number | null
+  onSelect: (index: number) => void
 }
 
-export function ProductContentPreview({ attempt, job, draftMoved }: ProductContentPreviewProps) {
+export function ProductContentPreview({ attempt, job, draftMoved, selectedIndex, onSelect }: ProductContentPreviewProps) {
   if (!job.result) return null
   const imagePrompt = attempt.material.target === 'image_prompt'
   return <section aria-labelledby="ai-preview-heading" className="space-y-4 rounded-lg border border-indigo-300 bg-indigo-50 p-4 forced-colors:border-[CanvasText]">
@@ -24,7 +26,7 @@ export function ProductContentPreview({ attempt, job, draftMoved }: ProductConte
         <h5 id="ai-generated-heading" className="font-medium">{imagePrompt ? 'Generated image prompts (text)' : 'Generated'}</h5>
         <ol className="mt-2 space-y-3">
           {job.result.variations.map((variation, index) => <li key={`${job.result!.resultId}:${index}`} className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Variation {index + 1}</p>
+            {!imagePrompt && attempt.material.targetPointer ? <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-md p-2 focus-within:ring-2 focus-within:ring-indigo-600"><input type="radio" name={`ai-variation-${job.result!.resultId}`} checked={selectedIndex === index} onChange={() => onSelect(index)} className="mt-1 size-5" /><span className="font-medium">Select variation {index + 1}</span></label> : <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Variation {index + 1}</p>}
             <output className="mt-1 block whitespace-pre-wrap break-words text-sm text-gray-950">{variation}</output>
           </li>)}
         </ol>

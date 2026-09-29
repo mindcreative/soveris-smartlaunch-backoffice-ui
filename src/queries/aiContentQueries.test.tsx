@@ -11,9 +11,11 @@ const CLIENT_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 const PRODUCT_ID = '11111111-2222-3333-4444-555555555555'
 const JOB_ID = '01995d88-7740-73f1-8000-000000000001'
 const KEY = '01995d88-7740-73f1-8000-000000000099'
+const REGENERATE_KEY = '01995d88-7740-73f1-8000-000000000100'
 
 const material: AiGenerationMaterial = {
   target: 'hero', currentValue: 'Frozen hero copy', productSlug: 'origin',
+  targetPointer: '/hero/title', targetValue: 'Frozen hero title', draftRevision: 7,
   productName: 'Origin', targetAudience: 'Teams', tone: 'professional',
   variations: 1, instructions: 'Be precise',
 }
@@ -55,7 +57,7 @@ function harness(overrides: Partial<AiWorkflowDependencies> = {}) {
     ...overrides,
   }
   const wrapper = ({ children }: PropsWithChildren) => <QueryClientProvider client={client}>{children}</QueryClientProvider>
-  const rendered = renderHook((props: { clientId: string; authorized: boolean }) => useAiContentGeneration({ actorId: ACTOR_ID, clientId: props.clientId, productId: PRODUCT_ID, classification: 'customer', authorized: props.authorized, dependencies }), { wrapper, initialProps: { clientId: CLIENT_ID, authorized: true } })
+  const rendered = renderHook((props: { clientId: string; authorized: boolean; productId?: string }) => useAiContentGeneration({ actorId: ACTOR_ID, clientId: props.clientId, productId: props.productId ?? PRODUCT_ID, classification: 'customer', authorized: props.authorized, dependencies }), { wrapper, initialProps: { clientId: CLIENT_ID, authorized: true } as { clientId: string; authorized: boolean; productId?: string } })
   return { ...rendered, dependencies, client }
 }
 
@@ -97,6 +99,73 @@ describe('retained AI content workflow', () => {
     expect(post.mock.calls[0]?.[0]).toBe(post.mock.calls[1]?.[0])
     expect(flow.result.current.state.attempt?.idempotencyKey).toBe(retained?.idempotencyKey)
     expect(flow.result.current.state.attempt?.serializedBody).toBe(retained?.serializedBody)
+  })
+
+  it('starts a confirmed regeneration with one fresh key while retaining the completed result', async () => {
+    const keys = [KEY, REGENERATE_KEY]
+    let releaseSecond!: (value: AiContentAdmission) => void
+    const post = vi.fn()
+      .mockResolvedValueOnce(admission)
+      .mockImplementationOnce(() => new Promise<AiContentAdmission>((resolve) => { releaseSecond = resolve }))
+    const flow = harness({ uuid: () => keys.shift()!, post })
+    act(() => { expect(flow.result.current.generate(material)).toBe(true) })
+    await waitFor(() => expect(flow.result.current.state.phase).toBe('completed'))
+    const completed = flow.result.current.state
+
+    act(() => { expect(flow.result.current.regenerate({ ...material, instructions: 'A fresh confirmed request' })).toBe(true) })
+    await waitFor(() => expect(flow.result.current.state.phase).toBe('submitting'))
+    expect(flow.result.current.state.prior).toMatchObject({
+      jobId: completed.jobId,
+      job: { result: { resultId: completed.job?.result?.resultId } },
+    })
+    const first = JSON.parse(post.mock.calls[0]?.[0] as string)
+    const second = JSON.parse(post.mock.calls[1]?.[0] as string)
+    expect(first.idempotencyKey).toBe(KEY)
+    expect(second.idempotencyKey).toBe(REGENERATE_KEY)
+    expect(second.instructions).toBe('A fresh confirmed request')
+
+    act(() => releaseSecond(admission))
+    await waitFor(() => expect(flow.result.current.state.phase).toBe('completed'))
+    expect(flow.result.current.state.prior?.jobId).toBe(completed.jobId)
+  })
+
+  it('never creates a regeneration key while admission of the retained attempt is uncertain', async () => {
+    const uuid = vi.fn().mockReturnValueOnce(KEY).mockReturnValueOnce(REGENERATE_KEY)
+    const flow = harness({ uuid, post: vi.fn().mockRejectedValue({ code: 'NETWORK_ERROR', message: 'offline' }) })
+    act(() => { expect(flow.result.current.generate(material)).toBe(true) })
+    await waitFor(() => expect(flow.result.current.state.phase).toBe('admission_unknown'))
+    act(() => { expect(flow.result.current.regenerate(material)).toBe(false) })
+    expect(uuid).toHaveBeenCalledTimes(1)
+  })
+
+  it('rechecks a completed Job by GET before returning durable Apply evidence', async () => {
+    const get = vi.fn().mockResolvedValue(job('completed'))
+    const flow = harness({ get })
+    act(() => { flow.result.current.generate(material) })
+    await waitFor(() => expect(flow.result.current.state.phase).toBe('completed'))
+    const automaticGets = get.mock.calls.length
+    let verified: AiJobStatusDto | null = null
+    await act(async () => { verified = await flow.result.current.recheckCompleted() })
+    expect(verified).toMatchObject({
+      jobId: JOB_ID,
+      status: 'completed',
+      guidance: { code: 'complete', poll: false, action: 'view_result' },
+      result: { variations: ['Persisted result'] },
+    })
+    expect(get).toHaveBeenCalledTimes(automaticGets + 1)
+  })
+
+  it('dismisses only local AI preview state without another request', async () => {
+    const post = vi.fn().mockResolvedValue(admission)
+    const get = vi.fn().mockResolvedValue(job('completed'))
+    const flow = harness({ post, get })
+    act(() => { flow.result.current.generate(material) })
+    await waitFor(() => expect(flow.result.current.state.phase).toBe('completed'))
+    const calls = { post: post.mock.calls.length, get: get.mock.calls.length }
+    act(() => { expect(flow.result.current.dismiss()).toBe(true) })
+    expect(flow.result.current.state).toMatchObject({ phase: 'idle', attempt: null, job: null, jobId: null, prior: null })
+    expect(post).toHaveBeenCalledTimes(calls.post)
+    expect(get).toHaveBeenCalledTimes(calls.get)
   })
 
   it('retains only its own byte-identical POST through auth replay and purges unrelated refreshes', async () => {
@@ -205,5 +274,30 @@ describe('retained AI content workflow', () => {
     flow.rerender({ clientId: 'cccccccc-cccc-cccc-cccc-cccccccccccc', authorized: false })
     await waitFor(() => expect(flow.result.current.state.phase).toBe('permission_lost'))
     expect(flow.result.current.state.attempt).toBeNull()
+  })
+
+  it('clears AI-only state on AI permission loss without purging an authorized product draft cache', async () => {
+    const flow = harness()
+    const productKey = ['backoffice', 'private', 'products', CLIENT_ID, 'content', PRODUCT_ID]
+    flow.client.setQueryData(productKey, { draft: 'retained product working context' })
+    act(() => { flow.result.current.generate(material) })
+    await waitFor(() => expect(flow.result.current.state.phase).toBe('completed'))
+    flow.rerender({ clientId: CLIENT_ID, authorized: false })
+    await waitFor(() => expect(flow.result.current.state.phase).toBe('permission_lost'))
+    expect(flow.result.current.state.job).toBeNull()
+    expect(flow.client.getQueryData(productKey)).toEqual({ draft: 'retained product working context' })
+  })
+
+  it('fences product changes and browser-history traversal before another private frame renders', async () => {
+    const flow = harness()
+    act(() => { flow.result.current.generate(material) })
+    await waitFor(() => expect(flow.result.current.state.phase).toBe('completed'))
+    flow.rerender({ clientId: CLIENT_ID, authorized: true, productId: '22222222-3333-4444-5555-666666666666' })
+    await waitFor(() => expect(flow.result.current.state.attempt).toBeNull())
+    expect(flow.result.current.state.message).toContain('Client or product changed')
+
+    act(() => window.dispatchEvent(new PopStateEvent('popstate')))
+    expect(flow.result.current.state.attempt).toBeNull()
+    expect(flow.result.current.state.message).toContain('session or navigation context changed')
   })
 })
