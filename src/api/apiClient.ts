@@ -82,6 +82,7 @@ export interface AuthRefreshLifecycleDetail {
 
 export interface ApiRequestConfig extends AxiosRequestConfig {
   onAuthReplay?: () => void
+  retryOnUnauthorized?: boolean
 }
 
 export async function notifySuccessfulAuthRefresh(): Promise<void> {
@@ -178,7 +179,8 @@ export class ApiClient {
     )
   }
 
-  private shouldRetryRequest(config: InternalAxiosRequestConfig & { _retry?: boolean }): boolean {
+  private shouldRetryRequest(config: InternalAxiosRequestConfig & { _retry?: boolean; retryOnUnauthorized?: boolean }): boolean {
+    if (config.retryOnUnauthorized === false) return false
     // Don't retry login, refresh, or health endpoints
     const nonRetryPaths = ['/auth/login', '/auth/refresh', '/health']
     return !nonRetryPaths.some((path) => config.url?.includes(path))

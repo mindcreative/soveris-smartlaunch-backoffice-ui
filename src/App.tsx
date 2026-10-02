@@ -19,6 +19,7 @@ import { BillingAccountPage, BillingIndexPage } from './pages/billing/BillingAcc
 import { BillingLedgerBoundaryPage } from './pages/billing/BillingLedgerBoundaryPage'
 import { BillingAdjustmentHistoryPage } from './pages/billing/BillingAdjustmentHistoryPage'
 import { BillingSubscriptionPage } from './pages/billing/BillingSubscriptionPage'
+import { AiImageJobsPage } from './pages/ai/AiImageJobsPage'
 // Protected route wrapper with role-based access
 function ProtectedRoute({
   children,
@@ -64,12 +65,8 @@ function App() {
                   <p className="text-gray-500">Theme management coming soon.</p>
                 </div>
               } />
-              <Route path="/ai" element={
-                <div className="space-y-4">
-                  <h1 className="text-xl font-semibold text-gray-900">AI Tools</h1>
-                  <p className="text-gray-500">AI tools integration coming soon.</p>
-                </div>
-              } />
+              <Route path="/ai" element={<AiImageJobsPage />} />
+              <Route path="/ai/image-jobs/:jobId" element={<AiImageJobsPage />} />
               {/* Audit Logs - Admin only */}
               <Route
                 path="/audit"
