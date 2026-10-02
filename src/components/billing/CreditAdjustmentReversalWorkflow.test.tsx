@@ -128,9 +128,11 @@ describe('CreditAdjustmentReversalWorkflow', () => {
         canAdjust canView selected={ORIGINAL} returnFocusRef={createRef()} onClose={vi.fn()} />
     </QueryClientProvider></StrictMode>)
     await screen.findByRole('dialog')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus())
     expect(billingApi.getAccountSnapshot).toHaveBeenCalledOnce()
     expect(adjustmentApi.getCreditAdjustmentFamily).toHaveBeenCalledOnce()
     screen.getByRole('button', { name: 'Confirm reversal' }).focus()
+    expect(screen.getByRole('button', { name: 'Confirm reversal' })).toHaveFocus()
     await user.keyboard('{Enter}')
     await waitFor(() => expect(screen.getByRole('alert')).toHaveFocus())
   })
