@@ -40,7 +40,7 @@ export interface AiImageQuote {
 
 export interface AiImageReservation {
   reservationId: string
-  state: 'active' | 'committed' | 'released'
+  state: 'active' | 'committed' | 'released' | 'expired'
   estimatedCredits: string
   actualCredits: string | null
   createdAt: string

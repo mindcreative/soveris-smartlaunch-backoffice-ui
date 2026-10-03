@@ -175,6 +175,88 @@ describe('AI image closed adapters', () => {
     expect(() => parseAiImageJobStatus(JSON.stringify(completed()).replace('"createdAt":"2026-10-02T08:00:05+00:00"', '"createdAt":"2026-10-02T08:00:06+00:00"'), CLIENT_ID, JOB_ID)).toThrow(AiImageContractError)
   })
 
+  it('accepts only the complete failed reconciliation reservation chains', () => {
+    const terminalAt = '2026-10-02T08:06:00+00:00'
+    const expiredReservation = {
+      ...status().reservation,
+      state: 'expired',
+      releasedAt: terminalAt,
+    }
+    const attemptZeroExpiry = status({
+      status: 'failed',
+      attemptCount: 0,
+      updatedAt: terminalAt,
+      completedAt: terminalAt,
+      reservation: expiredReservation,
+      guidance: { code: 'failed', poll: false },
+    })
+    const retryWaitingExpiry = status({
+      status: 'failed',
+      attemptCount: 2,
+      processingStartedAt: '2026-10-02T08:00:01+00:00',
+      lastAttemptCompletedAt: '2026-10-02T08:00:03+00:00',
+      updatedAt: terminalAt,
+      completedAt: terminalAt,
+      reservation: expiredReservation,
+      guidance: { code: 'failed', poll: false },
+    })
+    const staleAttemptExpiry = status({
+      ...retryWaitingExpiry,
+      attemptCount: 1,
+      lastAttemptCompletedAt: terminalAt,
+    })
+    const staleReleaseAt = '2026-10-02T08:00:03+00:00'
+    const staleAttemptRelease = status({
+      status: 'failed',
+      attemptCount: 1,
+      processingStartedAt: '2026-10-02T08:00:01+00:00',
+      lastAttemptCompletedAt: staleReleaseAt,
+      updatedAt: staleReleaseAt,
+      completedAt: staleReleaseAt,
+      reservation: { ...status().reservation, state: 'released', releasedAt: staleReleaseAt },
+      guidance: { code: 'failed', poll: false },
+    })
+
+    for (const value of [attemptZeroExpiry, retryWaitingExpiry, staleAttemptExpiry]) {
+      expect(parseAiImageJobStatus(JSON.stringify(value), CLIENT_ID, JOB_ID)).toMatchObject({
+        status: 'failed',
+        reservation: { state: 'expired', actualCredits: null, committedAt: null, releasedAt: terminalAt },
+        result: null,
+        resultAccess: null,
+        guidance: { code: 'failed', poll: false },
+      })
+    }
+    expect(parseAiImageJobStatus(JSON.stringify(staleAttemptRelease), CLIENT_ID, JOB_ID)).toMatchObject({
+      status: 'failed',
+      attemptCount: 1,
+      reservation: { state: 'released', actualCredits: null, committedAt: null, releasedAt: staleReleaseAt },
+      result: null,
+      resultAccess: null,
+      guidance: { code: 'failed', poll: false },
+    })
+
+    const contradictions = [
+      { ...attemptZeroExpiry, completedAt: null },
+      { ...attemptZeroExpiry, processingStartedAt: '2026-10-02T08:00:01+00:00' },
+      { ...attemptZeroExpiry, lastAttemptCompletedAt: terminalAt },
+      { ...attemptZeroExpiry, reservation: { ...expiredReservation, releasedAt: null } },
+      { ...attemptZeroExpiry, reservation: { ...expiredReservation, actualCredits: 0 } },
+      { ...attemptZeroExpiry, reservation: { ...expiredReservation, committedAt: terminalAt } },
+      { ...attemptZeroExpiry, reservation: { ...expiredReservation, releasedAt: '2026-10-02T08:04:59+00:00' } },
+      { ...retryWaitingExpiry, processingStartedAt: null },
+      { ...retryWaitingExpiry, lastAttemptCompletedAt: null },
+      { ...retryWaitingExpiry, reservation: { ...expiredReservation, state: 'released' } },
+      { ...retryWaitingExpiry, reservation: { ...expiredReservation, state: 'active' } },
+      { ...attemptZeroExpiry, reservation: { ...expiredReservation, state: 'released' } },
+      { ...attemptZeroExpiry, updatedAt: '2026-10-02T08:05:01+00:00' },
+      { ...attemptZeroExpiry, result: completed().result },
+      { ...attemptZeroExpiry, resultAccess: completed().resultAccess },
+      { ...attemptZeroExpiry, guidance: { code: 'failed', poll: true } },
+    ]
+    for (const value of contradictions)
+      expect(() => parseAiImageJobStatus(JSON.stringify(value), CLIENT_ID, JOB_ID)).toThrow(AiImageContractError)
+  })
+
   it('uses only root routes, exact bodies, AbortSignal, and actor fences', async () => {
     const signal = new AbortController().signal
     vi.spyOn(apiClient, 'postApiRoot').mockResolvedValue({

@@ -232,7 +232,7 @@ export function parseAiImageAdmission(body: string, status: number): AiImageAdmi
 function parseReservation(value: unknown): AiImageReservation {
   const item = record(value, 'reservation')
   exact(item, RESERVATION_KEYS, 'reservation')
-  if (!['active', 'committed', 'released'].includes(String(item.state))) invalid('reservation state is unsupported')
+  if (!['active', 'committed', 'released', 'expired'].includes(String(item.state))) invalid('reservation state is unsupported')
   return {
     reservationId: uuid7(item.reservationId, 'reservationId'),
     state: item.state as AiImageReservation['state'],
@@ -312,6 +312,24 @@ export function parseAiImageJobStatus(body: string, expectedClientId: string, ex
     (status === 'completed' && guidance.code === 'result_expired')
   if (!guidanceMatches || guidance.poll !== ['pending', 'processing', 'retrying', 'dlq'].includes(status))
     invalid('status and guidance disagree')
+  const noAttempt = attemptCount === 0 && !processingStartedAt && !lastAttemptCompletedAt
+  const completedAttempt = attemptCount > 0 && Boolean(processingStartedAt) && Boolean(lastAttemptCompletedAt)
+  const releasedAt = reservation.releasedAt
+  const releaseMatchesTerminal = releasedAt !== null && releasedAt === completedAt
+  const releaseMatchesReservationState = releasedAt !== null && releaseMatchesTerminal && (
+    (reservation.state === 'released' && at(reservation.expiresAt) > at(releasedAt)) ||
+    (reservation.state === 'expired' && at(reservation.expiresAt) <= at(releasedAt))
+  )
+  const terminalFailedReservation =
+    ['released', 'expired'].includes(reservation.state) &&
+    reservation.actualCredits === null &&
+    reservation.committedAt === null &&
+    releaseMatchesReservationState
+  const validFailedState = Boolean(completedAt) && updatedAt === completedAt &&
+    terminalFailedReservation && !result && !resultAccess && (
+    (reservation.state === 'released' && completedAttempt) ||
+    (reservation.state === 'expired' && (noAttempt || completedAttempt))
+  )
   const validState = status === 'pending'
     ? attemptCount === 0 && !processingStartedAt && !lastAttemptCompletedAt && !completedAt && reservation.state === 'active' && reservation.actualCredits === null && !result && !resultAccess
     : status === 'processing'
@@ -321,7 +339,7 @@ export function parseAiImageJobStatus(body: string, expectedClientId: string, ex
         : status === 'completed'
           ? attemptCount > 0 && Boolean(processingStartedAt) && Boolean(lastAttemptCompletedAt) && Boolean(completedAt) && reservation.state === 'committed' && reservation.actualCredits !== null && Boolean(reservation.committedAt) && !reservation.releasedAt && Boolean(result) && ((guidance.code === 'completed') === Boolean(resultAccess))
           : status === 'failed'
-            ? attemptCount > 0 && Boolean(processingStartedAt) && Boolean(lastAttemptCompletedAt) && Boolean(completedAt) && reservation.state === 'released' && reservation.actualCredits === null && Boolean(reservation.releasedAt) && !result && !resultAccess
+            ? validFailedState
             : attemptCount > 0 && Boolean(processingStartedAt) && Boolean(lastAttemptCompletedAt) && !completedAt && reservation.state === 'active' && reservation.actualCredits === null && !result && !resultAccess
   if (!validState) invalid('Job state evidence is impossible')
   if (result && (!completedAt || result.createdAt !== completedAt || at(result.observedAt) > at(result.createdAt) ||
