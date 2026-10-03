@@ -162,7 +162,7 @@ describe('AI image closed adapters', () => {
       status({ status: 'dlq', attemptCount: 6, processingStartedAt: '2026-10-02T08:00:01+00:00', lastAttemptCompletedAt: '2026-10-02T08:00:02+00:00', updatedAt: '2026-10-02T08:00:02+00:00', guidance: { code: 'dlq', poll: true } }),
       completed(),
       status({ status: 'failed', attemptCount: 6, processingStartedAt: '2026-10-02T08:00:01+00:00', lastAttemptCompletedAt: '2026-10-02T08:00:03+00:00', completedAt: '2026-10-02T08:00:03+00:00', updatedAt: '2026-10-02T08:00:03+00:00', reservation: { ...status().reservation, state: 'released', releasedAt: '2026-10-02T08:00:03+00:00' }, guidance: { code: 'failed', poll: false } }),
-      status({ status: 'execution_unknown', attemptCount: 1, processingStartedAt: '2026-10-02T08:00:01+00:00', lastAttemptCompletedAt: '2026-10-02T08:00:03+00:00', updatedAt: '2026-10-02T08:00:03+00:00', guidance: { code: 'contact_support', poll: false } }),
+      status({ status: 'execution_unknown', attemptCount: 1, processingStartedAt: '2026-10-02T08:00:01+00:00', lastAttemptCompletedAt: '2026-10-02T08:00:03+00:00', completedAt: '2026-10-02T08:00:03+00:00', updatedAt: '2026-10-02T08:00:03+00:00', guidance: { code: 'contact_support', poll: false } }),
     ]
     for (const value of states) {
       const body = JSON.stringify(value).replace(/1,"ruleVersion"/, '1.0000,"ruleVersion"').replace(/1,"actualCredits"/, '1.0000,"actualCredits"')
@@ -173,6 +173,33 @@ describe('AI image closed adapters', () => {
     expect(() => parseAiImageJobStatus(JSON.stringify(status({ guidance: { code: 'completed', poll: false } })), CLIENT_ID, JOB_ID)).toThrow(AiImageContractError)
     expect(() => parseAiImageJobStatus(JSON.stringify(status({ extra: true })), CLIENT_ID, JOB_ID)).toThrow(AiImageContractError)
     expect(() => parseAiImageJobStatus(JSON.stringify(completed()).replace('"createdAt":"2026-10-02T08:00:05+00:00"', '"createdAt":"2026-10-02T08:00:06+00:00"'), CLIENT_ID, JOB_ID)).toThrow(AiImageContractError)
+  })
+
+  it('accepts only canonical execution-unknown completion timestamp pairs', () => {
+    const common = {
+      status: 'execution_unknown',
+      attemptCount: 1,
+      processingStartedAt: '2026-10-02T08:00:01+00:00',
+      updatedAt: '2026-10-02T08:00:03+00:00',
+      guidance: { code: 'contact_support', poll: false },
+    }
+    const unresolved = status({ ...common, lastAttemptCompletedAt: null, completedAt: null })
+    const terminalAt = '2026-10-02T08:00:03+00:00'
+    const resolved = status({ ...common, lastAttemptCompletedAt: terminalAt, completedAt: terminalAt })
+
+    expect(parseAiImageJobStatus(JSON.stringify(unresolved), CLIENT_ID, JOB_ID).status)
+      .toBe('execution_unknown')
+    expect(parseAiImageJobStatus(JSON.stringify(resolved), CLIENT_ID, JOB_ID).completedAt)
+      .toBe(terminalAt)
+
+    for (const contradictory of [
+      status({ ...common, lastAttemptCompletedAt: terminalAt, completedAt: null }),
+      status({ ...common, lastAttemptCompletedAt: null, completedAt: terminalAt }),
+      status({ ...common, lastAttemptCompletedAt: terminalAt, completedAt: '2026-10-02T08:00:04+00:00', updatedAt: '2026-10-02T08:00:04+00:00' }),
+    ]) {
+      expect(() => parseAiImageJobStatus(JSON.stringify(contradictory), CLIENT_ID, JOB_ID))
+        .toThrow(AiImageContractError)
+    }
   })
 
   it('accepts only the complete failed reconciliation reservation chains', () => {

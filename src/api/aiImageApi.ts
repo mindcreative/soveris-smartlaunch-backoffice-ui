@@ -330,6 +330,9 @@ export function parseAiImageJobStatus(body: string, expectedClientId: string, ex
     (reservation.state === 'released' && completedAttempt) ||
     (reservation.state === 'expired' && (noAttempt || completedAttempt))
   )
+  const canonicalUnknownCompletion =
+    (lastAttemptCompletedAt === null && completedAt === null) ||
+    (lastAttemptCompletedAt !== null && completedAt === lastAttemptCompletedAt)
   const validState = status === 'pending'
     ? attemptCount === 0 && !processingStartedAt && !lastAttemptCompletedAt && !completedAt && reservation.state === 'active' && reservation.actualCredits === null && !result && !resultAccess
     : status === 'processing'
@@ -340,7 +343,7 @@ export function parseAiImageJobStatus(body: string, expectedClientId: string, ex
           ? attemptCount > 0 && Boolean(processingStartedAt) && Boolean(lastAttemptCompletedAt) && Boolean(completedAt) && reservation.state === 'committed' && reservation.actualCredits !== null && Boolean(reservation.committedAt) && !reservation.releasedAt && Boolean(result) && ((guidance.code === 'completed') === Boolean(resultAccess))
           : status === 'failed'
             ? validFailedState
-            : attemptCount > 0 && Boolean(processingStartedAt) && Boolean(lastAttemptCompletedAt) && !completedAt && reservation.state === 'active' && reservation.actualCredits === null && !result && !resultAccess
+            : attemptCount > 0 && Boolean(processingStartedAt) && canonicalUnknownCompletion && reservation.state === 'active' && reservation.actualCredits === null && !result && !resultAccess
   if (!validState) invalid('Job state evidence is impossible')
   if (result && (!completedAt || result.createdAt !== completedAt || at(result.observedAt) > at(result.createdAt) ||
       at(result.expiresAt) <= at(result.createdAt) || at(updatedAt) < at(result.createdAt)))
