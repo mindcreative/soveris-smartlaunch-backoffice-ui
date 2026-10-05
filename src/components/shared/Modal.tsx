@@ -110,7 +110,7 @@ export function Modal({
         className={`flex max-h-[90vh] w-full min-w-0 flex-col rounded-lg bg-white shadow-xl ${sizeMap[size]}`}
       >
         <div className="flex items-center justify-between gap-4 border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
-          {title ? <h2 id={titleId} className="min-w-0 text-lg font-semibold text-gray-950">{title}</h2> : <span />}
+          {title ? <h2 id={titleId} className="min-w-0 break-words text-lg font-semibold text-gray-950">{title}</h2> : <span />}
           <button
             ref={closeRef} type="button" onClick={onClose} disabled={closeDisabled} aria-label={closeLabel}
             className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:cursor-wait disabled:opacity-50"

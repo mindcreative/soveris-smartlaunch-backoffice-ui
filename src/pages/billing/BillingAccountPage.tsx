@@ -50,6 +50,7 @@ export function BillingIndexPage() {
     return <Navigate to={`/billing/clients/${clientId}/subscriptions`} replace />
   }
 
+  if (hasPermission('billing:reconcile')) return <Navigate to={`/billing/clients/${clientId}/reconciliation`} replace />
   return <ClientContextUnavailable />
 }
 

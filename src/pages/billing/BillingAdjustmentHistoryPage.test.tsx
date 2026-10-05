@@ -72,7 +72,7 @@ describe('Billing adjustment history experience', () => {
     expect(request).toHaveBeenCalledWith(CLIENT_ID, { filters: {} }, expect.any(AbortSignal))
     expect(within(screen.getByRole('navigation', { name: 'Billing workspace' }))
       .getAllByRole('link').map((link) => link.textContent))
-      .toEqual(['Account', 'Ledger', 'Adjustments', 'Subscriptions'])
+      .toEqual(['Reconciliation', 'Account', 'Ledger', 'Adjustments', 'Subscriptions'])
     expect(screen.getByRole('link', { name: 'Adjustments' })).toHaveAttribute('aria-current', 'page')
     const breadcrumbs = screen.getByRole('navigation', { name: 'Breadcrumb' })
     expect(breadcrumbs).toHaveTextContent(`Billing/Adjustment history/Selected Client ${CLIENT_ID}`)

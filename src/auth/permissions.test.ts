@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { hasRolePermission, ROLE_PERMISSIONS } from './permissions'
 
 describe('role permissions', () => {
+  it('maps delivered reconciliation permission only to Admin', () => {
+    expect(hasRolePermission('Admin', 'billing:reconcile')).toBe(true)
+    expect(hasRolePermission('Editor', 'billing:reconcile')).toBe(false)
+    expect(hasRolePermission('Viewer', 'billing:reconcile')).toBe(false)
+  })
   it('maps Billing view, subscription, and exact adjustment permissions only to Admin', () => {
     expect(hasRolePermission('Admin', 'billing:view')).toBe(true)
     expect(hasRolePermission('Admin', 'billing:subscription')).toBe(true)

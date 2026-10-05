@@ -5,6 +5,7 @@ export function BillingWorkspaceNav({ clientId }: { clientId: string }) {
   const location = useLocation()
   const { hasPermission } = useAuth()
   const items = [
+    ...(hasPermission('billing:reconcile') ? [{ label: 'Reconciliation', href: `/billing/clients/${clientId}/reconciliation` }] : []),
     ...(hasPermission('billing:view') ? [
       { label: 'Account', href: `/billing/clients/${clientId}/account` },
       { label: 'Ledger', href: `/billing/clients/${clientId}/ledger` },
