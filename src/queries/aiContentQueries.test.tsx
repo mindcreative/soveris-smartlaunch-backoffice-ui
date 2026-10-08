@@ -301,3 +301,14 @@ describe('retained AI content workflow', () => {
     expect(flow.result.current.state.message).toContain('session or navigation context changed')
   })
 })
+
+it('allows a fresh explicit attempt after preparation fails before admission', async () => {
+  const { AiBackendPreparationError } = await import('../api/aiBackendPreparation')
+  const post = vi.fn().mockRejectedValueOnce(new AiBackendPreparationError()).mockResolvedValueOnce(admission)
+  const flow = harness({ post })
+  act(() => { expect(flow.result.current.generate(material)).toBe(true) })
+  await waitFor(() => expect(flow.result.current.state.phase).toBe('validation'))
+  act(() => { expect(flow.result.current.generate(material)).toBe(true) })
+  await waitFor(() => expect(flow.result.current.state.phase).toBe('completed'))
+  expect(post).toHaveBeenCalledTimes(2)
+})

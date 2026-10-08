@@ -77,6 +77,30 @@ test('renders exact configured values and preserves Client context through histo
   await expect(page.getByText(`Selected Client: ${CLIENT_A}`)).toBeVisible()
 })
 
+test('Billing sidebar keeps a selected Client distinct from the signed-in Client', async ({ page }) => {
+  const requestedClients: string[] = []
+  await page.route('**/api/backoffice/clients/*/billing/account', async (route) => {
+    const clientId = route.request().url().match(/clients\/([^/]+)\/billing\/account/)?.[1] ?? ''
+    requestedClients.push(clientId)
+    await route.fulfill({
+      status: 200,
+      headers: { 'x-user-time-zone-revision': '1' },
+      contentType: 'application/json',
+      body: snapshotBody(clientId, '42.0000'),
+    })
+  })
+
+  await page.goto(accountPath(CLIENT_B))
+  await expect(page.getByText(`Selected Client: ${CLIENT_B}`)).toBeVisible()
+  await page.getByRole('navigation', { name: 'Back-Office', exact: true })
+    .getByRole('link', { name: 'Billing', exact: true }).click()
+
+  await expect(page).toHaveURL(accountPath(CLIENT_B))
+  await expect(page.getByText(`Selected Client: ${CLIENT_B}`)).toBeVisible()
+  expect(requestedClients.length).toBeGreaterThan(0)
+  expect(requestedClients.every((clientId) => clientId === CLIENT_B)).toBe(true)
+})
+
 test('loading and not-configured states pass automated accessibility scans', async ({ page }) => {
   let releaseLoading: (() => void) | undefined
   await page.route('**/api/backoffice/clients/*/billing/account', async (route) => {

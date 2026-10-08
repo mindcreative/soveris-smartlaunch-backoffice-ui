@@ -66,6 +66,7 @@ test('local fixture: fractional quote is reviewed and submitted through closed l
   await page.route('**/api/backoffice/**', async (route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname
+    if (path === '/api/ai/backend-preparations') { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ state: 'ready' }) }); return }
     requests.push({ method: request.method(), path, body: request.postData() })
     if (path === `/api/backoffice/clients/${CLIENT_ID}/capabilities`) {
       await fulfillLocal(route, { status: 200, contentType: 'application/json', body: JSON.stringify(capabilities()) })
@@ -76,6 +77,7 @@ test('local fixture: fractional quote is reviewed and submitted through closed l
   await page.route('**/api/ai/**', async (route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname
+    if (path === '/api/ai/backend-preparations') { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ state: 'ready' }) }); return }
     requests.push({ method: request.method(), path, body: request.postData() })
     if (request.method() === 'POST' && path === '/api/ai/image-admission-quotes') {
       await route.fulfill({
@@ -160,6 +162,7 @@ test('local fixture: direct URL tracks and privately redeems WebP without produc
   await page.route('**/api/ai/**', async (route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname
+    if (path === '/api/ai/backend-preparations') { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ state: 'ready' }) }); return }
     requests.push({ method: request.method(), path, body: request.postData() })
     if (request.method() === 'GET' && path === `/api/ai/jobs/${JOB_ID}`) {
       await respondJson(route, completedStatus())

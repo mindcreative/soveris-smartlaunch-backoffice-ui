@@ -84,6 +84,7 @@ async function installBase(
 ) {
   const handler = async (route: Route) => {
     const request = route.request(); const path = new URL(request.url()).pathname
+    if (path === '/api/ai/backend-preparations') return respond(route, { state: 'ready' })
     if (path === '/api/backoffice/me/timezone') { await route.fallback(); return }
     if (onContent && await onContent(route, path)) return
     if (path === `/api/backoffice/clients/${CLIENT_A}/products`) return respond(route, { items: [product()], page: 1, pageSize: 20, totalCount: 1, totalPages: 1 })

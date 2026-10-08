@@ -1,5 +1,5 @@
 import { isLosslessNumber, parse } from 'lossless-json'
-import { apiClient } from './apiClient'
+import { apiClient, type ApiError } from './apiClient'
 import { canonicalizeGuid } from '../lib/guid'
 import { useAuthStore } from '../stores/authStore'
 import {
@@ -267,8 +267,17 @@ function requireActor(expected: string): void {
   if (useAuthStore.getState().user?.id !== expected) invalid('authenticated actor changed during response load')
 }
 
-export async function postAiContentGeneration(serializedBody: string, signal?: AbortSignal, onAuthReplay?: () => void): Promise<AiContentAdmission> {
+export async function postAiContentGeneration(serializedBody: string, signal?: AbortSignal, onAuthReplay?: () => void, prepareBackend = false): Promise<AiContentAdmission> {
   const actorId = actor()
+  if (prepareBackend) {
+    const { prepareAiBackend, AiBackendPreparationError } = await import('./aiBackendPreparation')
+    try { await prepareAiBackend('content', signal) }
+    catch (error) {
+      if (signal?.aborted || (error as ApiError).status === 401 || (error as ApiError).status === 403) throw error
+      throw new AiBackendPreparationError()
+    }
+    requireActor(actorId)
+  }
   const response = await apiClient.postApiRoot<string>('/api/ai/content-generations', serializedBody, {
     responseType: 'text', signal, ...(onAuthReplay ? { onAuthReplay } : {}), headers: { 'Content-Type': 'application/json' },
   })

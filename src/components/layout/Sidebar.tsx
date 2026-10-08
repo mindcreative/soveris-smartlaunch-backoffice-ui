@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link, matchPath, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { canonicalizeGuid } from '../../lib/guid'
 
@@ -35,6 +35,9 @@ export function Sidebar({ mobile = false, onClose, onNavigate }: SidebarProps) {
   const location = useLocation()
   const { hasPermission, user } = useAuth()
   const defaultClientId = canonicalizeGuid(user?.clientId)
+  const selectedClientId = canonicalizeGuid(
+    matchPath('/billing/clients/:clientId/*', location.pathname)?.params.clientId)
+  const billingClientId = selectedClientId ?? defaultClientId
   const canViewBilling = hasPermission('billing:view')
   const canManageSubscriptions = hasPermission('billing:subscription')
   const canReconcile = hasPermission('billing:reconcile')
@@ -44,7 +47,7 @@ export function Sidebar({ mobile = false, onClose, onNavigate }: SidebarProps) {
         ...baseNavigation.slice(0, 1),
         {
           name: 'Billing',
-          href: `/billing/clients/${defaultClientId}/${billingLanding}`,
+          href: `/billing/clients/${billingClientId}/${billingLanding}`,
           icon: 'billing',
         },
         ...baseNavigation.slice(1),

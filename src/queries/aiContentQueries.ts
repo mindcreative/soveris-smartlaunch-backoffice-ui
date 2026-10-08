@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { ApiError } from '../api/apiClient'
 import { AiContentContractError, getAiContentJob, postAiContentGeneration, serializeAiContentRequest } from '../api/aiContentApi'
+import { AiBackendPreparationError } from '../api/aiBackendPreparation'
 import { createUuidV7 } from '../lib/uuidV7'
 import type {
   AiContentGenerationRequest,
@@ -245,12 +246,12 @@ export function useAiContentGeneration({
     }
   }, [current, handleGetError, queryClient, replace, terminalFromJob])
 
-  const submitRetained = useCallback(async (attempt: AiRetainedAttempt, generation: number) => {
+  const submitRetained = useCallback(async (attempt: AiRetainedAttempt, generation: number, prepareBackend = false) => {
     const controller = abortRef.current
     if (!controller || !current(generation)) return
     replace((value) => ({ phase: 'submitting', attempt, job: null, jobId: null, lastCheckedAt: null, message: 'Submitting one retained generation attempt…', retryAfterUntil: null, prior: value.prior }))
     try {
-      const admitted = await depsRef.current.post(attempt.serializedBody, controller.signal, () => { ownAuthReplayRef.current = true })
+      const admitted = await depsRef.current.post(attempt.serializedBody, controller.signal, () => { ownAuthReplayRef.current = true }, prepareBackend)
       if (!current(generation)) return
       replace((value) => ({ ...value, phase: 'polling', jobId: admitted.jobId, message: admitted.kind === 'completed' ? 'Generation completed; verifying the saved result…' : 'Generation admitted; checking the saved result…' }))
       await resolveJob(attempt, admitted.jobId, generation, true)
@@ -258,6 +259,11 @@ export function useAiContentGeneration({
       if (!current(generation) || isAbort(error)) return
       const failure = apiError(error)
       const common = { attempt, job: null, jobId: null, lastCheckedAt: null, prior: stateRef.current.prior }
+      if (error instanceof AiBackendPreparationError) {
+        busyRef.current = false
+        replace({ ...common, phase: 'validation', retryAfterUntil: null, message: error.message })
+        return
+      }
       if (failure.status === 401) {
         window.dispatchEvent(new CustomEvent('auth:cleared'))
         replace({ ...initialState, phase: 'permission_lost', message: 'Your session ended. Generated private content was cleared.' })
@@ -293,7 +299,7 @@ export function useAiContentGeneration({
       const idempotencyKey = depsRef.current.uuid()
       const request = buildAiContentRequest(material, idempotencyKey)
       const attempt: AiRetainedAttempt = { actorId, clientId, productId, idempotencyKey, request, serializedBody: serializeAiContentRequest(request), material: structuredClone(material), startedAt: depsRef.current.now() }
-      void submitRetained(attempt, generation)
+      void submitRetained(attempt, generation, true)
       return true
     } catch (error) {
       busyRef.current = false

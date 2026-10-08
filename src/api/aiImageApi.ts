@@ -372,6 +372,9 @@ export async function postAiImageAdmission(serializedBody: string, signal?: Abor
 
 export async function postAiImageAdmissionQuote(targetRole: AiImageTargetRole, signal?: AbortSignal): Promise<AiImageAdmissionQuote> {
   const actorId = actor()
+  const { prepareAiBackend } = await import('./aiBackendPreparation')
+  await prepareAiBackend('image', signal)
+  requireActor(actorId)
   const body = serializeAiImageQuoteRequest(targetRole)
   const response = await apiClient.postApiRoot<string>('/api/ai/image-admission-quotes', body, {
     responseType: 'text', signal, retryOnUnauthorized: false, headers: { 'Content-Type': 'application/json' },

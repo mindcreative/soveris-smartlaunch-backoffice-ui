@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { AiBackendPreparationButton } from '../ai/AiBackendPreparationButton'
 import { useAuth } from '../../hooks/useAuth'
 import { useClientCapabilities } from '../../queries/billingQueries'
 import { useAiContentGeneration } from '../../queries/aiContentQueries'
@@ -181,6 +182,8 @@ export function ProductAiGenerationPanel({ clientId, product, working, draftRevi
       <p className="mt-1 text-sm text-gray-700">Generate and review durable text. Only a separately confirmed Apply can validate and save one selected field; it never publishes.</p>
     </div>
     <p className="text-sm text-gray-700">{capabilityMessage}</p>
+    <AiBackendPreparationButton key={`${user?.id}:${clientId}`} kind="content"
+      allowed={hasCreate && hasView && !retainedLocked} onReady={() => capabilities.refetch()} />
     <div className="grid min-w-0 gap-4 sm:grid-cols-2">
       <label className="min-w-0 text-sm font-medium">Generation target
         <select aria-label="Generation target" value={target} disabled={retainedLocked} onChange={(event) => setTarget(event.target.value as AiGenerationTarget)} className="mt-1 min-h-11 w-full rounded-md border border-gray-300 px-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:opacity-50">

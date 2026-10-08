@@ -299,7 +299,9 @@ describe('AI image closed adapters', () => {
 
   it('requests a quote with only the exact target role and parses text losslessly', async () => {
     const signal = new AbortController().signal
-    const post = vi.spyOn(apiClient, 'postApiRoot').mockResolvedValue({ status: 200, data: quoteJson('1.2345') })
+    const post = vi.spyOn(apiClient, 'postApiRoot')
+      .mockResolvedValueOnce({ status: 200, data: '{"state":"ready"}' })
+      .mockResolvedValue({ status: 200, data: quoteJson('1.2345') })
     await expect(postAiImageAdmissionQuote('hero', signal)).resolves.toMatchObject({ quotedCredits: '1.2345' })
     expect(post).toHaveBeenCalledWith('/api/ai/image-admission-quotes', '{"targetRole":"hero"}', {
       responseType: 'text', signal, retryOnUnauthorized: false, headers: { 'Content-Type': 'application/json' },

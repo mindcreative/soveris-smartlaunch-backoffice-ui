@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react'
+import { AiBackendPreparationButton } from '../../components/ai/AiBackendPreparationButton'
 import { useNavigate, useParams } from 'react-router-dom'
 import { isCanonicalUuidV7 } from '../../api/aiImageApi'
 import { AiImageJobTracker } from '../../components/ai/AiImageJobTracker'
@@ -42,6 +43,8 @@ function SubmissionPage({ clientId }: { clientId: string }) {
         <h1 className="text-2xl font-semibold text-gray-950">AI image generation</h1>
         <p className="mt-1 text-sm text-gray-700">Submit and track one private generated image without exposing processing internals.</p>
       </header>
+      <AiBackendPreparationButton key={`${user?.id}:${clientId}`} kind="image" allowed={hasCreate}
+        onReady={() => capabilities.refetch()} />
       <AiImageSubmissionForm
         key={`${user?.id ?? 'anonymous'}:${clientId}`}
         clientId={clientId}
