@@ -214,6 +214,7 @@ export class ApiClient {
             code: fallbackCode,
             message: envelope.error,
             status,
+            ...(retryAfterSeconds !== undefined && { retryAfterSeconds }),
           }
         }
 
@@ -222,6 +223,7 @@ export class ApiClient {
             code: envelope.error.code || fallbackCode,
             message: envelope.error.message,
             status,
+            ...(retryAfterSeconds !== undefined && { retryAfterSeconds }),
           }
         }
 
@@ -230,6 +232,7 @@ export class ApiClient {
             code: envelope.statusCode ? `HTTP_${envelope.statusCode}` : fallbackCode,
             message: envelope.message,
             status,
+            ...(retryAfterSeconds !== undefined && { retryAfterSeconds }),
           }
         }
 
@@ -266,6 +269,7 @@ export class ApiClient {
           code: fallbackCode,
           message: responseData,
           status,
+          ...(retryAfterSeconds !== undefined && { retryAfterSeconds }),
         }
       }
 
@@ -273,6 +277,7 @@ export class ApiClient {
         code: fallbackCode,
         message: status ? `Request failed with status ${status}` : 'API request failed',
         status,
+        ...(retryAfterSeconds !== undefined && { retryAfterSeconds }),
       }
     }
 

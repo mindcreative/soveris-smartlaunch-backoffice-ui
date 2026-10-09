@@ -35,6 +35,7 @@ import type { ApiError } from '../api/apiClient'
 import { productKeys } from './productQueries'
 import { aiContentKeys } from './aiContentKeys'
 import { aiImageKeys } from './aiImageKeys'
+import { billingReportKeys, retireReportScopes } from './billingReportKeys'
 import { localInstantDateTime } from '../timezone/LocalInstant'
 import type {
   BillingAccountSnapshot,
@@ -164,6 +165,7 @@ function startsWithKey(value: readonly unknown[] | undefined, prefix: readonly u
 }
 
 export async function clearPrivateBillingQueries(queryClient: QueryClient): Promise<void> {
+  retireReportScopes()
   await queryClient.cancelQueries({ queryKey: billingAccountKeys.billing })
   queryClient.removeQueries({ queryKey: billingAccountKeys.billing })
   for (const mutation of queryClient.getMutationCache().getAll()) {
@@ -177,9 +179,10 @@ export async function clearPrivateClientScope(
   queryClient: QueryClient,
   clientId?: string
 ): Promise<void> {
+  retireReportScopes(clientId)
   const roots = clientId
     ? [
-        billingSubscriptionKeys.client(clientId), billingAccountKeys.account(clientId),
+        billingSubscriptionKeys.client(clientId), billingAccountKeys.account(clientId), billingReportKeys.client(clientId),
         billingAdjustmentKeys.client(clientId),
         clientCapabilityKeys.client(clientId), resourceAccessKeys.client(clientId),
         productKeys.client(clientId), domainClientPrefix(clientId), aiContentKeys.client(clientId),

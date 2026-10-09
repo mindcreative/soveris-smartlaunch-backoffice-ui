@@ -20,6 +20,7 @@ import { BillingLedgerBoundaryPage } from './pages/billing/BillingLedgerBoundary
 import { BillingAdjustmentHistoryPage } from './pages/billing/BillingAdjustmentHistoryPage'
 import { BillingSubscriptionPage } from './pages/billing/BillingSubscriptionPage'
 import { AiImageJobsPage } from './pages/ai/AiImageJobsPage'
+import { BillingReportsPage } from './pages/billing/BillingReportsPage'
 import { BillingReconciliationPage } from './pages/billing/BillingReconciliationPage'
 // Protected route wrapper with role-based access
 function ProtectedRoute({
@@ -54,6 +55,7 @@ function App() {
               <Route path="/products" element={<Products />} />
               <Route path="/users" element={<Users />} />
               <Route path="/billing" element={<BillingIndexPage />} />
+              <Route path="/billing/clients/:clientId/reports" element={<BillingReportsPage />} />
               <Route path="/billing/clients/:clientId/reconciliation" element={<BillingReconciliationPage />} />
               <Route path="/billing/clients/:clientId/account" element={<BillingAccountPage />} />
               <Route path="/billing/clients/:clientId/ledger" element={<BillingLedgerBoundaryPage />} />

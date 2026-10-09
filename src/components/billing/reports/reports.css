@@ -1,0 +1,31 @@
+.billing-reports { min-width: 0; overflow-wrap: anywhere; color: #0f172a; }
+.billing-reports h1:focus, .billing-reports :focus-visible { outline: 3px solid #4338ca; outline-offset: 3px; }
+.billing-reports button, .billing-reports summary, .report-filters input:not([type=checkbox]), .report-filters select { min-height: 44px; }
+.billing-reports button { border: 1px solid #64748b; border-radius: .375rem; padding: .5rem .75rem; background: white; color: #0f172a; }
+.billing-reports button:disabled { opacity: .65; }
+.report-filters input:not([type=checkbox]), .report-filters select { display: block; width: 100%; min-width: 0; border: 1px solid #64748b; border-radius: .25rem; padding: .5rem; color: #0f172a; background: white; }
+.report-section, .report-filters { border: 1px solid #64748b; border-radius: .5rem; padding: 1rem; }
+.billing-reports details { margin-top: 1rem; }
+.billing-reports summary { cursor: pointer; padding: .5rem 0; font-weight: 600; }
+@media (forced-colors: active) { .billing-reports button, .report-section, .report-filters, .report-filters input, .report-filters select { border: 1px solid CanvasText; } .billing-reports :focus-visible { outline-color: Highlight; } }
+.report-data { min-width: 0; margin-top: .75rem; }
+.report-data > select { min-height: 44px; max-width: 100%; padding: .5rem; margin: .5rem; border: 1px solid #64748b; border-radius: .25rem; background: white; }
+.report-table-scroll { max-width: 100%; overflow-x: auto; border: 1px solid #64748b; margin-top: .75rem; }
+.billing-reports table { border-collapse: collapse; width: 100%; font-size: .875rem; }
+.billing-reports caption { text-align: left; padding: .75rem; font-weight: 600; }
+.billing-reports th, .billing-reports td { text-align: left; vertical-align: top; border: 1px solid #94a3b8; padding: .75rem; }
+.report-table-scroll table { min-width: 950px; }
+.report-table-scroll th, .report-table-scroll td { min-width: 130px; max-width: 350px; }
+.report-metric-table { table-layout: fixed; }
+.report-metrics > div { margin: .5rem 0; }
+.report-metrics dt { font-weight: 600; }
+.report-metrics dd { margin-top: .25rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.report-records { list-style: decimal; padding-left: 1.5rem; }
+.report-records > li { margin: 1rem 0; padding: .5rem; border: 1px solid #94a3b8; }
+.report-currency { min-width: 0; border: 1px solid #64748b; padding: .75rem; border-radius: .25rem; }
+.report-instant { font-weight: normal; }
+.report-view-auto .report-structured-view, .report-view-table .report-structured-view, .report-view-structured .report-table-view { display: none; }
+@media (max-width: 767px) { .report-view-auto .report-table-view { display: none; } .report-view-auto .report-structured-view { display: block; } }
+@media (forced-colors: active) { .billing-reports th, .billing-reports td, .report-data > select, .report-records > li, .report-table-scroll, .report-currency { border-color: CanvasText; } }
+/* Keep continuation focus while requests/rate-limit cooldown prevent activation. */
+.billing-reports button[aria-disabled="true"] { opacity: .65; }

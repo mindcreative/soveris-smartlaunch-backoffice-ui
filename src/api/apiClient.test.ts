@@ -202,3 +202,9 @@ describe('successful refresh lifecycle', () => {
     window.removeEventListener('auth:refreshed', listener)
   })
 })
+
+describe('Retry-After on all admitted error envelopes', () => {
+  it.each([{error:'rate_limit_exceeded',message:'Too many requests'}, {error:{message:'Too many requests'}}, {message:'Too many requests'}, 'Unavailable', null])('retains the shared transport header for %j', data => {
+    expect(apiClient.normalizeError({response:{status:429,headers:{'retry-after':'1'},data}})).toMatchObject({status:429,retryAfterSeconds:1})
+  })
+})

@@ -85,7 +85,7 @@ test('canonical direct route presents complete reciprocal immutable evidence and
   await expect(page).toHaveURL(new RegExp(`${CLIENT}/adjustments$`))
   await expect(page.getByRole('heading', { name: 'Adjustment history', exact: true })).toBeFocused()
   const tabs = page.getByRole('navigation', { name: 'Billing workspace' }).getByRole('link')
-  await expect(tabs).toHaveText(['Account', 'Ledger', 'Adjustments', 'Subscriptions'])
+  await expect(tabs).toHaveText(['Reconciliation', 'Account', 'Ledger', 'Usage & expense', 'Adjustments', 'Subscriptions'])
   await expect(page.getByRole('link', { name: 'Adjustments' })).toHaveAttribute('aria-current', 'page')
   const table = page.getByRole('table', { name: 'Newest-first immutable Billing adjustment history' })
   await expect(table).toBeVisible()

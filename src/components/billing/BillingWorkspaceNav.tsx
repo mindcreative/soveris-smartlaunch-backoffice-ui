@@ -9,6 +9,7 @@ export function BillingWorkspaceNav({ clientId }: { clientId: string }) {
     ...(hasPermission('billing:view') ? [
       { label: 'Account', href: `/billing/clients/${clientId}/account` },
       { label: 'Ledger', href: `/billing/clients/${clientId}/ledger` },
+      { label: 'Usage & expense', href: `/billing/clients/${clientId}/reports` },
       { label: 'Adjustments', href: `/billing/clients/${clientId}/adjustments` },
     ] : []),
     ...(hasPermission('billing:subscription') ? [
