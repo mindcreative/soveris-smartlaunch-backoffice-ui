@@ -10,14 +10,14 @@ export class ReportInputError extends Error {
 const fail = (): never => { throw new ReportContractError() }
 const input = (field:string):never => {throw new ReportInputError(field)}
 type Obj = Record<string,unknown>
-function object(v:unknown):Obj {return v!==null && typeof v==='object' && !Array.isArray(v) ? v as Obj : fail()}
-function exact(v:Obj,keys:readonly string[]) {if(Object.keys(v).length!==keys.length || keys.some(k=>!Object.prototype.hasOwnProperty.call(v,k))) fail()}
-function list(v:unknown,max:number):unknown[] {return Array.isArray(v)&&v.length<=max?v:fail()}
-function str(v:unknown):string {return typeof v==='string'?v:fail()}
+export function object(v:unknown):Obj {return v!==null && typeof v==='object' && !Array.isArray(v) ? v as Obj : fail()}
+export function exact(v:Obj,keys:readonly string[]) {if(Object.keys(v).length!==keys.length || keys.some(k=>!Object.prototype.hasOwnProperty.call(v,k))) fail()}
+export function list(v:unknown,max:number):unknown[] {return Array.isArray(v)&&v.length<=max?v:fail()}
+export function str(v:unknown):string {return typeof v==='string'?v:fail()}
 function constant<T extends string>(v:unknown,c:T):T {return v===c?c:fail()}
-function token(v:unknown,choices:readonly string[]):string {return typeof v==='string'&&choices.includes(v)?v:fail()}
+export function token(v:unknown,choices:readonly string[]):string {return typeof v==='string'&&choices.includes(v)?v:fail()}
 const DECIMAL_MAX=79228162514264337593543950335n
-function decimal(v:unknown,scale=4,signed=false):string {
+export function decimal(v:unknown,scale=4,signed=false):string {
   if(!isLosslessNumber(v)) return fail()
   const s=v.toString()
   if(!new RegExp(`^${signed?'-?':''}(?:0|[1-9]\\d*)(?:\\.\\d{1,${scale}})?$`).test(s)) return fail()
@@ -26,7 +26,7 @@ function decimal(v:unknown,scale=4,signed=false):string {
   if(BigInt(coefficient)>DECIMAL_MAX) return fail()
   return s.startsWith('-') && scaled(s,scale)===0n?s.slice(1):s
 }
-function count(v:unknown):string {if(!isLosslessNumber(v)) return fail();const s=v.toString();return /^(0|[1-9]\d*)$/.test(s)&&BigInt(s)<=9223372036854775807n?s:fail()}
+export function count(v:unknown):string {if(!isLosslessNumber(v)) return fail();const s=v.toString();return /^(0|[1-9]\d*)$/.test(s)&&BigInt(s)<=9223372036854775807n?s:fail()}
 export function scaled(s:string,scale=4):bigint {const [a,b='']=s.replace('-','').split('.');return (BigInt(a)*10n**BigInt(scale)+BigInt(b.padEnd(scale,'0')))*(s.startsWith('-')?-1n:1n)}
 
 // Validate calendar fields before Date normalization. Preserve all six fractional digits.
@@ -43,7 +43,7 @@ export function utcInstant(v:string):string {
   return `${date}.${(m[7]??'').padEnd(6,'0')}Z`
 }
 export function instantMicros(v:string):bigint {const c=utcInstant(v);return BigInt(Date.parse(`${c.slice(0,19)}Z`))*1000n+BigInt(c.slice(20,26))}
-function responseInstant(v:unknown):string {try {const s=str(v);if(!s.endsWith('Z')&&!s.endsWith('+00:00')) return fail();return utcInstant(s)}catch{return fail()}}
+export function responseInstant(v:unknown):string {try {const s=str(v);if(!s.endsWith('Z')&&!s.endsWith('+00:00')) return fail();return utcInstant(s)}catch{return fail()}}
 function requestText(v:unknown,max:number,field:string):string|null {
   if(v===undefined||v===null) return null
   if(typeof v!=='string'||!v||/^\p{White_Space}|\p{White_Space}$/u.test(v)||[...v].length>max||/\p{Cc}/u.test(v)||/\p{Cs}/u.test(v)) return input(field)
@@ -131,8 +131,8 @@ function assertNoDuplicateObjectKeys(source: string): void {
   if (index !== source.length) fail()
 }
 
-function payload(s:string):Obj {try{assertNoDuplicateObjectKeys(s);return object(parse(s,null,{onDuplicateKey:()=>fail()}))}catch{return fail()}}
-function cursor(v:unknown):string|null {return v===null?null:typeof v==='string'&&v.trim()&&v.length<=4096?v:fail()}
+export function payload(s:string):Obj {try{assertNoDuplicateObjectKeys(s);return object(parse(s,null,{onDuplicateKey:()=>fail()}))}catch{return fail()}}
+export function cursor(v:unknown):string|null {return v===null?null:typeof v==='string'&&v.trim()&&v.length<=4096?v:fail()}
 function common<T extends 'abstract_credits'|'provider_money'>(o:Obj,client:string,unit:T) {
   if(!isLosslessNumber(o.schemaVersion)||o.schemaVersion.toString()!=='1'||o.clientId!==client||canonicalizeGuid(client)!==client||client==='00000000-0000-0000-0000-000000000000') return fail()
   return {schemaVersion:1 as const,clientId:client,unit:constant(o.unit,unit),timeZone:constant(o.timeZone,'UTC'),asOf:responseInstant(o.asOf),nextCursor:cursor(o.nextCursor)}
@@ -175,7 +175,7 @@ function currency(v:unknown):string|null {return v===null?null:typeof v==='strin
 function sources(v:unknown,allowed:string[]):SourceTotal[] {
   return list(v,allowed.length).map((v,i,a)=>{const o=object(v);exact(o,['source','observationCount','amount']);const source=token(o.source,allowed),observationCount=count(o.observationCount);if(observationCount==='0'||(i>0&&str(object(a[i-1]).source)>=source)) fail();return {source,observationCount,amount:decimal(o.amount)}})
 }
-function expenseMetrics(v:unknown,code:string|null):ExpenseMetrics {
+export function expenseMetrics(v:unknown,code:string|null):ExpenseMetrics {
   const o=object(v);exact(o,[...EXPENSE_COUNTS,...EXPENSE_AMOUNTS,'estimateSources','actualSources'])
   const m={} as ExpenseMetrics
   for(const k of EXPENSE_COUNTS) m[k]=count(o[k])

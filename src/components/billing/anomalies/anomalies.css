@@ -1,0 +1,13 @@
+.anomaly-panel { margin-top:1.5rem; min-width:0; border-top:2px solid #64748b; padding-top:1rem; }
+.anomaly-panel h3,.anomaly-panel h4,.anomaly-confirmation { color:#0f172a; }
+.anomaly-panel h3,.anomaly-panel h4 { font-weight:600; margin:.75rem 0; }
+.anomaly-filter-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr)); gap:.75rem; }
+.anomaly-results>button,.anomaly-confirmation button { min-height:44px; min-width:44px; margin:.25rem; }
+.anomaly-confirmation button { border:1px solid #64748b; background:white; color:#0f172a; border-radius:.375rem; padding:.5rem .75rem; }
+.anomaly-confirmation textarea { display:block; width:100%; min-height:88px; border:1px solid #64748b; background:white; color:#0f172a; padding:.5rem; }
+.anomaly-confirmation { overflow-wrap:anywhere; }
+.anomaly-confirmation :focus-visible { outline:3px solid #4338ca; outline-offset:3px; }
+.anomaly-confirmation button[aria-disabled=true] { opacity:.65; }
+.anomaly-panel a,.anomaly-confirmation a { color:#3730a3; text-decoration:underline; display:inline-block; min-height:44px; padding:.5rem 0; }
+@media(forced-colors:active) { .anomaly-panel,.anomaly-confirmation button,.anomaly-confirmation textarea { border-color:CanvasText; } .anomaly-confirmation :focus-visible { outline-color:Highlight; } .anomaly-panel a,.anomaly-confirmation a { color:LinkText; } }
+@media(prefers-reduced-motion:reduce) { .anomaly-panel *,.anomaly-confirmation * { animation:none!important; transition:none!important; } }

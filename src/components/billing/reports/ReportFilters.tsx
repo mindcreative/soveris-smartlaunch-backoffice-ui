@@ -8,7 +8,7 @@ export function defaultReportFilters():Filters {
 }
 interface Draft {from:string;to:string;groupBy:Filters['groupBy'];creditPageSize:string;expensePageSize:string;dimensions:ReportDimension[];currency:string;provider:string;model:string;status:string;source:string}
 const draftFrom=(credit:Filters,expense:Filters):Draft=>({from:credit.from,to:credit.to,groupBy:credit.groupBy,creditPageSize:String(credit.pageSize),expensePageSize:String(expense.pageSize),dimensions:[...(expense.dimensions??REPORT_DIMENSIONS)],currency:expense.currency??'',provider:expense.provider??'',model:expense.model??'',status:expense.status??'',source:expense.source??''})
-export function ReportFilters({credit,expense,onApply}:{credit:Filters;expense:Filters;onApply:(credit:Filters,expense:Filters)=>void}) {
+export function ReportFilters({credit,expense,onApply,blocked=false}:{blocked?:boolean;credit:Filters;expense:Filters;onApply:(credit:Filters,expense:Filters)=>void}) {
   const [draft,setDraft]=useState(()=>draftFrom(credit,expense));const [errors,setErrors]=useState<FormFieldError[]>([])
   const [acceptedDraft,setAcceptedDraft]=useState(()=>JSON.stringify(draftFrom(credit,expense)))
   const errorRef=useRef<HTMLDivElement>(null)
@@ -17,6 +17,7 @@ export function ReportFilters({credit,expense,onApply}:{credit:Filters;expense:F
   const edit=<K extends keyof Draft>(key:K,value:Draft[K])=>setDraft(d=>({...d,[key]:value}))
   const labels:Record<string,string>={from:'From (inclusive UTC)',to:'To (exclusive UTC)',groupBy:'UTC grain',creditPageSize:'Credit periods per page',expensePageSize:'Expense groups per page',currency:'Currency',provider:'Provider (exact match)',model:'Model (exact match)',status:'Cost status',source:'Effective source',dimensions:'Group expense by'}
   function apply(next:Draft){
+    if(blocked)return
     const failures:FormFieldError[]=[];let c:Filters|undefined,e:Filters|undefined
     for(const kind of ['credit','expense'] as const){try {
       const sizeKey=kind==='credit'?'creditPageSize':'expensePageSize'
@@ -39,6 +40,7 @@ export function ReportFilters({credit,expense,onApply}:{credit:Filters;expense:F
     <p id="report-exact-help">Provider and model are exact, case-sensitive matches. No discovery or fuzzy search. A known currency excludes unknown-currency observations. Source means actual when reconciled, otherwise estimate, otherwise unknown.</p>
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{textControl('currency')}{textControl('provider')}{textControl('model')}{selectControl('status',REPORT_STATUSES)}{selectControl('source',REPORT_SOURCES)}</div>
     <p role="status">{unapplied?'Unapplied changes — displayed results retain their applied filters.':'Drafts match applied filters.'}</p>
-    <div className="flex flex-wrap gap-3"><button type="submit">Apply filters</button><button type="button" onClick={()=>{const defaults=defaultReportFilters(),next=draftFrom(defaults,defaults);setDraft(next);apply(next)}}>Reset filters</button></div>
+    {blocked&&<p role="status">Wait for the anomaly rate limit to end or confirm/recover the pending operation before applying or resetting report filters.</p>}
+    <div className="flex flex-wrap gap-3"><button type="submit" aria-disabled={blocked}>Apply filters</button><button type="button" aria-disabled={blocked} onClick={()=>{if(blocked)return;const defaults=defaultReportFilters(),next=draftFrom(defaults,defaults);setDraft(next);apply(next)}}>Reset filters</button></div>
   </form>
 }

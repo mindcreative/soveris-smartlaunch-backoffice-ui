@@ -6,6 +6,8 @@ import App from '../../App'
 import type {CreditPage} from '../../types/billingReports'
 import {useAuthStore} from '../../stores/authStore'
 import {queryClient} from '../../queryClient'
+import * as anomalies from '../../api/billingAnomaliesApi'
+import {ANOMALY_ID,anomalyDetailFixture} from '../../test/billingAnomaliesFixture'
 import * as api from '../../api/billingReportsApi'
 import {creditFixture,expenseFixture,REPORT_CLIENT,REPORT_RANGE} from '../../test/billingReportsFixture'
 const B='ffffffff-1111-4222-8333-444444444444'
@@ -34,4 +36,9 @@ describe('Usage & expense route',()=>{
   vi.spyOn(api,'readBillingReport').mockImplementation((_,client)=>new Promise((resolve,reject)=>pending.push({resolve,reject,client})))
   render(<App/>);await waitFor(()=>expect(pending.length).toBe(2));act(()=>{window.history.pushState({},'',`/billing/clients/${B}/reports`);window.dispatchEvent(new PopStateEvent('popstate'))});await waitFor(()=>expect(pending.length).toBe(4));act(()=>{window.history.pushState({},'',`/billing/clients/${REPORT_CLIENT}/reports`);window.dispatchEvent(new PopStateEvent('popstate'))});await waitFor(()=>expect(pending.length).toBe(6));await act(async()=>{pending[0].resolve(api.parseCreditActivity(creditFixture(),REPORT_CLIENT,REPORT_RANGE));pending[1].reject({status:401})});expect(screen.queryByText('Full-window credit totals')).not.toBeInTheDocument();expect(useAuthStore.getState().isAuthenticated).toBe(true)
  })
+})
+
+it('canonicalizes uppercase Client deep links without losing the evaluation',async()=>{
+ session();queryClient.clear();const detail=vi.spyOn(anomalies,'readAnomalyDetail').mockImplementation(async(client,id)=>anomalies.parseAnomalyDetail(anomalyDetailFixture(client),client,id));vi.spyOn(anomalies,'readAnomalies').mockRejectedValue({status:503});vi.spyOn(api,'readBillingReport').mockRejectedValue({status:503})
+ window.history.replaceState({},'',`/billing/clients/${REPORT_CLIENT.toUpperCase()}/reports/anomalies/${ANOMALY_ID}`);render(<App/>);await waitFor(()=>expect(window.location.pathname).toBe(`/billing/clients/${REPORT_CLIENT}/reports/anomalies/${ANOMALY_ID}`));await waitFor(()=>expect(detail).toHaveBeenCalled());expect(detail.mock.calls[0].slice(0,2)).toEqual([REPORT_CLIENT,ANOMALY_ID])
 })

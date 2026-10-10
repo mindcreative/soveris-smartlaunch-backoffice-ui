@@ -1,0 +1,3 @@
+import {defineConfig,devices} from '@playwright/test'
+const port=Number(process.env.BILLING_ANOMALY_BROWSER_PORT??5177)
+export default defineConfig({testDir:'./e2e',testMatch:'billing-anomalies-live.spec.ts',fullyParallel:false,retries:0,reporter:'list',use:{baseURL:`http://127.0.0.1:${port}`,trace:'off'},projects:[{name:'chromium',use:{...devices['Desktop Chrome']}}],webServer:{command:`npx vite preview --config vite.reports-live.config.ts --host 127.0.0.1 --port ${port} --strictPort`,url:`http://127.0.0.1:${port}`,reuseExistingServer:false,env:{VITE_API_BASE_URL:'/api/backoffice',BILLING_REPORT_API_URL:process.env.BILLING_REPORT_API_URL??'http://127.0.0.1:15064'}}})

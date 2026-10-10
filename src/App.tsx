@@ -56,6 +56,7 @@ function App() {
               <Route path="/users" element={<Users />} />
               <Route path="/billing" element={<BillingIndexPage />} />
               <Route path="/billing/clients/:clientId/reports" element={<BillingReportsPage />} />
+              <Route path="/billing/clients/:clientId/reports/anomalies/:evaluationId" element={<BillingReportsPage />} />
               <Route path="/billing/clients/:clientId/reconciliation" element={<BillingReconciliationPage />} />
               <Route path="/billing/clients/:clientId/account" element={<BillingAccountPage />} />
               <Route path="/billing/clients/:clientId/ledger" element={<BillingLedgerBoundaryPage />} />

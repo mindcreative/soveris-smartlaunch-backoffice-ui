@@ -1,0 +1,27 @@
+import {act,render,screen,within,waitFor} from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import {beforeEach,it,expect,vi} from 'vitest'
+import {MemoryRouter} from 'react-router-dom'
+import {QueryClient,QueryClientProvider} from '@tanstack/react-query'
+import {AnomalyPanel} from './AnomalyPanel'
+import * as api from '../../../api/billingAnomaliesApi'
+import {useAuthStore} from '../../../stores/authStore'
+import {REPORT_CLIENT,REPORT_RANGE} from '../../../test/billingReportsFixture'
+import {anomalyPageFixture,anomalyDetailFixture,ANOMALY_ID} from '../../../test/billingAnomaliesFixture'
+import {retireAnomalyScopes} from '../../../queries/billingAnomalyKeys'
+const authority=()=>useAuthStore.getState().accessToken??''
+beforeEach(()=>{vi.restoreAllMocks();useAuthStore.setState({accessToken:'current',isAuthenticated:true,isInitialized:true,isLoading:false,user:{id:'cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa',clientId:REPORT_CLIENT,role:'Admin',email:'test@example.test',displayName:'Operator',accessToken:'current',refreshToken:'r',expiresIn:3600}});vi.spyOn(api,'readAnomalies').mockImplementation(async(client,f)=>api.parseAnomalyPage(anomalyPageFixture(f,client),client,f));vi.spyOn(api,'readAnomalyDetail').mockImplementation(async(client,id)=>api.parseAnomalyDetail(anomalyDetailFixture(client),client,id))})
+function mount(deny=vi.fn()){return render(<QueryClientProvider client={new QueryClient()}><MemoryRouter><AnomalyPanel client={REPORT_CLIENT} kind="expense" range={REPORT_RANGE} authority={authority} deny={deny}/></MemoryRouter></QueryClientProvider>)}
+it('keeps saved evidence visible, confirms scope and retains same-operation ambiguous recovery',async()=>{
+ let operation:string|undefined;const command=vi.spyOn(api,'transitionAnomaly').mockImplementation(async(client,id,r)=>{if(!operation){operation=r.operationId;throw {status:503}}expect(r.operationId).toBe(operation);return {clientId:client,evaluationId:id,operationId:r.operationId,actorId:useAuthStore.getState().user!.id,beforeStatus:'open',status:'acknowledged',beforeRevision:'0',revision:'1',at:'2026-10-10T00:00:00Z',reason:null,configVersion:r.configVersion,configHash:r.configHash,correlationId:r.operationId,routeVersion:null}})
+ mount();const user=userEvent.setup();await user.click((await screen.findAllByRole('button',{name:`Inspect evaluation ${ANOMALY_ID}`}))[0]);await screen.findByRole('heading',{name:'Investigation evidence'});expect(screen.getByText('5.0000 USD')).toBeInTheDocument();await user.click(screen.getByRole('button',{name:'Acknowledge anomaly'}));const dialog=screen.getByRole('dialog');expect(within(dialog).getByText(/Client .*Evaluation/)).toHaveTextContent(REPORT_CLIENT);await user.click(within(dialog).getByRole('button',{name:'Confirm operator status'}));await waitFor(()=>expect(within(dialog).getByText(/Outcome not yet confirmed/)).toBeInTheDocument());await user.click(within(dialog).getByRole('button',{name:'Recover same operation'}));await waitFor(()=>expect(screen.queryByRole('dialog')).not.toBeInTheDocument());expect(command).toHaveBeenCalledTimes(2);expect(screen.getByText(/Confirmed operation/)).toBeInTheDocument()
+})
+it('server view-only capability hides mutation controls and synchronous retirement clears evidence',async()=>{
+ vi.spyOn(api,'readAnomalyDetail').mockImplementation(async(client,id)=>api.parseAnomalyDetail(anomalyDetailFixture(client,'0','open',false),client,id));mount();const user=userEvent.setup();await user.click((await screen.findAllByRole('button',{name:`Inspect evaluation ${ANOMALY_ID}`}))[0]);await screen.findByRole('heading',{name:'Investigation evidence'});expect(screen.queryByRole('button',{name:'Acknowledge anomaly'})).not.toBeInTheDocument();act(()=>retireAnomalyScopes());expect(screen.queryByRole('heading',{name:'Investigation evidence'})).not.toBeInTheDocument()
+})
+it('blocks ordinary anomaly filters while an operation awaits same-operation recovery',async()=>{
+ vi.spyOn(api,'transitionAnomaly').mockRejectedValue({status:503});mount();const user=userEvent.setup();await user.click((await screen.findAllByRole('button',{name:`Inspect evaluation ${ANOMALY_ID}`}))[0]);await user.click(await screen.findByRole('button',{name:'Acknowledge anomaly'}));const dialog=screen.getByRole('dialog');await user.click(within(dialog).getByRole('button',{name:'Confirm operator status'}));await waitFor(()=>expect(within(dialog).getByRole('button',{name:'Recover same operation'})).toBeInTheDocument());await user.click(within(dialog).getByRole('button',{name:'Cancel confirmation'}));await user.type(screen.getByLabelText('Anomaly currency (exact)'),'EUR');const reads=vi.mocked(api.readAnomalies).mock.calls.length;expect(screen.getByRole('button',{name:'Apply anomaly filters'})).toHaveAttribute('aria-disabled','true');await user.click(screen.getByRole('button',{name:'Apply anomaly filters'}));await waitFor(()=>expect(vi.mocked(api.readAnomalies).mock.calls.length).toBe(reads));expect(screen.getByRole('button',{name:'Recover same operation'})).toBeInTheDocument();expect(vi.mocked(api.readAnomalies).mock.calls.length).toBe(reads)
+})
+it('keeps filters unavailable during an anomaly Retry-After cooldown',async()=>{
+ vi.spyOn(api,'readAnomalies').mockRejectedValue({status:429,retryAfterSeconds:30});mount();await screen.findByText('Rate limited. Wait before retrying.');expect(screen.getByRole('button',{name:'Apply anomaly filters'})).toHaveAttribute('aria-disabled','true')
+})
