@@ -137,7 +137,7 @@ export function AiImageSubmissionForm({
           <dt className="font-medium">Image action</dt><dd>Generate one private {quote.targetRole} image</dd>
           <dt className="font-medium">Quoted amount</dt><dd>{quote.quotedCredits} abstract credits</dd>
           <dt className="font-medium">Rule version</dt><dd className="break-words">{quote.ruleVersion}</dd>
-          <dt className="font-medium">Quote expires</dt><dd><time dateTime={quote.expiresAt}>{quote.expiresAt} (UTC)</time></dd>
+          <dt className="font-medium">Quote expires</dt><dd className="min-w-0 break-all"><time dateTime={quote.expiresAt}>{quote.expiresAt} (UTC)</time></dd>
           <dt className="font-medium">Cancellation</dt><dd>Cancel before submission. An acknowledged asynchronous Job cannot be cancelled here.</dd>
         </dl>
         <p className="mt-3">This is a short-lived server quote, not a reservation or charge. Submission may reserve the exact quoted amount.</p>

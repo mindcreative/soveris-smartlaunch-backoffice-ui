@@ -55,7 +55,7 @@ function exact(value: Record<string, unknown>, expected: readonly string[], fiel
   if (actual.length !== keys.length || actual.some((key, index) => key !== keys[index]))
     invalid(`${field} fields do not match the closed contract`)
 }
-function assertNoDuplicateObjectKeys(source: string): void {
+export function assertNoDuplicateObjectKeys(source: string): void {
   const stack: Array<Set<string> | null> = []
   for (let index = 0; index < source.length; index += 1) {
     const character = source[index]

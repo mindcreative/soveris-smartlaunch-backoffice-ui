@@ -202,17 +202,23 @@ export async function getContent(productId: string, signal?: AbortSignal): Promi
 
 export async function validateContent(
   productId: string,
-  data: ValidateProductContentRequest
+  data: ValidateProductContentRequest,
+  signal?: AbortSignal
 ): Promise<ProductContentValidationReport> {
-  const response = await apiClient.post(`/content/${productId}/validate`, data)
+  const response = signal
+    ? await apiClient.post(`/content/${productId}/validate`, data, { signal, retryOnUnauthorized: false })
+    : await apiClient.post(`/content/${productId}/validate`, data)
   return response.data as ProductContentValidationReport
 }
 
 export async function saveContentDraft(
   productId: string,
-  data: SaveProductContentDraftRequest
+  data: SaveProductContentDraftRequest,
+  signal?: AbortSignal
 ): Promise<ProductContentEnvelope> {
-  const response = await apiClient.put(`/content/${productId}/draft`, data)
+  const response = signal
+    ? await apiClient.put(`/content/${productId}/draft`, data, { signal, retryOnUnauthorized: false })
+    : await apiClient.put(`/content/${productId}/draft`, data)
   return response.data as ProductContentEnvelope
 }
 

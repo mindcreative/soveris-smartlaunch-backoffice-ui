@@ -44,6 +44,7 @@ export function AiImageJobTracker({ clientId, jobId }: { clientId: string; jobId
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold text-gray-950">Image Job</h1>
           <p className="mt-1 break-all font-mono text-sm text-gray-700">{jobId}</p>
+          <p className="mt-2 text-sm text-gray-700">To use a completed image, open its product editor and enter this Job ID in “Completed image Job ID”. Saving a private asset and Apply are separate actions.</p>
         </div>
         <Link to="/ai" className="inline-flex min-h-11 items-center rounded-md border border-gray-400 px-4 py-2 text-sm font-medium text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Back to AI Tools</Link>
       </div>

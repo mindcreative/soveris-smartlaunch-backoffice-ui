@@ -1,6 +1,6 @@
 import type { PropsWithChildren } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import origin from '../../contracts/product-content/v1/fixtures/valid/origin-full.json'
@@ -10,13 +10,18 @@ import type { ApiError } from '../../api/apiClient'
 import { useAuthStore } from '../../stores/authStore'
 import type { Product, ProductContentEnvelope, ProductContentV1 } from '../../types/content'
 import type { VerifiedAiApplySelection } from './productAiApply'
+import type { VerifiedGeneratedImageSelection } from './productImageApply'
+import { captureGeneratedImageTarget } from './productImageApply'
+import * as generatedImageApi from '../../api/generatedProductImageApi'
 
-const aiMocks = vi.hoisted(() => ({ selection: null as unknown as VerifiedAiApplySelection }))
+const aiMocks = vi.hoisted(() => ({ selection: null as unknown as VerifiedAiApplySelection, image: null as unknown as VerifiedGeneratedImageSelection, imageOutcome: null as unknown, imageAbort: null as AbortController | null }))
 
 vi.mock('./ProductAiGenerationPanel', () => ({
   ProductAiGenerationPanel: ({ onApply }: { onApply: (selection: VerifiedAiApplySelection) => Promise<unknown> }) =>
     <button type="button" onClick={() => void onApply(aiMocks.selection)}>Apply verified fixture</button>,
 }))
+vi.mock('./ProductGeneratedImagePanel', () => ({ ProductGeneratedImagePanel: ({ onApply }: { onApply: (selection: VerifiedGeneratedImageSelection, signal: AbortSignal) => Promise<unknown> }) =>
+  <button type="button" onClick={() => { aiMocks.imageAbort = new AbortController(); void onApply(aiMocks.image, aiMocks.imageAbort.signal).then(outcome => { aiMocks.imageOutcome = outcome }) }}>Apply verified image fixture</button> }))
 
 import { ProductEditorModal } from './ProductEditorModal'
 
@@ -75,12 +80,160 @@ describe('ProductEditorModal', () => {
     useAuthStore.setState({ user: { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', clientId: CLIENT_ID, email: 'editor@example.test', displayName: 'Editor', role: 'Editor', accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600 }, isAuthenticated: true })
     vi.spyOn(contentApi, 'getProduct').mockResolvedValue(product)
     vi.spyOn(contentApi, 'getContent').mockResolvedValue(envelope())
+    aiMocks.imageOutcome = null
     aiMocks.selection = applySelection()
+    aiMocks.image = { actorId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', clientId: CLIENT_ID, productId: PRODUCT_ID,
+      draftRevision: 7, target: captureGeneratedImageTarget(full, '/hero/backgroundImage')!, alt: 'Chosen user-owned image description',
+      receipt: { operationId: '018f0000-0000-7000-8000-000000000011', status: 'completed', jobId: '018f0000-0000-7000-8000-000000000012',
+        resultId: '018f0000-0000-7000-8000-000000000013', asset: { id: '018f0000-0000-7000-8000-000000000014', productId: PRODUCT_ID, role: 'hero',
+          url: '/assets/product-images/018f0000-0000-7000-8000-000000000014.webp', mediaType: 'image/webp', byteLength: 1000, width: 1200, height: 630,
+          visibility: 'private', createdAt: '2026-10-10T00:00:00Z' }, storage: { usedBytes: 1000, limitBytes: 2000, remainingBytes: 1000 } } }
     vi.stubGlobal('URL', {
       ...URL,
       createObjectURL: vi.fn(() => 'blob:private-preview'),
       revokeObjectURL: vi.fn(),
     })
+  })
+
+  it('image Apply reauthorizes retained adoption after source loss and saves only chosen src/alt', async () => {
+    const candidate = structuredClone(full); candidate.hero.backgroundImage = { src: aiMocks.image.receipt.asset.url, alt: aiMocks.image.alt }
+    vi.spyOn(generatedImageApi, 'getGeneratedProductImageStatus').mockResolvedValue(aiMocks.image.receipt)
+    vi.spyOn(contentApi, 'validateContent').mockResolvedValue({ schemaVersion: 1, isValid: true, errors: [], warnings: [] })
+    vi.spyOn(contentApi, 'saveContentDraft').mockResolvedValue({ ...envelope(), draft: { schemaVersion: 1, revision: 8, content: candidate } })
+    const publish = vi.spyOn(contentApi, 'publishContent'); const user = userEvent.setup(); renderEditor()
+    await screen.findByLabelText('Hero title')
+    await user.click(screen.getByRole('button', { name: 'Apply verified image fixture' }))
+    await waitFor(() => expect(contentApi.saveContentDraft).toHaveBeenCalledWith(PRODUCT_ID,
+      { schemaVersion: 1, expectedRevision: 7, content: candidate }, expect.any(AbortSignal)))
+    expect(publish).not.toHaveBeenCalled(); expect(generatedImageApi.getGeneratedProductImageStatus).toHaveBeenCalled()
+  })
+
+  it.each(['uploading', 'processing', 'uncertain'] as const)('image Apply waits for an ordinary upload in %s state', async phase => {
+    const upload = vi.spyOn(productImageApi, 'uploadProductImage')
+    if (phase === 'uploading') upload.mockImplementation(() => new Promise(() => {}))
+    else if (phase === 'processing') upload.mockResolvedValue({ operationId: 'upload', status: 'processing', retryAfterSeconds: 1 } as never)
+    else upload.mockRejectedValue({ code: 'NETWORK_ERROR', message: 'Response lost' })
+    const proof = vi.spyOn(generatedImageApi, 'getGeneratedProductImageStatus').mockResolvedValue(aiMocks.image.receipt)
+    const save = vi.spyOn(contentApi, 'saveContentDraft'); const user = userEvent.setup(); renderEditor()
+    await user.upload(await screen.findByLabelText('Replace hero image'), new File(['image'], 'hero.webp', { type: 'image/webp' }))
+    await user.click(screen.getByRole('button', { name: 'Apply verified image fixture' }))
+    expect(proof).not.toHaveBeenCalled(); expect(save).not.toHaveBeenCalled()
+    expect(aiMocks.imageOutcome).toEqual({ kind: 'review' })
+  })
+
+  it.each([500, 502, 503, 504])('verifies a possibly committed image PUT after HTTP %s without another write', async status => {
+    const candidate = structuredClone(full); candidate.hero.backgroundImage = { src: aiMocks.image.receipt.asset.url, alt: aiMocks.image.alt }
+    vi.spyOn(generatedImageApi, 'getGeneratedProductImageStatus').mockResolvedValue(aiMocks.image.receipt)
+    vi.mocked(contentApi.getContent).mockResolvedValueOnce(envelope()).mockResolvedValueOnce(envelope())
+      .mockResolvedValue({ ...envelope(), draft: { schemaVersion: 1, revision: 8, content: candidate } })
+    vi.spyOn(contentApi, 'validateContent').mockResolvedValue({ schemaVersion: 1, isValid: true, errors: [], warnings: [] })
+    const save = vi.spyOn(contentApi, 'saveContentDraft').mockRejectedValue({ status, code: 'server_error', message: 'Response lost' })
+    const user = userEvent.setup(); renderEditor(); await screen.findByLabelText('Hero title')
+    await user.click(screen.getByRole('button', { name: 'Apply verified image fixture' }))
+    await waitFor(() => expect(aiMocks.imageOutcome).toEqual({ kind: 'saved' }))
+    expect(save).toHaveBeenCalledTimes(1)
+    expect(screen.getByLabelText('Background image path')).toHaveValue(candidate.hero.backgroundImage.src)
+  })
+
+  it.each([401, 403, 404])('clears private image state when uncertain-save verification returns HTTP %s', async status => {
+    vi.spyOn(generatedImageApi, 'getGeneratedProductImageStatus').mockResolvedValue(aiMocks.image.receipt)
+    vi.mocked(contentApi.getContent).mockResolvedValueOnce(envelope()).mockResolvedValueOnce(envelope())
+      .mockRejectedValue({ status, code: 'unavailable', message: 'Unavailable' })
+    vi.spyOn(contentApi, 'validateContent').mockResolvedValue({ schemaVersion: 1, isValid: true, errors: [], warnings: [] })
+    const save = vi.spyOn(contentApi, 'saveContentDraft').mockRejectedValue({ code: 'NETWORK_ERROR', message: 'Response lost' })
+    const user = userEvent.setup(); renderEditor(); await screen.findByLabelText('Hero title')
+    await user.click(screen.getByRole('button', { name: 'Apply verified image fixture' }))
+    await waitFor(() => expect(aiMocks.imageOutcome).toEqual({ kind: 'permission_lost' }))
+    expect(save).toHaveBeenCalledTimes(1)
+  })
+
+  it('image Apply preserves unrelated dirty edits without a receipt read or write', async () => {
+    const proof = vi.spyOn(generatedImageApi, 'getGeneratedProductImageStatus')
+    const save = vi.spyOn(contentApi, 'saveContentDraft'); const user = userEvent.setup(); renderEditor()
+    const title = await screen.findByLabelText('Hero title'); await user.clear(title); await user.type(title, 'Unsaved title')
+    await user.click(screen.getByRole('button', { name: 'Apply verified image fixture' }))
+    expect(title).toHaveValue('Unsaved title'); expect(proof).not.toHaveBeenCalled(); expect(save).not.toHaveBeenCalled()
+  })
+
+  it('image Apply rejects a changed revision before validation or PUT', async () => {
+    vi.spyOn(generatedImageApi, 'getGeneratedProductImageStatus').mockResolvedValue(aiMocks.image.receipt)
+    vi.mocked(contentApi.getContent).mockResolvedValueOnce(envelope()).mockResolvedValue({ ...envelope(), draft: { schemaVersion: 1, revision: 8, content: full } })
+    const validate = vi.spyOn(contentApi, 'validateContent'); const save = vi.spyOn(contentApi, 'saveContentDraft')
+    const user = userEvent.setup(); renderEditor(); await screen.findByLabelText('Hero title')
+    await user.click(screen.getByRole('button', { name: 'Apply verified image fixture' }))
+    expect(await screen.findByText(/image destination or draft revision changed/i)).toBeVisible()
+    expect(validate).not.toHaveBeenCalled(); expect(save).not.toHaveBeenCalled()
+  })
+
+  it.each(['removed', 'reordered', 'renamed', 'replaced'] as const)('image Apply refuses a %s feature target and preserves the original working copy', async change => {
+    aiMocks.image.target = captureGeneratedImageTarget(full, '/features/items/0/image')!
+    aiMocks.image.receipt.asset.role = 'feature'
+    const remote = envelope()
+    const features = remote.draft!.content.features!.items
+    if (change === 'removed') features.splice(0, 1)
+    if (change === 'reordered') features.reverse()
+    if (change === 'renamed') features[0]!.title = 'Changed remotely'
+    if (change === 'replaced') features[0]!.image = { src: '/other.webp', alt: 'Other image' }
+    vi.spyOn(generatedImageApi, 'getGeneratedProductImageStatus').mockResolvedValue(aiMocks.image.receipt)
+    vi.mocked(contentApi.getContent).mockResolvedValueOnce(envelope()).mockResolvedValue(remote)
+    const validate = vi.spyOn(contentApi, 'validateContent'); const save = vi.spyOn(contentApi, 'saveContentDraft')
+    const publish = vi.spyOn(contentApi, 'publishContent'); const user = userEvent.setup(); renderEditor()
+    await screen.findByLabelText('Hero title'); await user.click(screen.getByRole('button', { name: 'Apply verified image fixture' }))
+    expect(await screen.findByText(/image destination or draft revision changed/i)).toBeVisible()
+    expect(screen.getAllByLabelText('Feature title')[0]).toHaveValue(full.features!.items[0]!.title)
+    expect(validate).not.toHaveBeenCalled(); expect(save).not.toHaveBeenCalled(); expect(publish).not.toHaveBeenCalled()
+  })
+
+  it('uncertain image PUT with a newer different remote draft preserves local content and never repeats the write', async () => {
+    vi.spyOn(generatedImageApi, 'getGeneratedProductImageStatus').mockResolvedValue(aiMocks.image.receipt)
+    const remote = envelope(); remote.draft!.revision = 9; remote.draft!.content.hero.title = 'Other editor winner'
+    vi.mocked(contentApi.getContent).mockResolvedValueOnce(envelope()).mockResolvedValueOnce(envelope()).mockResolvedValue(remote)
+    vi.spyOn(contentApi, 'validateContent').mockResolvedValue({ schemaVersion: 1, isValid: true, errors: [], warnings: [] })
+    const save = vi.spyOn(contentApi, 'saveContentDraft').mockRejectedValue({ code: 'NETWORK_ERROR', message: 'Response lost' })
+    const publish = vi.spyOn(contentApi, 'publishContent'); const user = userEvent.setup(); renderEditor()
+    await screen.findByLabelText('Hero title'); await user.click(screen.getByRole('button', { name: 'Apply verified image fixture' }))
+    await screen.findByText('Your working copy has not been replaced.')
+    expect(screen.getByLabelText('Hero title')).toHaveValue(full.hero.title)
+    expect(screen.queryByText('Image Apply was verified. Live content is unchanged.')).not.toBeInTheDocument()
+    expect(save).toHaveBeenCalledTimes(1); expect(publish).not.toHaveBeenCalled()
+  })
+
+  it('image Apply keeps canonical content and receipt after unsafe whole-draft validation', async () => {
+    vi.spyOn(generatedImageApi, 'getGeneratedProductImageStatus').mockResolvedValue(aiMocks.image.receipt)
+    vi.spyOn(contentApi, 'validateContent').mockRejectedValue({ status: 422, code: 'content_invalid', message: 'Unsafe draft',
+      errors: [{ path: '/hero/backgroundImage/src', keyword: 'asset', code: 'asset_invalid', message: 'Image is unavailable.' }] })
+    const save = vi.spyOn(contentApi, 'saveContentDraft'); const user = userEvent.setup(); renderEditor()
+    await screen.findByLabelText('Hero title'); await user.click(screen.getByRole('button', { name: 'Apply verified image fixture' }))
+    expect(await screen.findByRole('button', { name: 'Image is unavailable.' })).toBeVisible()
+    expect(screen.getByLabelText('Background image path')).toHaveValue(full.hero.backgroundImage.src)
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('image Apply verifies a lost PUT response with GET without another write', async () => {
+    const candidate = structuredClone(full); candidate.hero.backgroundImage = { src: aiMocks.image.receipt.asset.url, alt: aiMocks.image.alt }
+    vi.spyOn(generatedImageApi, 'getGeneratedProductImageStatus').mockResolvedValue(aiMocks.image.receipt)
+    vi.mocked(contentApi.getContent).mockResolvedValueOnce(envelope()).mockResolvedValueOnce(envelope())
+      .mockResolvedValueOnce({ ...envelope(), draft: { schemaVersion: 1, revision: 8, content: candidate } })
+    vi.spyOn(contentApi, 'validateContent').mockResolvedValue({ schemaVersion: 1, isValid: true, errors: [], warnings: [] })
+    const save = vi.spyOn(contentApi, 'saveContentDraft').mockRejectedValue({ code: 'NETWORK_ERROR', message: 'Response lost' })
+    const publish = vi.spyOn(contentApi, 'publishContent'); const user = userEvent.setup(); renderEditor()
+    await screen.findByLabelText('Hero title'); await user.click(screen.getByRole('button', { name: 'Apply verified image fixture' }))
+    expect(await screen.findByText('Image Apply was verified. Live content is unchanged.')).toBeVisible()
+    expect(save).toHaveBeenCalledTimes(1); expect(vi.mocked(contentApi.getContent).mock.calls.filter(call => call[1] === aiMocks.imageAbort!.signal)).toHaveLength(2); expect(publish).not.toHaveBeenCalled()
+  })
+
+  it('aborts the complete image Apply request sequence without a late draft write', async () => {
+    vi.spyOn(generatedImageApi, 'getGeneratedProductImageStatus').mockResolvedValue(aiMocks.image.receipt)
+    let complete!: (value: never) => void
+    const validate = vi.spyOn(contentApi, 'validateContent').mockImplementation(() => new Promise(resolve => { complete = resolve }))
+    const save = vi.spyOn(contentApi, 'saveContentDraft'); const user = userEvent.setup(); renderEditor()
+    await screen.findByLabelText('Hero title'); await user.click(screen.getByRole('button', { name: 'Apply verified image fixture' }))
+    await waitFor(() => expect(validate).toHaveBeenCalledTimes(1))
+    const signal = vi.mocked(contentApi.validateContent).mock.lastCall![2]!
+    expect(signal).toBe(aiMocks.imageAbort!.signal)
+    await act(async () => { aiMocks.imageAbort!.abort(); complete({ schemaVersion: 1, isValid: true, errors: [], warnings: [] } as never) })
+    expect(signal.aborted).toBe(true); expect(save).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Background image path')).toHaveValue(full.hero.backgroundImage.src)
   })
 
   it('uses a wide responsive editing surface', async () => {

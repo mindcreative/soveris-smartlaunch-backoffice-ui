@@ -191,7 +191,27 @@ export function ProductContentFields({
 
     <Section title="Features (optional)">
       {!content.features ? <button id={pointerToFieldId('/features')} type="button" disabled={disabled} onClick={() => update('/features', (draft) => { draft.features = { heading: '', items: [] } })} className={buttonClass}>Add Features section</button> : <>{field('Features heading', '/features/heading', content.features.heading, (draft, next) => { draft.features!.heading = next }, { max: 120 })}{content.features.description !== undefined ? field('Features description', '/features/description', content.features.description, (draft, next) => { draft.features!.description = next }, { max: 500, multiline: true }) : <button type="button" disabled={disabled} onClick={() => update('/features/description', (draft) => { draft.features!.description = '' })} className={buttonClass}>Add Features description</button>}
-        {content.features.items.map((item, index) => { const base = `/features/items/${index}`; const imagePointer = `${base}/image`; return <div key={index} className="space-y-3 rounded-md border border-gray-200 p-3"><h4 className="font-medium">Feature {index + 1}</h4>{field('Feature title', `${base}/title`, item.title, (draft, next) => { draft.features!.items[index]!.title = next }, { max: 120 })}{field('Feature description', `${base}/description`, item.description, (draft, next) => { draft.features!.items[index]!.description = next }, { max: 500, multiline: true })}{item.image ? <><div className="grid gap-4 sm:grid-cols-2">{field('Feature image path', `${base}/image/src`, item.image.src, (draft, next) => { draft.features!.items[index]!.image!.src = next }, { max: 2048 })}{field('Feature image alternative text', `${base}/image/alt`, item.image.alt, (draft, next) => { draft.features!.items[index]!.image!.alt = next }, { max: 120 })}</div><ProductImageUploadField pointer={imagePointer} role="feature" currentSrc={item.image.src} currentAlt={item.image.alt} disabled={disabled} upload={imageUploads[imagePointer]} onUpload={onImageUpload} onRetry={onImageRetry} onCancel={onImageCancel} /><button type="button" disabled={disabled} onClick={() => { onImageCancel(imagePointer); update(imagePointer, (draft) => { delete draft.features!.items[index]!.image }) }} className={buttonClass}>Remove feature image</button></> : <button id={pointerToFieldId(imagePointer)} type="button" disabled={disabled} onClick={() => update(imagePointer, (draft) => { draft.features!.items[index]!.image = { src: '', alt: '' } })} className={buttonClass}>Add feature image</button>}<button type="button" disabled={disabled} onClick={() => { onImageCancel(imagePointer); update(base, (draft) => { draft.features!.items.splice(index, 1) }) }} className={buttonClass}>Remove feature {index + 1}</button></div> })}
+        {content.features.items.map((item, index) => {
+          const base = `/features/items/${index}`
+          const imagePointer = `${base}/image`
+          return <div key={index} className="space-y-3 rounded-md border border-gray-200 p-3">
+            <h4 className="font-medium">Feature {index + 1}</h4>
+            {field('Feature title', `${base}/title`, item.title, (draft, next) => { draft.features!.items[index]!.title = next }, { max: 120 })}
+            {field('Feature description', `${base}/description`, item.description, (draft, next) => { draft.features!.items[index]!.description = next }, { max: 500, multiline: true })}
+            {item.image && <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {field('Feature image path', `${base}/image/src`, item.image.src, (draft, next) => { draft.features!.items[index]!.image!.src = next }, { max: 2048 })}
+                {field('Feature image alternative text', `${base}/image/alt`, item.image.alt, (draft, next) => { draft.features!.items[index]!.image!.alt = next }, { max: 120 })}
+              </div>
+              <ProductImageUploadField pointer={imagePointer} role="feature" currentSrc={item.image.src} currentAlt={item.image.alt} disabled={disabled} upload={imageUploads[imagePointer]} onUpload={onImageUpload} onRetry={onImageRetry} onCancel={onImageCancel} />
+            </>}
+            <div className="flex flex-wrap gap-2">
+              {item.image ? <button type="button" disabled={disabled} onClick={() => { onImageCancel(imagePointer); update(imagePointer, (draft) => { delete draft.features!.items[index]!.image }) }} className={buttonClass}>Remove feature image</button>
+                : <button id={pointerToFieldId(imagePointer)} type="button" disabled={disabled} onClick={() => update(imagePointer, (draft) => { draft.features!.items[index]!.image = { src: '', alt: '' } })} className={buttonClass}>Add feature image</button>}
+              <button type="button" disabled={disabled} onClick={() => { onImageCancel(imagePointer); update(base, (draft) => { draft.features!.items.splice(index, 1) }) }} className={buttonClass}>Remove feature {index + 1}</button>
+            </div>
+          </div>
+        })}
         <div className="flex flex-wrap gap-2"><button id={pointerToFieldId('/features/items')} type="button" disabled={disabled || content.features.items.length >= 12} onClick={() => update('/features/items', (draft) => { draft.features!.items.push({ title: '', description: '' }) })} className={buttonClass}>Add feature</button><button type="button" disabled={disabled} onClick={() => update('/features', (draft) => { delete draft.features })} className={buttonClass}>Remove Features section</button></div>
       </>}
     </Section>

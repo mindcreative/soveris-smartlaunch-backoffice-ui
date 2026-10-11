@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ApiError } from '../../api/apiClient'
+import { useQueryClient } from '@tanstack/react-query'
+import { contentApi } from '../../api/endpoints'
+import { productKeys } from '../../queries/productQueries'
+import { getGeneratedProductImageStatus } from '../../api/generatedProductImageApi'
 import { validateProductContent, type ContractIssue, type ContractTarget } from '../../contracts/product-content/validator'
 import { useAuth } from '../../hooks/useAuth'
 import { createUuidV7 } from '../../lib/uuidV7'
@@ -23,6 +27,8 @@ import { Badge } from '../shared/Badge'
 import { Modal } from '../shared/Modal'
 import { ProductContentFields } from './ProductContentFields'
 import { ProductAiGenerationPanel } from './ProductAiGenerationPanel'
+import { ProductGeneratedImagePanel } from './ProductGeneratedImagePanel'
+import { mergeGeneratedImage, sameImageTarget, semanticProductEqual, type VerifiedGeneratedImageSelection } from './productImageApply'
 import { ProductErrorSummary } from './ProductErrorSummary'
 import { aiApplyTargets, mergeAiVariation, readAiScalar, type AiApplyOutcome, type VerifiedAiApplySelection } from './productAiApply'
 import { cloneProductContent, issueMessage, pointerToFieldId, selectEditorContent } from './productEditorModel'
@@ -92,6 +98,7 @@ function imagePointerForSource(pointer: string): string | null {
 
 export function ProductEditorModal({ clientId, product, onClose }: ProductEditorModalProps) {
   const { user, hasPermission } = useAuth()
+  const queryClient = useQueryClient()
   const productId = product?.id ?? ''
   const detailQuery = useProduct(clientId, productId)
   const contentQuery = useProductContent(clientId, productId)
@@ -131,6 +138,8 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
     requestAnimationFrame(() => document.getElementById(pointerToFieldId(altPointer))?.focus())
   }, [])
   const imageUploads = useProductImageUploads(clientId, productId, onImageCompleted)
+  const imageUploadUnresolved = Object.values(imageUploads.uploads).some(upload =>
+    upload.phase === 'uploading' || upload.phase === 'processing' || upload.phase === 'uncertain')
 
   const editorKey = product ? `${clientId}:${product.id}` : ''
   const pending = applyBusy || validateDraft.isPending || saveDraft.isPending || publish.isPending || updateProduct.isPending
@@ -218,6 +227,78 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
       if (currentGeneration === generation.current) fail(error)
     }
   }, [authoritativeContent, authoritativeProduct, pending, product, saveDraft, validate, working])
+
+  const handleApplyGeneratedImage = useCallback(async (selection: VerifiedGeneratedImageSelection, signal: AbortSignal): Promise<AiApplyOutcome> => {
+    if (!working || !authoritativeContent || !authoritativeProduct || pending || dirty || imageUploadUnresolved) {
+      setCommandErrorText('Finish or cancel image uploads and save unrelated draft edits, then recapture the image destination before Apply.')
+      return { kind: 'review' }
+    }
+    if (selection.actorId !== user?.id || selection.clientId !== clientId || selection.productId !== productId ||
+      !hasPermission('products:update') || !(hasPermission('ai:view') || hasPermission('audit:view')) ||
+      selection.receipt.asset.productId !== productId || selection.receipt.asset.role !== selection.target.role ||
+      !sameImageTarget(working, selection.target)) return { kind: 'permission_lost' }
+    const captured = generation.current; setApplyBusy(true); setCommandErrorText('')
+    setStatusText('Rechecking the saved asset and current draft before image Apply…')
+    let candidate: ProductContentV1 | null = null; let expectedRevision: number | null = null; let putAttempted = false
+    try {
+      const proof = await getGeneratedProductImageStatus({ productId, operationId: selection.receipt.operationId,
+        jobId: selection.receipt.jobId, resultId: selection.receipt.resultId, assetRole: selection.target.role }, signal)
+      if (captured !== generation.current || signal.aborted) return { kind: 'review' }
+      if (proof.status !== 'completed' || proof.asset.id !== selection.receipt.asset.id) throw new Error('The saved image binding could not be verified.')
+      const [detail, envelope] = await Promise.all([contentApi.getProduct(productId, signal), contentApi.getContent(productId, signal)])
+      if (captured !== generation.current || signal.aborted) return { kind: 'review' }
+      if (detail.id !== productId || detail.clientId !== clientId || envelope.productId !== productId) return { kind: 'permission_lost' }
+      const fresh = selectEditorContent(detail, envelope)
+      expectedRevision = envelope.draft?.revision ?? 0
+      if (expectedRevision !== selection.draftRevision || !sameImageTarget(fresh, selection.target)) {
+        setServerCandidate({ product: detail, content: envelope }); setNeedsReview(true)
+        setCommandErrorText('The image destination or draft revision changed. Review and explicitly recapture with the same saved asset.')
+        return { kind: 'review' }
+      }
+      candidate = mergeGeneratedImage(fresh, selection.target, proof.asset.url, selection.alt)
+      const local = validateProductContent(candidate, 'draft', 1)
+      if (!local.valid) { setValidationErrors(issues(local.errors)); setCommandErrorText('Correct the complete draft before image Apply. Your edits and saved asset are retained.'); focusSummary(); return { kind: 'review' } }
+      const report = await contentApi.validateContent(productId, { schemaVersion: 1, content: candidate, target: 'draft' }, signal)
+      if (captured !== generation.current || signal.aborted) return { kind: 'review' }
+      if (!report.isValid) { setValidationErrors(report.errors); focusSummary(); return { kind: 'review' } }
+      putAttempted = true
+      const saved = await contentApi.saveContentDraft(productId, { schemaVersion: 1, expectedRevision, content: candidate }, signal)
+      if (captured !== generation.current || signal.aborted) return { kind: 'review' }
+      if (saved.productId !== productId || saved.draft?.schemaVersion !== 1 || saved.draft.revision !== expectedRevision + 1 ||
+        !semanticProductEqual(saved.draft.content, candidate)) throw new Error('The draft save outcome needs verification.')
+      queryClient.setQueryData(productKeys.content(clientId, productId), saved)
+      void queryClient.invalidateQueries({ queryKey: productKeys.client(clientId) })
+      setAuthoritativeProduct(detail); setAuthoritativeContent(saved); setWorking(selectEditorContent(detail, saved))
+      setDirty(false); setNeedsReview(false); setServerCandidate(null); setStatusText('Generated image applied and draft saved. Publication is separate.')
+      return { kind: 'saved' }
+    } catch (value) {
+      if (captured !== generation.current || signal.aborted) return { kind: 'review' }
+      const error = value as ApiError
+      if ([401, 403, 404].includes(error.status ?? 0)) { setCommandErrorText(commandError(error)); return { kind: 'permission_lost' } }
+      if (putAttempted && candidate && expectedRevision !== null && (!error.status || error.status >= 500)) {
+        setStatusText('Verifying an uncertain image Apply through an authorized draft read…')
+        try {
+          const check = await contentApi.getContent(productId, signal)
+          if (captured === generation.current && !signal.aborted && check?.draft?.schemaVersion === 1 && check.draft.revision === expectedRevision + 1 &&
+            semanticProductEqual(check.draft.content, candidate)) {
+            queryClient.setQueryData(productKeys.content(clientId, productId), check)
+            void queryClient.invalidateQueries({ queryKey: productKeys.client(clientId) })
+            setAuthoritativeContent(check); setWorking(check.draft.content); setDirty(false); setNeedsReview(false)
+            setStatusText('Image Apply was verified. Live content is unchanged.'); return { kind: 'saved' }
+          }
+        } catch (verificationError) {
+          if (captured !== generation.current || signal.aborted) return { kind: 'review' }
+          const problem = verificationError as ApiError
+          if ([401, 403, 404].includes(problem.status ?? 0)) {
+            setCommandErrorText(commandError(problem)); return { kind: 'permission_lost' }
+          }
+          // Preserve local edits and receipt; never retry the PUT blindly.
+        }
+      }
+      if (error.errors?.length) setValidationErrors(error.errors)
+      setNeedsReview(true); setCommandErrorText(commandError(error)); focusSummary(); return { kind: 'review' }
+    } finally { if (captured === generation.current) setApplyBusy(false) }
+  }, [authoritativeContent, authoritativeProduct, clientId, contentQuery, detailQuery, dirty, hasPermission, imageUploadUnresolved, pending, productId, queryClient, saveDraft, user?.id, validateDraft, working])
 
   const handleApplyGenerated = useCallback(async (selection: VerifiedAiApplySelection): Promise<AiApplyOutcome> => {
     if (!working || !authoritativeContent || !authoritativeProduct || pending || dirty) {
@@ -537,6 +618,8 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
       {warningText.length > 0 && <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"><p className="font-medium">Draft guidance</p><ul className="list-disc pl-5">{warningText.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>}
       <div aria-live="polite" role="status" className="min-h-6 text-sm font-medium text-gray-700">{applyBusy || validateDraft.isPending ? 'Applying generated content…' : pending ? saveDraft.isPending ? 'Saving draft…' : publish.isPending ? 'Publishing…' : 'Updating product…' : statusText}</div>
       <ProductAiGenerationPanel clientId={clientId} product={currentProduct} working={working} draftRevision={authoritativeContent.draft?.revision ?? 0} dirty={dirty} applyPending={applyBusy || validateDraft.isPending || saveDraft.isPending} onApply={handleApplyGenerated} />
+      <ProductGeneratedImagePanel key={`${user?.id}:${clientId}:${productId}`} clientId={clientId} productId={productId} working={working}
+        draftRevision={authoritativeContent.draft?.revision ?? 0} dirty={dirty} applyPending={pending || imageUploadUnresolved} onApply={handleApplyGeneratedImage} />
       <ProductContentFields
         value={working}
         errors={validationErrors}

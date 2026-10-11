@@ -99,7 +99,7 @@ export function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 [@media(max-height:480px)]:p-2"
       onMouseDown={(event) => {
         if (closeOnBackdropClick && !closeDisabled && event.target === event.currentTarget) onClose()
       }}
@@ -107,9 +107,9 @@ export function Modal({
       <div
         ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={title ? titleId : undefined}
         aria-label={title ? undefined : 'Dialog'} aria-describedby={descriptionId} tabIndex={-1}
-        className={`flex max-h-[90vh] w-full min-w-0 flex-col rounded-lg bg-white shadow-xl ${sizeMap[size]}`}
+        className={`flex max-h-[calc(100dvh-2rem)] w-full min-w-0 flex-col overflow-hidden rounded-lg bg-white shadow-xl [@media(max-height:480px)]:block [@media(max-height:480px)]:max-h-[calc(100dvh-1rem)] [@media(max-height:480px)]:overflow-y-auto ${sizeMap[size]}`}
       >
-        <div className="flex items-center justify-between gap-4 border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
+        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
           {title ? <h2 id={titleId} className="min-w-0 break-words text-lg font-semibold text-gray-950">{title}</h2> : <span />}
           <button
             ref={closeRef} type="button" onClick={onClose} disabled={closeDisabled} aria-label={closeLabel}
@@ -120,8 +120,10 @@ export function Modal({
             </svg>
           </button>
         </div>
-        <div className="min-w-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6" tabIndex={0}>{children}</div>
-        {footer && <div className="border-t border-gray-200 px-4 py-4 sm:px-6">{footer}</div>}
+        {/* At high zoom or with a mobile keyboard open, scroll the whole
+            dialog so fixed header/footer chrome cannot squeeze out the fields. */}
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 [@media(max-height:480px)]:overflow-visible" tabIndex={0}>{children}</div>
+        {footer && <div className="shrink-0 border-t border-gray-200 px-4 py-4 sm:px-6">{footer}</div>}
       </div>
     </div>, portalRef.current
   )
