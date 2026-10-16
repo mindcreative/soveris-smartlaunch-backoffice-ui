@@ -1,3 +1,4 @@
+import { normalizeDomainProblem } from './domainProblem'
 import axios, {
   type AxiosInstance,
   type AxiosRequestConfig,
@@ -192,7 +193,7 @@ export class ApiClient {
     }
 
     if (error && typeof error === 'object' && 'response' in error) {
-      const axiosError = error as { response?: AxiosResponse<unknown> }
+      const axiosError = error as { response?: AxiosResponse<unknown>; config?: { url?: string } }
       const responseData = decodeErrorBody(axiosError.response?.data)
       const status = axiosError.response?.status
       const fallbackCode = status ? `HTTP_${status}` : 'API_ERROR'
@@ -208,6 +209,9 @@ export class ApiClient {
 
       if (responseData && typeof responseData === 'object') {
         const envelope = responseData as ApiErrorResponse
+        const requestPath = axiosError.config?.url ?? axiosError.response?.config?.url ?? ''
+        if (/(?:^|\/)domains(?:\/|$)/.test(requestPath))
+          return normalizeDomainProblem(envelope, status, retryAfterSeconds)
 
         if (typeof envelope.error === 'string') {
           return {

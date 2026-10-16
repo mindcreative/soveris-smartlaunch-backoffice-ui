@@ -3,6 +3,7 @@ import type { UserRole } from '../types/auth'
 export const ROLE_PERMISSIONS: Record<UserRole, readonly string[]> = {
   Admin: [
     'dashboard:view',
+    'domains:view', 'domains:create', 'domains:verify', 'domains:update', 'domains:delete',
     'users:view', 'users:create', 'users:edit', 'users:delete',
     'products:view', 'products:create', 'products:update',
     'submissions:view', 'submissions:edit', 'submissions:delete',
@@ -17,6 +18,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly string[]> = {
   ],
   Editor: [
     'dashboard:view',
+    'domains:view', 'domains:create', 'domains:verify', 'domains:update',
     'products:view', 'products:create', 'products:update',
     'submissions:view', 'submissions:edit',
     'submissions:approve', 'submissions:reject',
@@ -25,6 +27,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly string[]> = {
   ],
   Viewer: [
     'dashboard:view',
+    'domains:view',
     'products:view',
     'submissions:view',
     'analytics:view',

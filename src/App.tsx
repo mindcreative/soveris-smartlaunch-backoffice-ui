@@ -9,6 +9,7 @@ import Dashboard from './pages/dashboard/DashboardPage'
 import Submissions from './pages/submissions/SubmissionsPage'
 import Analytics from './pages/analytics/AnalyticsPage'
 import Products from './pages/products/ProductsPage'
+import Domains from './pages/domains/DomainsPage'
 import Users from './pages/users/UsersPage'
 import { AuditLogPage } from './pages/audit'
 import Forbidden from './pages/error/ForbiddenPage'
@@ -53,6 +54,8 @@ function App() {
               <Route path="/submissions" element={<Submissions />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/products" element={<Products />} />
+              <Route path="/domains" element={<Domains />} />
+              <Route path="/domains/:domainId" element={<Domains />} />
               <Route path="/users" element={<Users />} />
               <Route path="/billing" element={<BillingIndexPage />} />
               <Route path="/billing/clients/:clientId/reports" element={<BillingReportsPage />} />

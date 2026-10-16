@@ -57,6 +57,9 @@ export function Modal({
       element.setAttribute('aria-hidden', 'true')
     }
     const frame = requestAnimationFrame(() => {
+      // A fast response may already have focused a validation summary, or the
+      // user may have moved focus. Initial focus must not override that action.
+      if (dialogRef.current?.contains(document.activeElement)) return
       const preferred = initialFocusRef?.current ??
         dialogRef.current?.querySelector<HTMLElement>('[data-modal-initial-focus]') ?? closeRef.current
       preferred?.focus()

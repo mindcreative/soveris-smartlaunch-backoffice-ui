@@ -12,6 +12,7 @@ export interface Column<T> {
 }
 
 interface DataTableProps<T> {
+  caption?: string
   columns: Column<T>[]
   data: T[]
   onRowClick?: (row: T) => void
@@ -22,6 +23,7 @@ interface DataTableProps<T> {
 
 export function DataTable<T extends Record<string, unknown>>({
   columns,
+  caption,
   data,
   onRowClick,
   loading,
@@ -78,11 +80,13 @@ export function DataTable<T extends Record<string, unknown>>({
     <div className={`bg-white rounded-lg border border-gray-200 overflow-hidden ${className}`}>
       <div className="overflow-x-auto">
         <table className="w-full">
+          {caption && <caption className="sr-only">{caption}</caption>}
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               {columns.map((col) => (
                 <th
                   key={col.key}
+                  scope="col"
                   onClick={() => col.sortable && handleSort(col.key)}
                   className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
                     col.sortable ? 'cursor-pointer hover:bg-gray-100' : ''

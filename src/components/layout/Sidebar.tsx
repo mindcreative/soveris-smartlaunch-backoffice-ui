@@ -7,6 +7,7 @@ const baseNavigation = [
   { name: 'Submissions', href: '/submissions', icon: 'inbox' },
   { name: 'Analytics', href: '/analytics', icon: 'chart' },
   { name: 'Products', href: '/products', icon: 'edit' },
+  { name: 'Domains', href: '/domains', icon: 'domains' },
   { name: 'Themes', href: '/themes', icon: 'palette' },
   { name: 'AI Tools', href: '/ai', icon: 'sparkle' },
   { name: 'Users', href: '/users', icon: 'users' },
@@ -23,6 +24,7 @@ const iconMap: Record<string, string> = {
   users: '👥',
   shield: '🛡️',
   billing: '◎',
+  domains: '◉',
 }
 
 interface SidebarProps {
@@ -62,6 +64,8 @@ export function Sidebar({ mobile = false, onClose, onNavigate }: SidebarProps) {
         return hasPermission('audit:view')
       case 'AI Tools':
         return hasPermission('ai:view')
+      case 'Domains':
+        return hasPermission('domains:view')
       case 'Products':
         return hasPermission('products:view')
       default:
