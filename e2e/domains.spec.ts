@@ -122,10 +122,15 @@ test('ambiguous create and Retry retain exact identities; DNS, TLS and policy st
   await session(page)
   let current = { ...initial, ownership: { ...initial.ownership, status: 'failed' }, verification: { ...initial.verification, lastErrorCode: 'dns_mismatch' }, authority: { ...initial.authority, canVerify: false, verifyReason: 'verification_retry_required', canRetry: true, retryReason: null } }
   const creates: string[] = [], retries: string[] = []
+  const claimCapabilities = { ...capabilities,
+    limits: capabilities.limits.map((limit: { key: string; value: number }) => limit.key === 'hostnames' ? { ...limit, value: 1 } : limit),
+  }
   await page.route('**/api/backoffice/**', async route => {
     const r = route.request(), path = new URL(r.url()).pathname
     const reply = (data: unknown, status = 200, location?: string) => route.fulfill({ status, contentType: 'application/json', headers: { 'Access-Control-Expose-Headers': 'Location,Retry-After', ...(location && { Location: location }) }, body: JSON.stringify(data) })
-    if (path.endsWith('/capabilities')) return reply(capabilities)
+    if (path.endsWith('/capabilities')) return reply({ ...claimCapabilities,
+      usage: capabilities.usage.map((usage: { key: string; value: number }) => usage.key === 'hostnames' ? { ...usage, value: creates.length ? 1 : 0 } : usage),
+    })
     if (path.endsWith(`/clients/${CLIENT}/domains`)) {
       if (r.method() === 'POST') { creates.push(r.postData()!); return creates.length === 1 ? route.abort('failed') : reply({ ...initial, authority: null }, 200, `/api/backoffice/domains/${ID}`) }
       return reply({ items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 })

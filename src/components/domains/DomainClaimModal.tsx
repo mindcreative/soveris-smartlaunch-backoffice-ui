@@ -52,9 +52,10 @@ export function DomainClaimModal({ scope, open, canReadProducts, capabilities, r
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     if (busy.current || denied || performance.now() < retryUntil.current) return
+    const replaying = uncertain && material.current !== null
     const validation: FormFieldError[] = []
     if (!host.trim()) validation.push({ fieldId: 'domain-host', label: 'Hostname', message: 'Enter a hostname.' })
-    if (target === 'product' && (!canReadProducts || !productId)) validation.push({ fieldId: 'domain-product', label: 'Product', message: 'Choose an authorized active Product.' })
+    if (!replaying && target === 'product' && (!canReadProducts || !productId)) validation.push({ fieldId: 'domain-product', label: 'Product', message: 'Choose an authorized active Product.' })
     if (validation.length) { setErrors(validation); return }
     if (!material.current) material.current = { operationId: createUuidV7(), host: host.trim(), bindingType: target,
       ...(target === 'product' && { productId }), verificationMethod: method }
@@ -66,10 +67,15 @@ export function DomainClaimModal({ scope, open, canReadProducts, capabilities, r
       assertDomainScope(scope)
       if (!alive.current) return
       if (!policy || policy.clientId !== scope.clientId) throw { code: 'configuration_unavailable', status: 503, message: 'Policy context could not be confirmed. The claim was not sent.' }
-      if (!policy.flags.some(f => f.key === featureKey && f.enabled)) throw { code: 'feature_not_available', status: 403, message: 'This binding type is unavailable under current policy.' }
-      const limit = policy.limits.find(l => l.key === 'hostnames'), usage = policy.usage.find(u => u.key === 'hostnames')
-      if (!limit || !usage) throw { code: 'configuration_unavailable', status: 503, message: 'Hostname capacity is unavailable. The claim was not sent.' }
-      if (BigInt(usage.value) >= BigInt(limit.value)) throw { code: 'limit_reached', status: 409, message: 'The current hostname limit has been reached.' }
+      // An unresolved request may already have consumed the final slot or lost
+      // new-claim eligibility. The server authorizes and resolves its exact
+      // receipt before applying admission checks to any new allocation.
+      if (!replaying) {
+        if (!policy.flags.some(f => f.key === featureKey && f.enabled)) throw { code: 'feature_not_available', status: 403, message: 'This binding type is unavailable under current policy.' }
+        const limit = policy.limits.find(l => l.key === 'hostnames'), usage = policy.usage.find(u => u.key === 'hostnames')
+        if (!limit || !usage) throw { code: 'configuration_unavailable', status: 503, message: 'Hostname capacity is unavailable. The claim was not sent.' }
+        if (BigInt(usage.value) >= BigInt(limit.value)) throw { code: 'limit_reached', status: 409, message: 'The current hostname limit has been reached.' }
+      }
       setCheckingPolicy(false)
       commandSent = true
       const result = await create.mutateAsync(material.current)
@@ -91,7 +97,8 @@ export function DomainClaimModal({ scope, open, canReadProducts, capabilities, r
         if (problem.status === 401) window.dispatchEvent(new Event('auth:cleared'))
         return
       }
-      const ambiguous = commandSent && (!problem.status || problem.status >= 500 || problem.code === 'time_zone_not_set')
+      // A failure of this attempt cannot settle an earlier unconfirmed POST.
+      const ambiguous = replaying || commandSent && (!problem.status || problem.status >= 500 || problem.code === 'time_zone_not_set')
       if (ambiguous) void invalidateDomainConsequences(client, scope, canReadProducts)
       setUncertain(ambiguous)
       const message = problem.code === 'time_zone_not_set'
@@ -104,7 +111,7 @@ export function DomainClaimModal({ scope, open, canReadProducts, capabilities, r
   }
   return <Modal isOpen={open} title="Claim domain" onClose={() => { if (!busy.current) onClose() }} closeDisabled={(create.isPending || pending)} initialFocusRef={initialFocus} footer={<div className="flex flex-wrap justify-end gap-3">
     <button type="button" className={domainButton} disabled={(create.isPending || pending)} onClick={onClose}>Close</button>
-    <button type="submit" form="domain-claim-form" className={domainButton} disabled={(create.isPending || pending) || denied || !featureAllowed || now < retryUntil.current || target === 'product' && (!canReadProducts || !productId || Boolean(products.error))}>{pending ? 'Checking claim eligibility…' : create.isPending ? 'Claiming domain…' : uncertain ? 'Retry exact claim' : 'Claim domain'}</button>
+    <button type="submit" form="domain-claim-form" className={domainButton} disabled={(create.isPending || pending) || denied || now < retryUntil.current || !uncertain && (!featureAllowed || target === 'product' && (!canReadProducts || !productId || Boolean(products.error)))}>{pending ? 'Checking claim eligibility…' : create.isPending ? 'Claiming domain…' : uncertain ? 'Retry exact claim' : 'Claim domain'}</button>
   </div>}>
     <form id="domain-claim-form" tabIndex={-1} noValidate onSubmit={submit} className="min-w-0 space-y-4">
       <p className="break-all text-sm text-foreground">Active Client: {scope.clientId}. A claim reserves the hostname; ownership verification alone does not activate serving.</p>
