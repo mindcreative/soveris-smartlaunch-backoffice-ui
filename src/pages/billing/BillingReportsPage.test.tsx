@@ -3,7 +3,7 @@ import { render,screen,waitFor,within,act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {beforeEach,describe,expect,it,vi} from 'vitest'
 import App from '../../App'
-import type {CreditPage} from '../../types/billingReports'
+import type {ReportPage, ReportKind} from '../../types/billingReports'
 import {useAuthStore} from '../../stores/authStore'
 import {queryClient} from '../../queryClient'
 import * as anomalies from '../../api/billingAnomaliesApi'
@@ -24,18 +24,55 @@ describe('Usage & expense route',()=>{
   const form=screen.getByRole('form',{name:'Report filters'});const user=userEvent.setup();await user.clear(within(form).getByLabelText('Provider (exact match)'));await user.type(within(form).getByLabelText('Provider (exact match)'),'draft');expect(screen.getByText(/Unapplied changes/)).toBeInTheDocument();expect(screen.getByText('Full-window credit totals')).toBeInTheDocument();const before=read.mock.calls.length;await user.clear(within(form).getByLabelText('From (inclusive UTC)'));await user.click(within(form).getByRole('button',{name:'Apply filters'}));expect(screen.getByRole('alert')).toHaveFocus();expect(read.mock.calls.length).toBe(before)
  })
  it('a current denial clears both sections and late results never refill them',async()=>{
-  let reject!:(e:unknown)=>void,resolve!:(p:CreditPage)=>void
+  let reject!:(e:unknown)=>void,resolve!:(p:ReportPage)=>void
   vi.spyOn(api,'readBillingReport').mockImplementation(kind=>kind==='expense'?new Promise((_,r)=>{reject=r}):new Promise(r=>{resolve=r}))
   render(<App/>);await waitFor(()=>expect(reject).toBeDefined());await act(async()=>reject({status:403}));expect(screen.getByRole('heading',{name:'Access denied'})).toBeInTheDocument();await act(async()=>resolve(api.parseCreditActivity(creditFixture(),REPORT_CLIENT,REPORT_RANGE)));expect(screen.queryByText('Full-window credit totals')).not.toBeInTheDocument()
  })
  it('token/role changes gate existing protected content synchronously',async()=>{
   vi.spyOn(api,'readBillingReport').mockImplementation(async kind=>kind==='credit'?api.parseCreditActivity(creditFixture(),REPORT_CLIENT,REPORT_RANGE):api.parseProviderExpense(expenseFixture(),REPORT_CLIENT,REPORT_RANGE));render(<App/>);await waitFor(()=>expect(screen.getByText('Full-window credit totals')).toBeInTheDocument());act(()=>session('Viewer'));expect(screen.queryByText('Full-window credit totals')).not.toBeInTheDocument();expect(screen.getByText(/Current billing:view permission/)).toBeInTheDocument()
  })
- it('switch A→B→A rejects the first A success and errors even after abort',async()=>{
-  const pending:{resolve:(v:CreditPage)=>void;reject:(e:unknown)=>void;client:string}[]=[]
-  vi.spyOn(api,'readBillingReport').mockImplementation((_,client)=>new Promise((resolve,reject)=>pending.push({resolve,reject,client})))
-  render(<App/>);await waitFor(()=>expect(pending.length).toBe(2));act(()=>{window.history.pushState({},'',`/billing/clients/${B}/reports`);window.dispatchEvent(new PopStateEvent('popstate'))});await waitFor(()=>expect(pending.length).toBe(4));act(()=>{window.history.pushState({},'',`/billing/clients/${REPORT_CLIENT}/reports`);window.dispatchEvent(new PopStateEvent('popstate'))});await waitFor(()=>expect(pending.length).toBe(6));await act(async()=>{pending[0].resolve(api.parseCreditActivity(creditFixture(),REPORT_CLIENT,REPORT_RANGE));pending[1].reject({status:401})});expect(screen.queryByText('Full-window credit totals')).not.toBeInTheDocument();expect(useAuthStore.getState().isAuthenticated).toBe(true)
+ it.each([
+  {strict:false,returnToA:false}, {strict:false,returnToA:true},
+  {strict:true,returnToA:false}, {strict:true,returnToA:true},
+ ])('rejects old successes/denials even when transport ignores abort ($strict StrictMode, return to A $returnToA)',async({strict,returnToA})=>{
+  type Pending={resolve:(v:ReportPage)=>void;reject:(e:unknown)=>void;client:string;kind:ReportKind;signal:AbortSignal;page:ReportPage}
+  const pending:Pending[]=[]
+  vi.spyOn(api,'readBillingReport').mockImplementation((kind,client,filters,_cursor,signal)=>new Promise((resolve,reject)=>{
+   const page:ReportPage=kind==='credit'?api.parseCreditActivity(creditFixture(client),client,REPORT_RANGE):api.parseProviderExpense(expenseFixture(client),client,REPORT_RANGE)
+   if(page.unit==='abstract_credits'){
+    page.from=api.utcInstant(filters.from);page.to=api.utcInstant(filters.to)
+    page.items=page.items.map(i=>({...i,periodStart:page.from}))
+   }
+   pending.push({resolve,reject,client,kind,signal:signal!,page})
+  }))
+  render(strict?<StrictMode><App/></StrictMode>:<App/>)
+  const active=(client:string)=>pending.filter(r=>r.client===client&&!r.signal.aborted)
+  const waitForPair=async(client:string)=>{await waitFor(()=>expect(active(client).map(r=>r.kind).sort()).toEqual(['credit','expense']))}
+  const navigate=async(client:string)=>{act(()=>{window.history.pushState({},'',`/billing/clients/${client}/reports`);window.dispatchEvent(new PopStateEvent('popstate'))});await waitForPair(client)}
+  await waitForPair(REPORT_CLIENT)
+  const oldA=[...active(REPORT_CLIENT)]
+  await navigate(B)
+  const oldB=[...active(B)]
+  if(returnToA)await navigate(REPORT_CLIENT)
+  expect(oldA.every(r=>r.signal.aborted)).toBe(true)
+  if(returnToA)expect(oldB.every(r=>r.signal.aborted)).toBe(true)
+  // Resolve/reject the promises despite their aborted signals: cancellation
+  // alone cannot make this pass if the report authority fence is broken.
+  await act(async()=>{
+   for(const r of pending.filter(r=>r.signal.aborted)){
+    if(r.kind==='credit')r.resolve(r.page);else r.reject({status:401})
+   }
+  })
+  expect(screen.queryByText('Full-window credit totals')).not.toBeInTheDocument()
+  expect(screen.queryByText('Full-window expense totals')).not.toBeInTheDocument()
+  expect(useAuthStore.getState().isAuthenticated).toBe(true)
+  expect(useAuthStore.getState().accessToken).toBe('token')
+  expect(window.location.pathname).toBe(`/billing/clients/${returnToA?REPORT_CLIENT:B}/reports`)
+  await act(async()=>{for(const r of active(returnToA?REPORT_CLIENT:B))r.resolve(r.page)})
+  await waitFor(()=>expect(screen.getByText('Full-window credit totals')).toBeInTheDocument())
+  expect(screen.getByText('Full-window expense totals')).toBeInTheDocument()
  })
+
 })
 
 it('canonicalizes uppercase Client deep links without losing the evaluation',async()=>{
