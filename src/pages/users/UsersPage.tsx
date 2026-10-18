@@ -131,11 +131,11 @@ const UsersPage: FC = () => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-900">Users</h1>
+        <h1 className="text-xl font-semibold text-foreground">Users</h1>
         <button
           onClick={() => setShowCreateModal(true)}
           disabled={createUserMutation.isPending}
-          className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50"
+          className="px-4 py-2 text-sm font-medium text-on-accent bg-primary-solid rounded-md hover:bg-primary-hover disabled:opacity-50"
         >
           {createUserMutation.isPending ? 'Creating...' : 'Create User'}
         </button>
@@ -173,14 +173,14 @@ const UsersPage: FC = () => {
           <>
             <button
               onClick={() => { setShowCreateModal(false); setFormData(initialUserState) }}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              className="px-4 py-2 text-sm font-medium text-foreground bg-surface border border-control rounded-md hover:bg-subtle"
             >
               Cancel
             </button>
             <button
               onClick={handleCreateUser}
               disabled={!formData.email || !formData.password || !formData.displayName || !formData.timeZoneId || createUserMutation.isPending}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 disabled:opacity-50"
+              className="px-4 py-2 text-sm font-medium text-on-accent bg-primary-solid rounded-md hover:bg-primary-hover disabled:opacity-50"
             >
               {createUserMutation.isPending ? 'Creating...' : 'Create User'}
             </button>
@@ -189,41 +189,41 @@ const UsersPage: FC = () => {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+            <label className="block text-sm font-medium text-foreground mb-1">Email *</label>
             <input
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+              className="block w-full px-3 py-2 border border-control rounded-md shadow-sm placeholder-muted focus:outline-none focus:ring-2 focus:ring-focus focus:border-transparent text-sm"
               placeholder="user@example.com"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Display Name *</label>
+            <label className="block text-sm font-medium text-foreground mb-1">Display Name *</label>
             <input
               type="text"
               value={formData.displayName}
               onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+              className="block w-full px-3 py-2 border border-control rounded-md shadow-sm placeholder-muted focus:outline-none focus:ring-2 focus:ring-focus focus:border-transparent text-sm"
               placeholder="John Doe"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+            <label className="block text-sm font-medium text-foreground mb-1">Password *</label>
             <input
               type="password"
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+              className="block w-full px-3 py-2 border border-control rounded-md shadow-sm placeholder-muted focus:outline-none focus:ring-2 focus:ring-focus focus:border-transparent text-sm"
               placeholder="Min. 8 characters"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+            <label className="block text-sm font-medium text-foreground mb-1">Role</label>
             <select
               value={formData.role}
               onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
-              className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+              className="block w-full px-3 py-2 border border-control rounded-md shadow-sm placeholder-muted focus:outline-none focus:ring-2 focus:ring-focus focus:border-transparent text-sm"
             >
               <option value="Viewer">Viewer</option>
               <option value="Editor">Editor</option>
@@ -231,10 +231,10 @@ const UsersPage: FC = () => {
             </select>
           </div>
           <div>
-            <label htmlFor="new-user-time-zone" className="block text-sm font-medium text-gray-700 mb-1">IANA timezone *</label>
+            <label htmlFor="new-user-time-zone" className="block text-sm font-medium text-foreground mb-1">IANA timezone *</label>
             <select id="new-user-time-zone" required value={formData.timeZoneId}
               onChange={(event) => setFormData({ ...formData, timeZoneId: event.target.value })}
-              className="block w-full min-h-11 rounded-md border border-gray-300 p-2 focus-visible:outline-indigo-600">
+              className="block w-full min-h-11 rounded-md border border-control p-2 focus-visible:outline-focus">
               <option value="">Select a timezone</option>
               {timeZoneOptions().map((id) => <option key={id} value={id}>{id}</option>)}
             </select>
@@ -251,21 +251,21 @@ const UsersPage: FC = () => {
           <>
             <button
               onClick={() => setShowDeleteConfirm(null)}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              className="px-4 py-2 text-sm font-medium text-foreground bg-surface border border-control rounded-md hover:bg-subtle"
             >
               Cancel
             </button>
             <button
               onClick={handleDeactivateUser}
               disabled={!showDeleteConfirm || deactivateUserMutation.isPending}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50"
+              className="px-4 py-2 text-sm font-medium text-on-accent bg-danger-solid rounded-md hover:bg-danger-solid disabled:opacity-50"
             >
                {deactivateUserMutation.isPending ? 'Deactivating...' : 'Deactivate User'}
             </button>
           </>
         }
       >
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-muted">
           Are you sure you want to deactivate this user? They will no longer be able to log in.
         </p>
       </Modal>

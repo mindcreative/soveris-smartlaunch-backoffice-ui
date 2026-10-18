@@ -18,7 +18,7 @@ export function BillingWorkspaceNav({ clientId }: { clientId: string }) {
   ]
 
   return (
-    <nav aria-label="Billing workspace" className="mb-6 border-b border-gray-200">
+    <nav aria-label="Billing workspace" className="mb-6 border-b border-line">
       <ul className="flex flex-wrap gap-2">
         {items.map((item) => {
           const active = location.pathname === item.href
@@ -29,8 +29,8 @@ export function BillingWorkspaceNav({ clientId }: { clientId: string }) {
                 aria-current={active ? 'page' : undefined}
                 className={`inline-flex min-h-11 items-center border-b-2 px-3 py-2 text-sm font-medium ${
                   active
-                    ? 'border-indigo-600 text-indigo-700'
-                    : 'border-transparent text-gray-600 hover:border-gray-300 hover:text-gray-900'
+                    ? 'border-primary-line text-primary'
+                    : 'border-transparent text-muted hover:border-control hover:text-foreground'
                 }`}
               >
                 {item.label}

@@ -16,11 +16,11 @@ import { domainKeys } from '../../queries/domainQueries'
 import { clientCapabilityKeys, clearPrivateClientScope } from '../../queries/billingQueries'
 import { Modal } from '../shared/Modal'
 import { SavedZoneTime } from '../../timezone/SavedZoneTime'
-const button='min-h-11 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:opacity-50'
+const button='min-h-11 rounded-md border border-control px-4 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-50'
 function errorMessage(error:unknown){const e=error as ApiError;return e.code==='product_removal_blocked'?'Dependencies prevent deletion. Use Archive or resolve pending attachment work.':e.code==='stale_revision'||e.code==='removal_preview_stale'?'The Product or its dependencies changed. Refresh and review before confirming.':'The outcome could not be verified. Check retained removal status before retrying.'}
 function Progress({receipt}:{receipt:RemovalReceipt}){
  const {assets,domains,assetState,domainState}=receipt.cleanup
- return <section aria-label="Product removal progress" className="space-y-3 rounded-md border border-gray-300 p-4">
+ return <section aria-label="Product removal progress" className="space-y-3 rounded-md border border-control p-4">
   <h3 className="font-semibold">Product deleted: {receipt.productName}</h3>
   <p>Removed <SavedZoneTime value={receipt.removedAt}/>. Its page, saved content and drafts have been removed. Required operation, audit and financial history are retained.</p>
   <p role="status">Image cleanup: {assetState.replace(/_/g,' ')}. Domain cleanup: {domainState.replace(/_/g,' ')}.</p>
@@ -55,7 +55,7 @@ export function ProductRemovalHistory({ scope }: { scope: DomainScope }) {
  }, [denied, queryClient, scope.actorId, scope.clientId, scope.generation])
  if (denied || !removalScopeCurrent(scope)) return null
  const recovered = new Set(recoveries.flatMap(recovery => recovery.data ? [recovery.data.operationId] : []))
- return <section aria-labelledby="product-removal-history" className="space-y-3 rounded-lg border border-gray-200 bg-white p-4">
+ return <section aria-labelledby="product-removal-history" className="space-y-3 rounded-lg border border-line bg-surface p-4">
   <h2 id="product-removal-history" className="text-lg font-semibold">Product removals</h2><p>Retained results are loaded from the server, including after a full reload. Product deletion and physical cleanup have separate outcomes.</p>
   <button className={button} onClick={() => void query.refetch()} disabled={query.isFetching}>Check removal status</button>
   {query.isLoading && <p role="status">Loading removal history…</p>}{query.error && <p role="alert">Removal history is unavailable. A missing Product does not prove removal or cleanup completed.</p>}
@@ -154,8 +154,8 @@ export function ProductRemovalModal({clientId,product,onClose,onArchive,returnFo
  }
  if(!authorized||[401,403].includes((preview.error as ApiError|null)?.status??0))return null
  const d=preview.data?.dependencies
- return <Modal isOpen onClose={onClose} title="Delete product permanently" descriptionId={description} initialFocusRef={cancel} returnFocusRef={receipt?returnFocusRef:undefined} closeDisabled={pending} closeOnBackdropClick={false} footer={<div className="flex flex-wrap justify-end gap-3"><button ref={cancel} className={button} onClick={onClose} disabled={pending}>{receipt?'Close':'Cancel'}</button>{!receipt&&!unknown&&<button className={`${button} border-red-700 bg-red-700 text-white`} disabled={pending||preview.isFetching||!preview.data?.hardDeleteAllowed||Boolean(preview.error)} onClick={()=>void remove()}>Delete product permanently</button>}</div>}>
-  <div className="space-y-4 text-sm text-gray-900"><p id={description}>Selected Client: {clientId}. Product: {preview.data?.productName??product.name}. Archive is the normal reversible action. Permanent deletion cannot be undone; your source repository is unaffected.</p>
+ return <Modal isOpen onClose={onClose} title="Delete product permanently" descriptionId={description} initialFocusRef={cancel} returnFocusRef={receipt?returnFocusRef:undefined} closeDisabled={pending} closeOnBackdropClick={false} footer={<div className="flex flex-wrap justify-end gap-3"><button ref={cancel} className={button} onClick={onClose} disabled={pending}>{receipt?'Close':'Cancel'}</button>{!receipt&&!unknown&&<button className={`${button} border-danger-line bg-danger-solid text-on-accent`} disabled={pending||preview.isFetching||!preview.data?.hardDeleteAllowed||Boolean(preview.error)} onClick={()=>void remove()}>Delete product permanently</button>}</div>}>
+  <div className="space-y-4 text-sm text-foreground"><p id={description}>Selected Client: {clientId}. Product: {preview.data?.productName??product.name}. Archive is the normal reversible action. Permanent deletion cannot be undone; your source repository is unaffected.</p>
   {receipt?<><Progress receipt={receipt}/><button className={button} onClick={()=>void check()} disabled={pending}>Check cleanup status</button></>:<>
   {preview.isLoading&&<p role="status">Loading dependency preview…</p>}{preview.error&&!previewRecovery&&<p role="alert">The dependency preview could not be verified. Deletion is disabled.</p>}
   {d&&<><dl className="grid grid-cols-1 gap-2 sm:grid-cols-2"><div><dt>Submissions</dt><dd>{d.submissions}</dd></div><div><dt>Analytics/funnel records</dt><dd>{d.funnelEvents}</dd></div><div><dt>Product bindings (primary)</dt><dd>{d.productBindings} ({d.primaryProductBindings})</dd></div><div><dt>Independent domain obligations</dt><dd>{d.domainReleaseObligations}</dd></div><div><dt>Ordinary images</dt><dd>{(BigInt(d.ordinaryAssets.finalizing)+BigInt(d.ordinaryAssets.ready)+BigInt(d.ordinaryAssets.deleting)+BigInt(d.ordinaryAssets.failed)+BigInt(d.ordinaryAssets.deleted)).toString()}</dd></div><div><dt>Adopted generated images</dt><dd>{(BigInt(d.generatedAssets.finalizing)+BigInt(d.generatedAssets.ready)+BigInt(d.generatedAssets.deleting)+BigInt(d.generatedAssets.failed)+BigInt(d.generatedAssets.deleted)).toString()}</dd></div></dl>

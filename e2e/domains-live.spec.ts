@@ -48,6 +48,13 @@ test('built Domains UI drives actual DNS, edge, primary and retained release aga
   for (let sample = 0; sample < 20; sample++) {
     await page.getByRole('button', { name: 'Claim domain', exact: true }).click()
     await expect(page.getByRole('dialog', { name: 'Claim domain' })).toBeVisible()
+    const draft = page.getByRole('dialog').getByLabel('Hostname')
+    await draft.fill('appearance-draft.example.test')
+    await page.emulateMedia({ colorScheme: sample % 2 ? 'dark' : 'light' })
+    await expect(page.locator('html')).toHaveAttribute('data-theme', sample % 2 ? 'dark' : 'light')
+    await expect(draft).toHaveValue('appearance-draft.example.test')
+    await expect(draft).toBeFocused()
+    expect(await page.locator('#root').evaluate(element => element.inert)).toBe(true)
     await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click()
   }
   const ackSamples = await page.evaluate(() => (window as unknown as { domainFeedbackObservations: { ack: number[] } }).domainFeedbackObservations.ack)
@@ -87,7 +94,9 @@ test('built Domains UI drives actual DNS, edge, primary and retained release aga
     return domain
   }
   const host = `browser-${Date.now()}.story117.test`
+  await page.emulateMedia({ colorScheme: 'light' })
   const first = await claim(`first-${host}`)
+  await page.emulateMedia({ colorScheme: 'dark' })
   const second = await claim(host)
   expect(pendingSamples).toHaveLength(2)
   expect(Math.max(...pendingSamples)).toBeLessThanOrEqual(500)

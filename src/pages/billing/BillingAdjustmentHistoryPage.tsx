@@ -71,10 +71,10 @@ function HistoryPageFrame({ clientId, children, headingRef }: {
       <BillingWorkspaceNav clientId={clientId} />
       <div className="mb-6 min-w-0">
         <h1 ref={headingRef} tabIndex={headingRef ? -1 : undefined}
-          className="text-2xl font-bold text-gray-950 outline-none focus-visible:ring-2 focus-visible:ring-indigo-700">
+          className="text-2xl font-bold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-focus">
           Adjustment history
         </h1>
-        <p className="mt-1 break-all text-sm text-gray-600">Selected Client: {clientId}</p>
+        <p className="mt-1 break-all text-sm text-muted">Selected Client: {clientId}</p>
       </div>
       {children}
     </div>
@@ -207,7 +207,7 @@ function CanonicalAdjustmentHistoryPage({ clientId }: { clientId: string }) {
         <ErrorDisplay message="Saved timezone required"
           detail="Contact an administrator to save a timezone before reviewing adjustment history." />}
       {initialError && status === 422 && fieldError &&
-        <p role="status" className="state-indicator rounded-md border border-amber-400 bg-amber-50 p-4 text-sm text-amber-950">
+        <p role="status" className="state-indicator rounded-md border border-warning-line bg-warning-soft p-4 text-sm text-warning">
           The selected local time needs attention. The filter draft has been preserved.
         </p>}
       {initialError && status === 400 &&
@@ -235,32 +235,32 @@ function CanonicalAdjustmentHistoryPage({ clientId }: { clientId: string }) {
           description="No immutable adjustments exist for this authorized Client scope." />}
       {!query.isPending && !initialError && !rowsPresent && filtersActive &&
         <section role="status" aria-labelledby="no-adjustment-matches"
-          className="rounded-lg border border-gray-300 bg-white p-6 text-center">
-          <h2 id="no-adjustment-matches" className="text-lg font-semibold text-gray-950">
+          className="rounded-lg border border-control bg-surface p-6 text-center">
+          <h2 id="no-adjustment-matches" className="text-lg font-semibold text-foreground">
             No adjustments match these filters
           </h2>
-          <p className="mt-2 text-sm text-gray-700">
+          <p className="mt-2 text-sm text-foreground">
             The Client scope remains selected and the applied filters are preserved.
           </p>
           <button type="button" onClick={clearFilters}
-            className="mt-4 min-h-11 rounded-md border border-gray-400 bg-white px-4 py-2 text-sm font-semibold text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-700">
+            className="mt-4 min-h-11 rounded-md border border-control bg-surface px-4 py-2 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
             Clear filters
           </button>
         </section>}
 
       {rowsPresent && <>
         <div role="status"
-          className="state-indicator mb-4 rounded-md border border-blue-400 bg-blue-50 p-3 text-sm text-blue-950">
+          className="state-indicator mb-4 rounded-md border border-primary-line bg-selected p-3 text-sm text-primary">
           <p>Results snapshot as of {query.asOf && <LocalInstant value={query.asOf} />}.</p>
           <p className="mt-1">Rows are shown newest first in authoritative server order.</p>
         </div>
         {(query.isStaleSnapshot || laterError) &&
           <div role="status"
-            className="state-indicator mb-4 rounded-md border border-amber-500 bg-amber-50 p-3 text-sm text-amber-950">
+            className="state-indicator mb-4 rounded-md border border-warning-line bg-warning-soft p-3 text-sm text-warning">
             This adjustment history may be stale. Displayed rows remain tied to the original results snapshot.
             <button type="button"
               onClick={() => void startTraversal(filters, 'Refreshing from a fresh adjustment history snapshot.')}
-              className="ml-2 min-h-11 rounded-md border border-amber-800 px-3 py-2 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-700">
+              className="ml-2 min-h-11 rounded-md border border-warning-line px-3 py-2 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
               Refresh
             </button>
           </div>}
@@ -272,7 +272,7 @@ function CanonicalAdjustmentHistoryPage({ clientId }: { clientId: string }) {
           }} />
         {laterError &&
           <div role="alert"
-            className="state-indicator mt-4 rounded-md border border-red-500 bg-red-50 p-4 text-sm text-red-950">
+            className="state-indicator mt-4 rounded-md border border-danger-line bg-danger-soft p-4 text-sm text-danger">
             <p className="font-semibold">{continuationInvalid
               ? 'This adjustment history can no longer be continued'
               : 'More adjustment history could not be loaded'}</p>
@@ -280,11 +280,11 @@ function CanonicalAdjustmentHistoryPage({ clientId }: { clientId: string }) {
             {continuationInvalid
               ? <button type="button"
                   onClick={() => void startTraversal(filters, 'Starting a fresh adjustment history snapshot.')}
-                  className="mt-3 min-h-11 rounded-md bg-red-800 px-4 py-2 font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-700">
+                  className="mt-3 min-h-11 rounded-md bg-danger-solid px-4 py-2 font-semibold text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
                   Start fresh
                 </button>
               : <button type="button" onClick={() => void loadMore()}
-                  className="mt-3 min-h-11 rounded-md bg-red-800 px-4 py-2 font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-700">
+                  className="mt-3 min-h-11 rounded-md bg-danger-solid px-4 py-2 font-semibold text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
                   Retry loading more
                 </button>}
           </div>}
@@ -292,16 +292,16 @@ function CanonicalAdjustmentHistoryPage({ clientId }: { clientId: string }) {
           <div className="mt-5">
             <button type="button" onClick={() => void loadMore()}
               disabled={query.isFetchingNextPage} aria-describedby="adjustment-history-pagination-status"
-              className="min-h-11 rounded-md border border-gray-400 bg-white px-4 py-2 text-sm font-semibold text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-700 disabled:cursor-wait disabled:opacity-60">
+              className="min-h-11 rounded-md border border-control bg-surface px-4 py-2 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-wait disabled:opacity-60">
               {query.isFetchingNextPage ? 'Loading more…' : 'Load more'}
             </button>
-            <p id="adjustment-history-pagination-status" role="status" className="mt-2 text-sm text-gray-700">
+            <p id="adjustment-history-pagination-status" role="status" className="mt-2 text-sm text-foreground">
               {query.isFetchingNextPage ? 'Loading the next cursor page.' : 'More results are available from this snapshot.'}
             </p>
           </div>}
         {!laterError && !query.hasNextPage &&
           <p ref={endRef} tabIndex={-1} role="status"
-            className="state-indicator mt-5 rounded-md border border-gray-400 bg-gray-50 p-3 text-sm font-medium text-gray-900 outline-none focus-visible:ring-2 focus-visible:ring-indigo-700">
+            className="state-indicator mt-5 rounded-md border border-control bg-subtle p-3 text-sm font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-focus">
             End of adjustment history results.
           </p>}
       </>}

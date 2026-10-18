@@ -34,10 +34,10 @@ export function AiBackendPreparationButton({ kind, allowed, onReady }: {
   if (!allowed) return null
   return <div className="space-y-2">
     <button type="button" disabled={state === 'preparing'} onClick={() => { void prepare() }}
-      className="min-h-11 rounded border border-gray-400 px-3 disabled:opacity-50">
+      className="min-h-11 rounded border border-control px-3 disabled:opacity-50">
       {state === 'preparing' ? 'Preparing AI…' : 'Prepare AI'}
     </button>
-    <p role="status" className="text-sm text-gray-700">
+    <p role="status" className="text-sm text-foreground">
       {state === 'ready' ? 'AI is ready. Generation still requires eligibility and admission.' :
         state === 'unavailable' ? 'AI preparation is unavailable or busy. No generation was submitted.' :
         'Prepare processing without submitting a generation or reserving credits.'}

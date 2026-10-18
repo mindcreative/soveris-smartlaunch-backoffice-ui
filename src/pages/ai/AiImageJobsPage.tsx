@@ -12,7 +12,7 @@ import { useAiImageAdmission } from '../../queries/aiImageQueries'
 
 function InvalidJobRoute() {
   return (
-    <section className="mx-auto max-w-3xl rounded-lg border border-red-700 bg-red-50 p-5 text-red-950" role="alert">
+    <section className="mx-auto max-w-3xl rounded-lg border border-danger-line bg-danger-soft p-5 text-danger" role="alert">
       <h1 className="text-xl font-semibold">Invalid image Job link</h1>
       <p className="mt-2">The route must contain one canonical lowercase UUIDv7 Job ID. No server request was made.</p>
     </section>
@@ -40,8 +40,8 @@ function SubmissionPage({ clientId }: { clientId: string }) {
   return (
     <div className="mx-auto min-w-0 max-w-4xl space-y-5">
       <header>
-        <h1 className="text-2xl font-semibold text-gray-950">AI image generation</h1>
-        <p className="mt-1 text-sm text-gray-700">Submit and track one private generated image without exposing processing internals.</p>
+        <h1 className="text-2xl font-semibold text-foreground">AI image generation</h1>
+        <p className="mt-1 text-sm text-foreground">Submit and track one private generated image without exposing processing internals.</p>
       </header>
       <AiBackendPreparationButton key={`${user?.id}:${clientId}`} kind="image" allowed={hasCreate}
         onReady={() => capabilities.refetch()} />

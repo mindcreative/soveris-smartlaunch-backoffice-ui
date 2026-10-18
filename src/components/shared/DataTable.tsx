@@ -1,3 +1,4 @@
+import { ArrowUp, ArrowDown } from 'lucide-react'
 import { useState } from 'react'
 function sortableValue(value: unknown): string {
   return String(value)
@@ -56,11 +57,11 @@ export function DataTable<T extends Record<string, unknown>>({
 
   if (loading) {
     return (
-      <div className={`bg-white rounded-lg border border-gray-200 ${className}`}>
+      <div className={`bg-surface rounded-lg border border-line ${className}`}>
         <div className="p-8">
           <div className="animate-pulse space-y-4">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-4 bg-gray-200 rounded"></div>
+              <div key={i} className="h-4 bg-hover rounded"></div>
             ))}
           </div>
         </div>
@@ -70,47 +71,46 @@ export function DataTable<T extends Record<string, unknown>>({
 
   if (data.length === 0) {
     return (
-      <div className={`bg-white rounded-lg border border-gray-200 ${className}`}>
-        <p className="text-center text-gray-500 py-8">{emptyMessage}</p>
+      <div className={`bg-surface rounded-lg border border-line ${className}`}>
+        <p className="text-center text-muted py-8">{emptyMessage}</p>
       </div>
     )
   }
 
   return (
-    <div className={`bg-white rounded-lg border border-gray-200 overflow-hidden ${className}`}>
+    <div className={`bg-surface rounded-lg border border-line overflow-hidden ${className}`}>
       <div className="overflow-x-auto">
         <table className="w-full">
           {caption && <caption className="sr-only">{caption}</caption>}
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-subtle border-b border-line">
             <tr>
               {columns.map((col) => (
                 <th
                   key={col.key}
                   scope="col"
-                  onClick={() => col.sortable && handleSort(col.key)}
-                  className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                    col.sortable ? 'cursor-pointer hover:bg-gray-100' : ''
+                  onClick={col.sortable ? () => handleSort(col.key) : undefined}
+                  aria-sort={col.sortable ? sortKey === col.key ? sortDir === 'asc' ? 'ascending' : 'descending' : 'none' : undefined}
+                  className={`px-4 py-3 text-left text-xs font-medium text-muted uppercase tracking-wider ${
+                    col.sortable ? 'cursor-pointer hover:bg-subtle' : ''
                   } ${col.className || ''}`}
                 >
-                  <div className="flex items-center gap-1">
+                  {col.sortable ? <button type="button" aria-label={`Sort by ${col.label}`} title={`Sort by ${col.label}`} className="flex min-h-11 items-center gap-1 rounded" onClick={event => { event.stopPropagation(); handleSort(col.key) }}>
                     {col.label}
-                    {col.sortable && sortKey === col.key && (
-                      <span className="text-blue-600">{sortDir === 'asc' ? '↑' : '↓'}</span>
-                    )}
-                  </div>
+                    {sortKey === col.key && <span className="text-primary">{sortDir === 'asc' ? <ArrowUp aria-hidden="true" size={16} /> : <ArrowDown aria-hidden="true" size={16} />}</span>}
+                  </button> : col.label}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-line">
             {sortedData.map((row, idx) => (
               <tr
                 key={idx}
                 onClick={() => onRowClick && onRowClick(row)}
-                className={`${onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+                className={`${onRowClick ? 'cursor-pointer hover:bg-subtle' : ''}`}
               >
                 {columns.map((col) => (
-                  <td key={col.key} className={`px-4 py-3 text-sm text-gray-700 ${col.className || ''}`}>
+                  <td key={col.key} className={`px-4 py-3 text-sm text-foreground ${col.className || ''}`}>
                     {col.render ? col.render(row[col.key], row) : String(row[col.key] ?? '-')}
                   </td>
                 ))}

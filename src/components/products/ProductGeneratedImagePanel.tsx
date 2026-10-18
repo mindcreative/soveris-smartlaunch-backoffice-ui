@@ -15,7 +15,7 @@ interface Props {
   clientId: string; productId: string; working: ProductContentV1; draftRevision: number; dirty: boolean; applyPending: boolean
   onApply: (selection: VerifiedGeneratedImageSelection, signal: AbortSignal) => Promise<AiApplyOutcome>
 }
-const button = 'min-h-11 rounded-md border border-indigo-700 px-4 py-2 text-sm font-medium text-indigo-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:opacity-50'
+const button = 'min-h-11 rounded-md border border-primary-line px-4 py-2 text-sm font-medium text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-50'
 export function ProductGeneratedImagePanel({ clientId, productId, working, draftRevision, dirty, applyPending, onApply }: Props) {
   const { user, hasPermission } = useAuth()
   const allowed = Boolean(user && user.clientId === clientId && hasPermission('products:update') && (hasPermission('ai:view') || hasPermission('audit:view')))
@@ -128,7 +128,7 @@ export function ProductGeneratedImagePanel({ clientId, productId, working, draft
     finally { if (captured === generation.current) setBusy(false) }
   }
   if (!allowed) return null
-  return <section aria-labelledby={`generated-image-title-${productId}`} className="min-w-0 space-y-3 rounded-md border border-gray-300 p-4">
+  return <section aria-labelledby={`generated-image-title-${productId}`} className="min-w-0 space-y-3 rounded-md border border-control p-4">
     <h3 id={`generated-image-title-${productId}`} className="font-semibold">Use a completed generated image</h3>
     <p className="text-sm">Saving an asset does not change this draft. Apply saves the chosen image; publishing is separate. Closing may leave accepted work finishing as a private asset.</p>
     <label className="block">Image destination<select aria-label="Image destination" value={pointer} disabled={busy || applyPending} onChange={e => setPointer(e.target.value)} className="block min-h-11 w-full border p-2">
@@ -152,7 +152,7 @@ export function ProductGeneratedImagePanel({ clientId, productId, working, draft
         <button type="button" className={button} onClick={() => { clear(); jobInput.current?.focus() }}>Clear image selection</button>
       </div>
     </>}
-    <p role="status" aria-live="polite">{message}</p>{error && <div ref={errorSummary} role="alert" tabIndex={-1} aria-label="Generated image needs attention" className="rounded border border-red-700 p-3 focus:outline focus:outline-2 focus:outline-indigo-600">
+    <p role="status" aria-live="polite">{message}</p>{error && <div ref={errorSummary} role="alert" tabIndex={-1} aria-label="Generated image needs attention" className="rounded border border-danger-line p-3 focus:outline focus:outline-2 focus:outline-focus">
       <button id={errorId} type="button" className={button} onClick={() => (altError ? altInput : jobInput).current?.focus()}>{error}</button>
     </div>}
     {preview && <img src={preview} alt={alt || 'Private generated image preview'} className="max-h-64 max-w-full object-contain" />}

@@ -11,23 +11,23 @@ interface ProductContentPreviewProps {
 export function ProductContentPreview({ attempt, job, draftMoved, selectedIndex, onSelect }: ProductContentPreviewProps) {
   if (!job.result) return null
   const imagePrompt = attempt.material.target === 'image_prompt'
-  return <section aria-labelledby="ai-preview-heading" className="space-y-4 rounded-lg border border-indigo-300 bg-indigo-50 p-4 forced-colors:border-[CanvasText]">
+  return <section aria-labelledby="ai-preview-heading" className="space-y-4 rounded-lg border border-primary-line bg-selected p-4 forced-colors:border-[CanvasText]">
     <div>
-      <h4 id="ai-preview-heading" className="font-semibold text-gray-950">{imagePrompt ? 'Image prompt preview' : 'Current and generated preview'}</h4>
-      <p className="mt-1 text-sm text-gray-700">Read-only saved result. No product content has been changed.</p>
+      <h4 id="ai-preview-heading" className="font-semibold text-foreground">{imagePrompt ? 'Image prompt preview' : 'Current and generated preview'}</h4>
+      <p className="mt-1 text-sm text-foreground">Read-only saved result. No product content has been changed.</p>
     </div>
-    {draftMoved && <p role="status" className="rounded-md border border-amber-500 bg-amber-50 p-3 text-sm text-amber-950">The working draft has moved on. The comparison below is “Current at generation start”.</p>}
+    {draftMoved && <p role="status" className="rounded-md border border-warning-line bg-warning-soft p-3 text-sm text-warning">The working draft has moved on. The comparison below is “Current at generation start”.</p>}
     <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-      <section aria-labelledby="ai-current-heading" className="min-w-0 rounded-md border border-gray-300 bg-white p-3">
+      <section aria-labelledby="ai-current-heading" className="min-w-0 rounded-md border border-control bg-surface p-3">
         <h5 id="ai-current-heading" className="font-medium">{draftMoved ? 'Current at generation start' : 'Current'}</h5>
-        <p className="mt-2 whitespace-pre-wrap break-words text-sm text-gray-800">{attempt.material.currentValue || 'No current text'}</p>
+        <p className="mt-2 whitespace-pre-wrap break-words text-sm text-foreground">{attempt.material.currentValue || 'No current text'}</p>
       </section>
-      <section aria-labelledby="ai-generated-heading" className="min-w-0 rounded-md border border-gray-300 bg-white p-3">
+      <section aria-labelledby="ai-generated-heading" className="min-w-0 rounded-md border border-control bg-surface p-3">
         <h5 id="ai-generated-heading" className="font-medium">{imagePrompt ? 'Generated image prompts (text)' : 'Generated'}</h5>
         <ol className="mt-2 space-y-3">
           {job.result.variations.map((variation, index) => <li key={`${job.result!.resultId}:${index}`} className="min-w-0">
-            {!imagePrompt && attempt.material.targetPointer ? <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-md p-2 focus-within:ring-2 focus-within:ring-indigo-600"><input type="radio" name={`ai-variation-${job.result!.resultId}`} checked={selectedIndex === index} onChange={() => onSelect(index)} className="mt-1 size-5" /><span className="font-medium">Select variation {index + 1}</span></label> : <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Variation {index + 1}</p>}
-            <output className="mt-1 block whitespace-pre-wrap break-words text-sm text-gray-950">{variation}</output>
+            {!imagePrompt && attempt.material.targetPointer ? <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-md p-2 focus-within:ring-2 focus-within:ring-focus"><input type="radio" name={`ai-variation-${job.result!.resultId}`} checked={selectedIndex === index} onChange={() => onSelect(index)} className="mt-1 size-5" /><span className="font-medium">Select variation {index + 1}</span></label> : <p className="text-xs font-semibold uppercase tracking-wide text-muted">Variation {index + 1}</p>}
+            <output className="mt-1 block whitespace-pre-wrap break-words text-sm text-foreground">{variation}</output>
           </li>)}
         </ol>
       </section>

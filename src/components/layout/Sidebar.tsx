@@ -1,3 +1,4 @@
+import { LayoutDashboard, Inbox, ChartNoAxesCombined, Package, Globe, Sparkles, Users, ClipboardClock, ReceiptText, X, type LucideIcon } from 'lucide-react'
 import { Link, matchPath, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { canonicalizeGuid } from '../../lib/guid'
@@ -8,23 +9,14 @@ const baseNavigation = [
   { name: 'Analytics', href: '/analytics', icon: 'chart' },
   { name: 'Products', href: '/products', icon: 'edit' },
   { name: 'Domains', href: '/domains', icon: 'domains' },
-  { name: 'Themes', href: '/themes', icon: 'palette' },
   { name: 'AI Tools', href: '/ai', icon: 'sparkle' },
   { name: 'Users', href: '/users', icon: 'users' },
   { name: 'Audit Logs', href: '/audit', icon: 'shield' },
 ]
 
-const iconMap: Record<string, string> = {
-  home: '🏠',
-  inbox: '📬',
-  chart: '📊',
-  edit: '✏️',
-  palette: '🎨',
-  sparkle: '✨',
-  users: '👥',
-  shield: '🛡️',
-  billing: '◎',
-  domains: '◉',
+const iconMap: Record<string, LucideIcon> = {
+  home: LayoutDashboard, inbox: Inbox, chart: ChartNoAxesCombined, edit: Package,
+  sparkle: Sparkles, users: Users, shield: ClipboardClock, billing: ReceiptText, domains: Globe,
 }
 
 interface SidebarProps {
@@ -77,32 +69,35 @@ export function Sidebar({ mobile = false, onClose, onNavigate }: SidebarProps) {
     <aside
       aria-label={mobile ? 'Mobile navigation' : 'Primary navigation'}
       className={mobile
-        ? 'fixed inset-y-0 left-0 z-50 flex w-[min(20rem,calc(100vw-3rem))] flex-col bg-white shadow-xl lg:hidden'
+        ? 'fixed inset-y-0 left-0 z-50 flex w-[min(20rem,calc(100vw-3rem))] flex-col bg-surface shadow-xl lg:hidden'
         : 'hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col'}
     >
-      <div className="flex flex-grow flex-col border-r border-gray-200 bg-white">
-        <div className="flex h-16 items-center justify-between border-b border-gray-200 px-4 sm:px-6">
-          <div className="flex min-w-0 items-center">
-            <span className="text-lg font-semibold text-gray-900">Soveris</span>
-            <span className="ml-2 rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-              Back-Office
+      <div className="flex flex-grow flex-col border-r border-line bg-surface">
+        <div className="flex h-16 items-center justify-between border-b border-line px-4 sm:px-6">
+          <Link to="/dashboard" onClick={onNavigate} aria-label="Soveris SmartLaunch Dashboard" className="flex min-h-11 min-w-0 items-center rounded focus-visible:ring-2 focus-visible:ring-focus">
+            <img src="/soveris-light.svg" alt="" className="brand-light h-auto w-28 shrink-0" />
+            <img src="/soveris-dark.svg" alt="" className="brand-dark h-auto w-28 shrink-0" />
+            <span className="ml-2 text-xs font-medium text-muted">
+              SmartLaunch
             </span>
-          </div>
+          </Link>
           {mobile && (
             <button
               type="button"
               autoFocus
               onClick={onClose}
               aria-label="Close navigation"
-              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-2xl text-gray-700 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+              title="Close navigation"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-2xl text-foreground hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
-              <span aria-hidden="true">×</span>
+              <X aria-hidden="true" size={20} />
             </button>
           )}
         </div>
 
-        <nav aria-label="Back-Office" className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        <nav aria-label="SmartLaunch" className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
           {filteredNav.map((item) => {
+            const Icon = iconMap[item.icon]
             const activePrefix = item.name === 'Billing' ? '/billing' : item.href
             const isActive = location.pathname.startsWith(activePrefix)
             return (
@@ -113,26 +108,17 @@ export function Sidebar({ mobile = false, onClose, onNavigate }: SidebarProps) {
                 aria-current={isActive ? 'page' : undefined}
                 className={`flex min-h-11 items-center rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                   isActive
-                    ? 'bg-indigo-50 text-indigo-700'
-                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                    ? 'bg-selected text-primary'
+                    : 'text-foreground hover:bg-subtle hover:text-foreground'
                 }`}
               >
-                <span aria-hidden="true" className="mr-3 text-lg">{iconMap[item.icon]}</span>
+                <Icon aria-hidden="true" size={20} className="mr-3 shrink-0" />
                 {item.name}
               </Link>
             )
           })}
         </nav>
 
-        {user && (
-          <div className="border-t border-gray-200 p-4">
-            <p className="text-xs text-gray-500">Logged in as</p>
-            <p className="truncate text-sm font-medium text-gray-900">
-              {user.displayName || user.email || 'User'}
-            </p>
-            <p className="text-xs capitalize text-gray-500">{user.role}</p>
-          </div>
-        )}
       </div>
     </aside>
   )

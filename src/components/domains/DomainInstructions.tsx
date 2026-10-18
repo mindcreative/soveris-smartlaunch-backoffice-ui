@@ -12,7 +12,7 @@ const dnsMessages: Record<string, string> = {
   dns_provider_failure: 'The DNS check is temporarily unavailable. Keep the existing records.',
 }
 export function DomainTime({ label, value }: { label: string; value: string | null }) {
-  return <div className="min-w-0"><dt className="font-medium text-gray-700">{label}</dt><dd className="break-words text-gray-950">{value ? <LocalInstant value={value} /> : 'Not supplied'}</dd></div>
+  return <div className="min-w-0"><dt className="font-medium text-foreground">{label}</dt><dd className="break-words text-foreground">{value ? <LocalInstant value={value} /> : 'Not supplied'}</dd></div>
 }
 function RecordView({ record, label }: { record: DomainRecord | DomainRoutingRecord; label: string }) {
   const text = `${record.type} ${record.name} ${record.value} TTL ${record.ttlSeconds}`
@@ -28,7 +28,7 @@ function RecordView({ record, label }: { record: DomainRecord | DomainRoutingRec
       if (alive.current && attempt === sequence.current) setMessage('Copy unavailable. Select the record text below and copy it.')
     }
   }
-  return <article className="min-w-0 space-y-3 rounded-md border border-gray-300 p-4">
+  return <article className="min-w-0 space-y-3 rounded-md border border-control p-4">
     <h3 className="font-semibold">{label}</h3>
     <dl className="grid min-w-0 gap-3 text-sm sm:grid-cols-2">
       <div><dt>Type</dt><dd className="font-mono">{record.type}</dd></div>
@@ -39,26 +39,26 @@ function RecordView({ record, label }: { record: DomainRecord | DomainRoutingRec
       {'managedBy' in record && <div><dt>Managed by</dt><dd>{record.managedBy === 'soveris' ? 'Soveris — keep this managed record' : 'Client — configure with your DNS provider'}</dd></div>}
     </dl>
     <div className="flex flex-wrap gap-2"><button type="button" className={domainButton} onClick={() => void copy()}>Copy {label.toLowerCase()}</button><button type="button" className={domainButton} onClick={() => { fallback.current?.focus(); fallback.current?.select() }}>Select {label.toLowerCase()} text</button></div>
-    <p role="status" className="min-h-6 text-sm text-gray-700">{message}</p>
-    <label className="block text-sm">{label} text<textarea ref={fallback} readOnly value={text} rows={3} className="mt-1 w-full min-w-0 resize-y rounded-md border border-gray-400 p-2 font-mono text-sm text-gray-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600" /></label>
+    <p role="status" className="min-h-6 text-sm text-foreground">{message}</p>
+    <label className="block text-sm">{label} text<textarea ref={fallback} readOnly value={text} rows={3} className="mt-1 w-full min-w-0 resize-y rounded-md border border-control p-2 font-mono text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus" /></label>
   </article>
 }
 export function DomainInstructions({ domain }: { domain: Domain }) {
   const check = domain.verification
   return <section aria-labelledby="domain-dns-heading" className="min-w-0 space-y-4">
     <h2 id="domain-dns-heading" className="text-lg font-semibold">DNS instructions and check history</h2>
-    <p className="text-sm text-gray-700">Ownership proof, traffic routing and TLS are separate. Keep the exact record values, including trailing dots. TXT proves ownership; it does not establish apex routing. Configure routing separately using a record type supported by your provider.</p>
+    <p className="text-sm text-foreground">Ownership proof, traffic routing and TLS are separate. Keep the exact record values, including trailing dots. TXT proves ownership; it does not establish apex routing. Configure routing separately using a record type supported by your provider.</p>
     <RecordView key={`${domain.id}:${check.generation}:ownership`} record={check.record} label="Ownership record" />
     <h3 className="font-semibold">Routing records</h3>
     {domain.routing.records.length === 0 ? <p>No routing instructions were supplied. Do not assume routing is configured.</p> : domain.routing.records.map((record, i) => <RecordView key={`${domain.id}:${check.generation}:routing:${i}`} record={record} label={`Routing record ${i + 1}`} />)}
-    {check.lastErrorCode && <p className="rounded-md border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950">{dnsMessages[check.lastErrorCode]}</p>}
+    {check.lastErrorCode && <p className="rounded-md border border-warning-line bg-warning-soft p-3 text-sm text-warning">{dnsMessages[check.lastErrorCode]}</p>}
     <dl className="grid min-w-0 gap-4 text-sm sm:grid-cols-2">
       <DomainTime label="Last check" value={check.lastCheckedAt} /><DomainTime label="Next DNS check (server schedule)" value={check.nextCheckAt} />
       <DomainTime label="Campaign deadline" value={check.deadlineAt} /><DomainTime label="Persisted Verify cooldown until" value={check.cooldownUntil} />
       <DomainTime label="Ownership verified at" value={domain.ownership.verifiedAt} /><DomainTime label="Ownership proof expires" value={domain.ownership.validUntil} />
       <DomainTime label="TLS expires" value={domain.tls.validUntil} /><DomainTime label="Edge next action" value={domain.edge?.nextActionAt ?? null} />
     </dl>
-    <p className="text-sm text-gray-700">Times use your saved timezone and preserve microseconds. Scheduled timestamps are display context; cooldown and request-rate waits come from separate server timing. Five minutes of UI tracking is not a verification failure deadline.</p>
-    {domain.edge && <p className="break-words text-sm text-gray-700">Edge {domain.edge.workKind}: {domain.edge.state}; attempts {domain.edge.attemptCount}.{domain.edge.lastErrorCode ? ` Recovery: ${domain.edge.lastErrorCode.replace(/_/g, ' ')}. Routing and TLS still require current confirmation.` : ''} No separate edge-activation or edge-Retry action is available.</p>}
+    <p className="text-sm text-foreground">Times use your saved timezone and preserve microseconds. Scheduled timestamps are display context; cooldown and request-rate waits come from separate server timing. Five minutes of UI tracking is not a verification failure deadline.</p>
+    {domain.edge && <p className="break-words text-sm text-foreground">Edge {domain.edge.workKind}: {domain.edge.state}; attempts {domain.edge.attemptCount}.{domain.edge.lastErrorCode ? ` Recovery: ${domain.edge.lastErrorCode.replace(/_/g, ' ')}. Routing and TLS still require current confirmation.` : ''} No separate edge-activation or edge-Retry action is available.</p>}
   </section>
 }

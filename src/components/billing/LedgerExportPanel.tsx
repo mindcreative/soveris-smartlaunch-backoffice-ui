@@ -43,9 +43,9 @@ function FilterScope({ filters }: { filters: BillingLedgerExportFilters }) {
   return (
     <dl className="mt-3 grid min-w-0 gap-2 text-sm sm:grid-cols-2">
       {FILTER_LABELS.map(([key, label]) => (
-        <div key={key} className="min-w-0 rounded-md bg-gray-50 p-2">
-          <dt className="font-semibold text-gray-800">{label}</dt>
-          <dd className="break-all text-gray-700">{(key === 'from' || key === 'to') && filters[key]
+        <div key={key} className="min-w-0 rounded-md bg-subtle p-2">
+          <dt className="font-semibold text-foreground">{label}</dt>
+          <dd className="break-all text-foreground">{(key === 'from' || key === 'to') && filters[key]
             ? <SavedZoneTime value={filters[key]!} /> : filters[key] ?? 'Unfiltered'}</dd>
         </div>
       ))}
@@ -342,26 +342,26 @@ export function LedgerExportPanel({
   const artifactEligible = metadata?.status === 'completed' && Boolean(metadata.artifactExpiresAt)
 
   return (
-    <section aria-labelledby="ledger-export-title" className="state-indicator mb-6 min-w-0 rounded-lg border border-gray-300 bg-white p-4 sm:p-5">
+    <section aria-labelledby="ledger-export-title" className="state-indicator mb-6 min-w-0 rounded-lg border border-control bg-surface p-4 sm:p-5">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 id="ledger-export-title" className="text-lg font-semibold text-gray-950">Ledger CSV export</h2>
-          <p className="mt-1 text-sm text-gray-700">Request an asynchronous private CSV from the currently applied Client and filters.</p>
+          <h2 id="ledger-export-title" className="text-lg font-semibold text-foreground">Ledger CSV export</h2>
+          <p className="mt-1 text-sm text-foreground">Request an asynchronous private CSV from the currently applied Client and filters.</p>
         </div>
         {requestActionAllowed && <button type="button" onClick={openConfirmation} disabled={mutation.isPending}
-          className="min-h-11 rounded-md bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:cursor-wait disabled:opacity-60">
+          className="min-h-11 rounded-md bg-primary-hover px-4 py-2 text-sm font-semibold text-on-accent hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-wait disabled:opacity-60">
           {mutation.isPending ? 'Requesting ledger CSV export…' : newRequestWarning || metadata ? 'Request a new CSV export' : 'Request ledger CSV export'}
         </button>}
       </div>
 
-      {commandState === 'ambiguous' && <div role="alert" className="state-indicator mt-4 rounded-md border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950"><p className="font-semibold">Export acceptance is unknown</p><p className="mt-1">{feedback}</p></div>}
-      {commandState === 'validation' && <div role="alert" className="state-indicator mt-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-950">{feedback}</div>}
-      {commandState === 'contract' && <div role="alert" className="state-indicator mt-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-950">The export status response did not match the private Billing contract. Export controls were cleared.</div>}
-      {commandState === 'transient' && <div role="status" className="state-indicator mt-4 rounded-md border border-amber-400 bg-amber-50 p-3 text-sm text-amber-950">{feedback}</div>}
+      {commandState === 'ambiguous' && <div role="alert" className="state-indicator mt-4 rounded-md border border-warning-line bg-warning-soft p-3 text-sm text-warning"><p className="font-semibold">Export acceptance is unknown</p><p className="mt-1">{feedback}</p></div>}
+      {commandState === 'validation' && <div role="alert" className="state-indicator mt-4 rounded-md border border-danger-line bg-danger-soft p-3 text-sm text-danger">{feedback}</div>}
+      {commandState === 'contract' && <div role="alert" className="state-indicator mt-4 rounded-md border border-danger-line bg-danger-soft p-3 text-sm text-danger">The export status response did not match the private Billing contract. Export controls were cleared.</div>}
+      {commandState === 'transient' && <div role="status" className="state-indicator mt-4 rounded-md border border-warning-line bg-warning-soft p-3 text-sm text-warning">{feedback}</div>}
 
       {metadata && (
-        <div className="state-indicator mt-4 min-w-0 rounded-md border border-blue-300 bg-blue-50 p-4 text-sm text-blue-950">
-          <h3 ref={statusHeadingRef} tabIndex={-1} className="text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Export status: {metadata.status}</h3>
+        <div className="state-indicator mt-4 min-w-0 rounded-md border border-primary-line bg-selected p-4 text-sm text-primary">
+          <h3 ref={statusHeadingRef} tabIndex={-1} className="text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-focus">Export status: {metadata.status}</h3>
           <dl className="mt-3 grid min-w-0 gap-2 sm:grid-cols-2">
             <div><dt className="font-semibold">Export ID</dt><dd className="break-all">{metadata.exportId}</dd></div>
             <div><dt className="font-semibold">Client ID</dt><dd className="break-all">{metadata.clientId}</dd></div>
@@ -382,13 +382,13 @@ export function LedgerExportPanel({
           <div className="mt-4 flex flex-wrap gap-3">
             {pollingPaused && (metadata.status === 'pending' || metadata.status === 'processing') && (
               <button type="button" onClick={() => void manualRefresh()} disabled={statusQuery.isFetching}
-                className="min-h-11 rounded-md border border-blue-800 px-4 py-2 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:cursor-wait disabled:opacity-60">
+                className="min-h-11 rounded-md border border-primary-line px-4 py-2 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-wait disabled:opacity-60">
                 {statusQuery.isFetching ? 'Refreshing export status…' : 'Refresh export status'}
               </button>
             )}
             {artifactEligible && (
               <button type="button" onClick={() => void download()} disabled={downloadBusy}
-                className="min-h-11 rounded-md bg-indigo-700 px-4 py-2 font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:cursor-wait disabled:opacity-60">
+                className="min-h-11 rounded-md bg-primary-hover px-4 py-2 font-semibold text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-wait disabled:opacity-60">
                 {downloadBusy ? 'Preparing private CSV download…' : 'Download ledger CSV'}
               </button>
             )}
@@ -401,14 +401,14 @@ export function LedgerExportPanel({
 
       <Modal isOpen={dialogOpen} onClose={() => setDialogOpen(false)} title="Confirm ledger CSV export"
         descriptionId="ledger-export-dialog-description" closeDisabled={mutation.isPending} closeLabel="Close export confirmation"
-        footer={<div className="flex flex-wrap justify-end gap-3"><button type="button" data-modal-initial-focus onClick={() => setDialogOpen(false)} disabled={mutation.isPending} className="min-h-11 rounded-md border border-gray-300 bg-white px-4 py-2 font-semibold text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:opacity-60">Cancel</button><button type="button" onClick={() => void confirm()} disabled={mutation.isPending} className="min-h-11 rounded-md bg-indigo-700 px-4 py-2 font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:cursor-wait disabled:opacity-60">{mutation.isPending ? 'Requesting one export…' : 'Confirm CSV export'}</button></div>}>
-        <div id="ledger-export-dialog-description" className="min-w-0 text-sm text-gray-700">
-          {newRequestWarning && <p className="state-indicator mb-3 rounded-md border border-amber-400 bg-amber-50 p-3 font-medium text-amber-950">This is a deliberate new export. Another export may already exist; confirming sends exactly one new request.</p>}
+        footer={<div className="flex flex-wrap justify-end gap-3"><button type="button" data-modal-initial-focus onClick={() => setDialogOpen(false)} disabled={mutation.isPending} className="min-h-11 rounded-md border border-control bg-surface px-4 py-2 font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-60">Cancel</button><button type="button" onClick={() => void confirm()} disabled={mutation.isPending} className="min-h-11 rounded-md bg-primary-hover px-4 py-2 font-semibold text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-wait disabled:opacity-60">{mutation.isPending ? 'Requesting one export…' : 'Confirm CSV export'}</button></div>}>
+        <div id="ledger-export-dialog-description" className="min-w-0 text-sm text-foreground">
+          {newRequestWarning && <p className="state-indicator mb-3 rounded-md border border-warning-line bg-warning-soft p-3 font-medium text-warning">This is a deliberate new export. Another export may already exist; confirming sends exactly one new request.</p>}
           <p>The server will fix a new point-in-time export snapshot when it accepts this request. It will not reuse the ledger view’s current snapshot time.</p>
           <p className="mt-2">Page size, loaded pages, cursors, and the currently visible row subset do not limit the CSV.</p>
-          <p className="mt-3 font-semibold text-gray-900">Selected Client ID</p>
+          <p className="mt-3 font-semibold text-foreground">Selected Client ID</p>
           <p className="break-all">{clientId}</p>
-          <h3 className="mt-4 font-semibold text-gray-900">Applied export filters</h3>
+          <h3 className="mt-4 font-semibold text-foreground">Applied export filters</h3>
           <FilterScope filters={normalizeLedgerExportFilters(dialogFilters)} />
           {feedback && mutation.isPending && <p role="status" className="mt-3 font-medium">{feedback}</p>}
         </div>

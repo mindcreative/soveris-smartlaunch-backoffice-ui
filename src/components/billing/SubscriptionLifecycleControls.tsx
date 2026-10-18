@@ -88,17 +88,17 @@ function ConfirmationContent({
   return (
     <form onSubmit={(event) => { event.preventDefault(); onConfirm() }} className="min-w-0 space-y-4">
       {validationError && (
-        <div id="lifecycle-validation-summary" ref={validationSummaryRef} role="alert" tabIndex={-1} className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-950 outline-none focus-visible:ring-2 focus-visible:ring-red-700">
+        <div id="lifecycle-validation-summary" ref={validationSummaryRef} role="alert" tabIndex={-1} className="rounded-md border border-danger-line bg-danger-soft p-3 text-sm text-danger outline-none focus-visible:ring-2 focus-visible:ring-danger">
           <a href="#lifecycle-reason" className="font-semibold underline">{validationError}</a>
         </div>
       )}
       <dl className="grid min-w-0 gap-3 text-sm sm:grid-cols-2">
-        <div><dt className="font-medium text-gray-600">Client</dt><dd className="break-all font-mono">{clientId}</dd></div>
-        <div><dt className="font-medium text-gray-600">Subscription</dt><dd className="break-all font-mono">{current.subscriptionId}</dd></div>
-        <div><dt className="font-medium text-gray-600">Plan</dt><dd className="break-words">{current.planName}</dd></div>
-        <div><dt className="font-medium text-gray-600">Status change</dt><dd>{current.status} → {TARGET_STATUS[action]}</dd></div>
+        <div><dt className="font-medium text-muted">Client</dt><dd className="break-all font-mono">{clientId}</dd></div>
+        <div><dt className="font-medium text-muted">Subscription</dt><dd className="break-all font-mono">{current.subscriptionId}</dd></div>
+        <div><dt className="font-medium text-muted">Plan</dt><dd className="break-words">{current.planName}</dd></div>
+        <div><dt className="font-medium text-muted">Status change</dt><dd>{current.status} → {TARGET_STATUS[action]}</dd></div>
       </dl>
-      <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+      <div className="rounded-md border border-warning-line bg-warning-soft p-3 text-sm text-warning">
         <p>{consequence(action)}</p>
         <p className="mt-2">Existing rollover credits and active reservations remain intact. This operation creates no grant, ledger entry, refund, or credit deletion.</p>
         <p className="mt-2">{action === 'expire'
@@ -106,7 +106,7 @@ function ConfirmationContent({
           : 'Effective time: the server database operation time.'}</p>
       </div>
       <div>
-        <label htmlFor="lifecycle-reason" className="block text-sm font-medium text-gray-800">Reason</label>
+        <label htmlFor="lifecycle-reason" className="block text-sm font-medium text-foreground">Reason</label>
         <textarea
           id="lifecycle-reason"
           value={reason}
@@ -114,12 +114,12 @@ function ConfirmationContent({
           aria-invalid={validationError ? 'true' : undefined}
           aria-describedby={validationError ? errorId : 'lifecycle-reason-help'}
           rows={4}
-          className="mt-1 min-h-24 w-full min-w-0 rounded-md border border-gray-300 px-3 py-2 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+          className="mt-1 min-h-24 w-full min-w-0 rounded-md border border-control px-3 py-2 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         />
-        <p id="lifecycle-reason-help" className="mt-1 text-xs text-gray-600">Required: 1–512 Unicode characters; no leading/trailing whitespace or control characters. Text is preserved exactly.</p>
-        {validationError && <p id={errorId} className="mt-1 text-sm text-red-800">{validationError}</p>}
+        <p id="lifecycle-reason-help" className="mt-1 text-xs text-muted">Required: 1–512 Unicode characters; no leading/trailing whitespace or control characters. Text is preserved exactly.</p>
+        {validationError && <p id={errorId} className="mt-1 text-sm text-danger">{validationError}</p>}
       </div>
-      <button type="submit" className="min-h-11 w-full rounded-md bg-indigo-600 px-4 py-2 font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2">
+      <button type="submit" className="min-h-11 w-full rounded-md bg-primary-solid px-4 py-2 font-semibold text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2">
         Confirm {ACTION_LABEL[action]}
       </button>
     </form>
@@ -237,41 +237,41 @@ export function SubscriptionLifecycleControlsView({
   if (!current && lifecycle.outcome === 'idle') return null
 
   return (
-    <section aria-labelledby="lifecycle-heading" className="min-w-0 rounded-lg border border-gray-200 bg-white p-4 sm:p-6">
-      <h2 id="lifecycle-heading" className="text-lg font-semibold text-gray-950">Subscription lifecycle</h2>
+    <section aria-labelledby="lifecycle-heading" className="min-w-0 rounded-lg border border-line bg-surface p-4 sm:p-6">
+      <h2 id="lifecycle-heading" className="text-lg font-semibold text-foreground">Subscription lifecycle</h2>
       {lifecycle.outcome === 'idle' && current && (
         <>
-          <p className="mt-2 text-sm text-gray-700">Actions use authoritative state as of <span className="break-all font-mono">{state.stateAsOf}</span>. The server database clock remains final.</p>
+          <p className="mt-2 text-sm text-foreground">Actions use authoritative state as of <span className="break-all font-mono">{state.stateAsOf}</span>. The server database clock remains final.</p>
           <div className="mt-4 flex flex-wrap gap-3">
             {actions.map((action) => (
-              <button key={action} type="button" onClick={() => open(action)} aria-label={`${ACTION_LABEL[action]} subscription`} className="min-h-11 min-w-11 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
+              <button key={action} type="button" onClick={() => open(action)} aria-label={`${ACTION_LABEL[action]} subscription`} className="min-h-11 min-w-11 rounded-md border border-control bg-surface px-4 py-2 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
                 {ACTION_LABEL[action]}
               </button>
             ))}
-            <button type="button" onClick={() => { void refreshLifecycleState() }} disabled={refreshState === 'checking'} className="min-h-11 min-w-11 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:cursor-wait disabled:opacity-60">{refreshState === 'checking' ? 'Refreshing lifecycle state…' : 'Refresh lifecycle state'}</button>
+            <button type="button" onClick={() => { void refreshLifecycleState() }} disabled={refreshState === 'checking'} className="min-h-11 min-w-11 rounded-md border border-control bg-surface px-4 py-2 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-wait disabled:opacity-60">{refreshState === 'checking' ? 'Refreshing lifecycle state…' : 'Refresh lifecycle state'}</button>
           </div>
-          {refreshState !== 'idle' && <p role={refreshState === 'failed' ? 'alert' : 'status'} className={`state-indicator mt-3 text-sm ${refreshState === 'failed' ? 'text-red-800' : 'text-gray-700'}`}>{refreshState === 'checking' ? 'Refreshing authoritative lifecycle state…' : refreshState === 'succeeded' ? 'Authoritative lifecycle state refreshed.' : 'Authoritative lifecycle state could not be refreshed.'}</p>}
+          {refreshState !== 'idle' && <p role={refreshState === 'failed' ? 'alert' : 'status'} className={`state-indicator mt-3 text-sm ${refreshState === 'failed' ? 'text-danger' : 'text-foreground'}`}>{refreshState === 'checking' ? 'Refreshing authoritative lifecycle state…' : refreshState === 'succeeded' ? 'Authoritative lifecycle state refreshed.' : 'Authoritative lifecycle state could not be refreshed.'}</p>}
         </>
       )}
 
       {(lifecycle.outcome === 'preflighting' || lifecycle.outcome === 'submitting') && (
-        <div className="mt-3"><h3 ref={resultHeadingRef} tabIndex={-1} className="font-semibold outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">{lifecycle.outcome === 'preflighting' ? 'Checking authoritative state' : 'Applying lifecycle operation'}</h3><p role="status" className="state-indicator mt-1 text-sm text-gray-700">{lifecycle.outcome === 'preflighting' ? 'Confirmation is being revalidated…' : 'Submitting the retained operation once…'}</p></div>
+        <div className="mt-3"><h3 ref={resultHeadingRef} tabIndex={-1} className="font-semibold outline-none focus-visible:ring-2 focus-visible:ring-focus">{lifecycle.outcome === 'preflighting' ? 'Checking authoritative state' : 'Applying lifecycle operation'}</h3><p role="status" className="state-indicator mt-1 text-sm text-foreground">{lifecycle.outcome === 'preflighting' ? 'Confirmation is being revalidated…' : 'Submitting the retained operation once…'}</p></div>
       )}
 
       {lifecycle.outcome === 'preflight-rejected' && (
-        <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3"><h3 ref={resultHeadingRef} tabIndex={-1} className="font-semibold text-amber-950 outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Confirmation expired</h3><p role="alert" className="state-indicator mt-1 text-sm text-amber-950">Authoritative Client, subscription, status, validity, permission, or availability changed. Nothing was sent.</p><button type="button" onClick={lifecycle.clear} className="mt-3 min-h-11 rounded-md border border-amber-500 bg-white px-4 py-2 text-sm font-semibold text-amber-950">Return to refreshed actions</button></div>
+        <div className="mt-3 rounded-md border border-warning-line bg-warning-soft p-3"><h3 ref={resultHeadingRef} tabIndex={-1} className="font-semibold text-warning outline-none focus-visible:ring-2 focus-visible:ring-focus">Confirmation expired</h3><p role="alert" className="state-indicator mt-1 text-sm text-warning">Authoritative Client, subscription, status, validity, permission, or availability changed. Nothing was sent.</p><button type="button" onClick={lifecycle.clear} className="mt-3 min-h-11 rounded-md border border-warning-line bg-surface px-4 py-2 text-sm font-semibold text-warning">Return to refreshed actions</button></div>
       )}
 
       {lifecycle.outcome === 'completed' && lifecycle.receipt && (
-        <div className="mt-3 rounded-md border border-emerald-300 bg-emerald-50 p-3"><h3 ref={resultHeadingRef} tabIndex={-1} className="font-semibold text-emerald-950 outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Lifecycle operation completed</h3><p role="status" className="state-indicator mt-1 text-sm text-emerald-950">The immutable receipt was accepted. It does not distinguish first application from exact replay.</p><p className="mt-2 break-all text-sm text-emerald-950">Latest authoritative state as of <span className="font-mono">{state.stateAsOf}</span>.</p><dl className="mt-3 grid min-w-0 gap-2 text-sm sm:grid-cols-2"><div><dt className="font-medium">Operation ID</dt><dd className="break-all font-mono">{lifecycle.receipt.lifecycleOperationId}</dd></div><div><dt className="font-medium">Status change</dt><dd>{lifecycle.receipt.previousStatus} → {lifecycle.receipt.status}</dd></div><div><dt className="font-medium">Effective at</dt><dd className="break-all">{lifecycle.receipt.effectiveAt}</dd></div><div><dt className="font-medium">Processed at</dt><dd className="break-all">{lifecycle.receipt.operationAsOf}</dd></div><div className="sm:col-span-2"><dt className="font-medium">Exact reason</dt><dd className="break-words">{lifecycle.receipt.reason}</dd></div></dl>{lifecycle.stateRefreshPending && <p role="status" className="state-indicator mt-3 text-sm text-amber-950">Refreshing authoritative subscription state. Older state is stale and is not the operation result.</p>}{lifecycle.stateRefreshFailed && <><p role="alert" className="mt-3 text-sm text-amber-950">The receipt is valid, but refreshed subscription state is unavailable. Older state must not be treated as the result.</p><button type="button" onClick={() => { void lifecycle.retryStateRefresh() }} className="mt-3 min-h-11 rounded-md border border-amber-500 bg-white px-4 py-2 text-sm font-semibold text-amber-950">Retry authoritative refresh</button></>}{!lifecycle.stateRefreshPending && !lifecycle.stateRefreshFailed && <button type="button" onClick={clearCompleted} className="mt-3 min-h-11 rounded-md border border-emerald-500 bg-white px-4 py-2 text-sm font-semibold text-emerald-950">Continue with authoritative state</button>}</div>
+        <div className="mt-3 rounded-md border border-success-line bg-success-soft p-3"><h3 ref={resultHeadingRef} tabIndex={-1} className="font-semibold text-success outline-none focus-visible:ring-2 focus-visible:ring-focus">Lifecycle operation completed</h3><p role="status" className="state-indicator mt-1 text-sm text-success">The immutable receipt was accepted. It does not distinguish first application from exact replay.</p><p className="mt-2 break-all text-sm text-success">Latest authoritative state as of <span className="font-mono">{state.stateAsOf}</span>.</p><dl className="mt-3 grid min-w-0 gap-2 text-sm sm:grid-cols-2"><div><dt className="font-medium">Operation ID</dt><dd className="break-all font-mono">{lifecycle.receipt.lifecycleOperationId}</dd></div><div><dt className="font-medium">Status change</dt><dd>{lifecycle.receipt.previousStatus} → {lifecycle.receipt.status}</dd></div><div><dt className="font-medium">Effective at</dt><dd className="break-all">{lifecycle.receipt.effectiveAt}</dd></div><div><dt className="font-medium">Processed at</dt><dd className="break-all">{lifecycle.receipt.operationAsOf}</dd></div><div className="sm:col-span-2"><dt className="font-medium">Exact reason</dt><dd className="break-words">{lifecycle.receipt.reason}</dd></div></dl>{lifecycle.stateRefreshPending && <p role="status" className="state-indicator mt-3 text-sm text-warning">Refreshing authoritative subscription state. Older state is stale and is not the operation result.</p>}{lifecycle.stateRefreshFailed && <><p role="alert" className="mt-3 text-sm text-warning">The receipt is valid, but refreshed subscription state is unavailable. Older state must not be treated as the result.</p><button type="button" onClick={() => { void lifecycle.retryStateRefresh() }} className="mt-3 min-h-11 rounded-md border border-warning-line bg-surface px-4 py-2 text-sm font-semibold text-warning">Retry authoritative refresh</button></>}{!lifecycle.stateRefreshPending && !lifecycle.stateRefreshFailed && <button type="button" onClick={clearCompleted} className="mt-3 min-h-11 rounded-md border border-success-line bg-surface px-4 py-2 text-sm font-semibold text-success">Continue with authoritative state</button>}</div>
       )}
 
       {lifecycle.outcome === 'rejected' && (
-        <div className="mt-3 rounded-md border border-red-300 bg-red-50 p-3"><h3 ref={resultHeadingRef} tabIndex={-1} className="font-semibold text-red-950 outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">{resultCopy(lifecycle.error).title}</h3><p role="alert" className="state-indicator mt-1 text-sm text-red-950">{resultCopy(lifecycle.error).detail}</p><p className="mt-2 text-sm text-red-950">The exact reason remains available for review: <span className="break-words font-medium">{reason}</span></p><button type="button" onClick={() => { void lifecycle.abandon() }} className="mt-3 min-h-11 rounded-md border border-red-400 bg-white px-4 py-2 text-sm font-semibold text-red-950">Review refreshed state</button></div>
+        <div className="mt-3 rounded-md border border-danger-line bg-danger-soft p-3"><h3 ref={resultHeadingRef} tabIndex={-1} className="font-semibold text-danger outline-none focus-visible:ring-2 focus-visible:ring-focus">{resultCopy(lifecycle.error).title}</h3><p role="alert" className="state-indicator mt-1 text-sm text-danger">{resultCopy(lifecycle.error).detail}</p><p className="mt-2 text-sm text-danger">The exact reason remains available for review: <span className="break-words font-medium">{reason}</span></p><button type="button" onClick={() => { void lifecycle.abandon() }} className="mt-3 min-h-11 rounded-md border border-danger-line bg-surface px-4 py-2 text-sm font-semibold text-danger">Review refreshed state</button></div>
       )}
 
       {lifecycle.outcome === 'unknown' && (
-        <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3"><h3 ref={resultHeadingRef} tabIndex={-1} className="font-semibold text-amber-950 outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Lifecycle outcome unknown</h3><p role="alert" className="state-indicator mt-1 text-sm text-amber-950">The subscription may have changed. Authoritative GET state is context only and cannot prove this operation.</p><p className="mt-2 text-sm text-amber-950">{lifecycle.recovery === 'checking' ? 'Reconciling the Client-scoped subscription state…' : lifecycle.recovery === 'ready' ? 'Scope was reconciled. You may explicitly replay the exact retained route, body, reason, and operation ID.' : lifecycle.recovery === 'mismatch' ? 'The retained subscription is absent from current and terminal history. Exact replay remains blocked.' : 'Reconciliation is unavailable. Exact replay remains blocked.'}</p><div className="mt-3 flex flex-wrap gap-3"><button type="button" onClick={() => { void lifecycle.retryExact() }} disabled={lifecycle.recovery !== 'ready'} className="min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Retry exact operation</button><button type="button" onClick={() => { void lifecycle.abandon() }} className="min-h-11 rounded-md border border-amber-500 bg-white px-4 py-2 text-sm font-semibold text-amber-950">Abandon unresolved attempt</button></div><p className="mt-2 text-xs text-amber-900">Abandon only if you accept that the first command may still have committed. A fresh GET is required before another action.</p></div>
+        <div className="mt-3 rounded-md border border-warning-line bg-warning-soft p-3"><h3 ref={resultHeadingRef} tabIndex={-1} className="font-semibold text-warning outline-none focus-visible:ring-2 focus-visible:ring-focus">Lifecycle outcome unknown</h3><p role="alert" className="state-indicator mt-1 text-sm text-warning">The subscription may have changed. Authoritative GET state is context only and cannot prove this operation.</p><p className="mt-2 text-sm text-warning">{lifecycle.recovery === 'checking' ? 'Reconciling the Client-scoped subscription state…' : lifecycle.recovery === 'ready' ? 'Scope was reconciled. You may explicitly replay the exact retained route, body, reason, and operation ID.' : lifecycle.recovery === 'mismatch' ? 'The retained subscription is absent from current and terminal history. Exact replay remains blocked.' : 'Reconciliation is unavailable. Exact replay remains blocked.'}</p><div className="mt-3 flex flex-wrap gap-3"><button type="button" onClick={() => { void lifecycle.retryExact() }} disabled={lifecycle.recovery !== 'ready'} className="min-h-11 rounded-md bg-primary-solid px-4 py-2 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-50">Retry exact operation</button><button type="button" onClick={() => { void lifecycle.abandon() }} className="min-h-11 rounded-md border border-warning-line bg-surface px-4 py-2 text-sm font-semibold text-warning">Abandon unresolved attempt</button></div><p className="mt-2 text-xs text-warning">Abandon only if you accept that the first command may still have committed. A fresh GET is required before another action.</p></div>
       )}
 
       <Modal
@@ -281,7 +281,7 @@ export function SubscriptionLifecycleControlsView({
         size="lg"
         closeLabel="Keep current status"
         initialFocusRef={safeDismissRef}
-        footer={<button ref={safeDismissRef} type="button" data-modal-initial-focus onClick={dismissConfirmation} className="min-h-11 w-full rounded-md border border-gray-300 bg-white px-4 py-2 font-semibold text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Keep current status</button>}
+        footer={<button ref={safeDismissRef} type="button" data-modal-initial-focus onClick={dismissConfirmation} className="min-h-11 w-full rounded-md border border-control bg-surface px-4 py-2 font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">Keep current status</button>}
       >
         {selected && selectedSnapshot && <ConfirmationContent action={selected} current={selectedSnapshot} clientId={clientId} reason={reason} setReason={(value) => { setReason(value); setValidationError(null) }} validationError={validationError} validationSummaryRef={validationSummaryRef} onConfirm={() => { void confirm() }} />}
       </Modal>

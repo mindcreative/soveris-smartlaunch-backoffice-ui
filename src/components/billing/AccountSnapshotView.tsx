@@ -3,15 +3,15 @@ import { CreditAmount } from './CreditAmount'
 import { LocalInstant } from '../../timezone/LocalInstant'
 
 const statusClasses = {
-  active: 'bg-green-100 text-green-800',
-  suspended: 'bg-amber-100 text-amber-900',
-  closed: 'bg-gray-200 text-gray-800',
+  active: 'bg-success-soft text-success',
+  suspended: 'bg-warning-soft text-warning',
+  closed: 'bg-hover text-foreground',
 } as const
 
 function AmountCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-      <dt className="text-sm font-medium text-gray-600">{label}</dt>
+    <div className="min-w-0 rounded-lg border border-line bg-surface p-5 shadow-sm">
+      <dt className="text-sm font-medium text-muted">{label}</dt>
       <dd className="mt-2 min-w-0"><CreditAmount value={value} /></dd>
     </div>
   )
@@ -28,29 +28,29 @@ export function AccountSnapshotView({ snapshot }: { snapshot: BillingAccountSnap
       </dl>
 
       <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-lg border border-gray-200 bg-white p-5">
-          <dt className="text-sm font-medium text-gray-600">Active reservations</dt>
-          <dd className="mt-2 text-2xl font-semibold tabular-nums text-gray-950">
+        <div className="rounded-lg border border-line bg-surface p-5">
+          <dt className="text-sm font-medium text-muted">Active reservations</dt>
+          <dd className="mt-2 text-2xl font-semibold tabular-nums text-foreground">
             {snapshot.activeReservationCount}
           </dd>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-5">
-          <dt className="text-sm font-medium text-gray-600">Account status</dt>
+        <div className="rounded-lg border border-line bg-surface p-5">
+          <dt className="text-sm font-medium text-muted">Account status</dt>
           <dd className="mt-3">
             <span className={`state-indicator inline-flex rounded-full px-3 py-1 text-sm font-semibold capitalize ${statusClasses[snapshot.status]}`}>
               {snapshot.status}
             </span>
           </dd>
         </div>
-        <div className="min-w-0 rounded-lg border border-gray-200 bg-white p-5">
-          <dt className="text-sm font-medium text-gray-600">Snapshot as of</dt>
-          <dd className="mt-2 break-words text-sm font-medium text-gray-900">
+        <div className="min-w-0 rounded-lg border border-line bg-surface p-5">
+          <dt className="text-sm font-medium text-muted">Snapshot as of</dt>
+          <dd className="mt-2 break-words text-sm font-medium text-foreground">
             <LocalInstant value={snapshot.asOf} />
           </dd>
         </div>
       </dl>
 
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
+      <div className="rounded-lg border border-primary-line bg-selected p-4 text-sm text-primary">
         <p>
           Active reservations are represented by the current amount and count above. These values are
           independently supplied by the server.

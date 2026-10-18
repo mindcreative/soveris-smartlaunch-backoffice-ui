@@ -1,0 +1,53 @@
+/* One semantic palette. Utility consumers opt into roles rather than redefining
+   Tailwind's color families, so content images and financial signs stay intact. */
+:root {
+  --app: #f4f7fa; --surface: #ffffff; --subtle: #eef3f7; --hover: #e4ebf2;
+  --foreground: #172b3a; --muted: #526575; --line: #c2ccd6; --control: #758596;
+  --primary: #1d4ed8; --primary-solid: #2563eb; --primary-hover: #1d4ed8;
+  --selected: #e8efff; --primary-line: #587bc0; --focus: #1d4ed8; --on-accent: #ffffff;
+  --success: #166534; --success-soft: #edf8f0; --success-line: #36815a; --success-solid: #166534;
+  --warning: #854d0e; --warning-soft: #fffbeb; --warning-line: #a7791f; --warning-solid: #854d0e;
+  --danger: #b91c1c; --danger-soft: #fef2f2; --danger-line: #c54d57; --danger-solid: #b91c1c;
+  --info: #075985; --info-soft: #edf7fc; --info-line: #477d99; --info-solid: #075985;
+  --success-hover: #14532d; --warning-hover: #713f12; --danger-hover: #991b1b; --info-hover: #0c4a6e;
+  --overlay: #0c1722; --disabled: #526575; --disabled-surface: #e4ebf2;
+}
+:root[data-theme='dark'] {
+  --app: #111d2b; --surface: #1b2d40; --subtle: #22374c; --hover: #2d455e;
+  --foreground: #e6edf3; --muted: #b3c3d1; --line: #3e556b; --control: #8097ac;
+  --primary: #93c5fd; --primary-solid: #60a5fa; --primary-hover: #93c5fd;
+  --selected: #243f5b; --primary-line: #77a9df; --focus: #93c5fd; --on-accent: #111d2b;
+  --success: #8be0b1; --success-soft: #173e35; --success-line: #63b68b; --success-solid: #8be0b1;
+  --warning: #f6d48a; --warning-soft: #40351f; --warning-line: #c9a852; --warning-solid: #f6d48a;
+  --danger: #fecaca; --danger-soft: #492a32; --danger-line: #e38e9b; --danger-solid: #fca5a5;
+  --info: #99d8ed; --info-soft: #193f50; --info-line: #77afc5; --info-solid: #99d8ed;
+  --success-hover: #b5efcf; --warning-hover: #fde7b3; --danger-hover: #fed7d7; --info-hover: #c4edf9;
+  --disabled: #b3c3d1; --disabled-surface: #2d455e;
+}
+@theme inline {
+  --color-app: var(--app); --color-surface: var(--surface); --color-subtle: var(--subtle); --color-hover: var(--hover);
+  --color-foreground: var(--foreground); --color-muted: var(--muted); --color-line: var(--line); --color-control: var(--control);
+  --color-primary: var(--primary); --color-primary-solid: var(--primary-solid); --color-primary-hover: var(--primary-hover);
+  --color-selected: var(--selected); --color-primary-line: var(--primary-line); --color-focus: var(--focus); --color-on-accent: var(--on-accent);
+  --color-success: var(--success); --color-success-soft: var(--success-soft); --color-success-line: var(--success-line); --color-success-solid: var(--success-solid);
+  --color-warning: var(--warning); --color-warning-soft: var(--warning-soft); --color-warning-line: var(--warning-line); --color-warning-solid: var(--warning-solid);
+  --color-danger: var(--danger); --color-danger-soft: var(--danger-soft); --color-danger-line: var(--danger-line); --color-danger-solid: var(--danger-solid);
+  --color-info: var(--info); --color-info-soft: var(--info-soft); --color-info-line: var(--info-line); --color-info-solid: var(--info-solid);
+  --color-overlay: var(--overlay); --color-disabled: var(--disabled); --color-disabled-surface: var(--disabled-surface);
+}
+
+/* Honor native high-contrast colors, including inverse text on action buttons. */
+@media (forced-colors: active) {
+  :root, :root[data-theme='dark'] {
+    --app: Canvas; --surface: Canvas; --subtle: Canvas; --hover: Canvas;
+    --foreground: CanvasText; --muted: CanvasText; --line: CanvasText; --control: ButtonText;
+    --primary: LinkText; --primary-solid: ButtonFace; --primary-hover: ButtonFace;
+    --selected: Canvas; --primary-line: ButtonText; --focus: Highlight; --on-accent: ButtonText;
+    --success: CanvasText; --success-soft: Canvas; --success-line: CanvasText; --success-solid: ButtonFace;
+    --warning: CanvasText; --warning-soft: Canvas; --warning-line: CanvasText; --warning-solid: ButtonFace;
+    --danger: CanvasText; --danger-soft: Canvas; --danger-line: CanvasText; --danger-solid: ButtonFace;
+    --info: CanvasText; --info-soft: Canvas; --info-line: CanvasText; --info-solid: ButtonFace;
+    --success-hover: Highlight; --warning-hover: Highlight; --danger-hover: Highlight; --info-hover: Highlight;
+    --disabled: GrayText; --disabled-surface: ButtonFace;
+  }
+}

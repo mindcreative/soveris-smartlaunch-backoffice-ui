@@ -40,36 +40,36 @@ export function Pagination({
   if (totalPages <= 1) return null
 
   return (
-    <div className={`flex items-center justify-between px-4 py-3 border-t border-gray-200 ${className}`}>
+    <div className={`flex items-center justify-between px-4 py-3 border-t border-line ${className}`}>
       <div className="hidden sm:flex sm:items-center sm:gap-2">
         {totalItems !== undefined && itemsPerPage !== undefined && (
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-muted">
             Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
             {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} results
           </span>
         )}
       </div>
-      <nav className="flex items-center gap-1">
+      <nav aria-label="Pages" className="flex flex-wrap items-center gap-1">
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="px-2 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="min-h-11 min-w-11 px-2 py-1.5 text-sm rounded-md border border-control text-foreground hover:bg-subtle disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Previous
         </button>
         {getPageNumbers().map((page, idx) =>
           typeof page === 'string' ? (
-            <span key={`ellipsis-${idx}`} className="px-2 py-1.5 text-sm text-gray-400">
+            <span key={`ellipsis-${idx}`} className="min-h-11 min-w-11 px-2 py-1.5 text-sm text-muted">
               ...
             </span>
           ) : (
             <button
               key={page}
               onClick={() => onPageChange(page)}
-              className={`px-3 py-1.5 text-sm rounded-md font-medium ${
+              className={`min-h-11 min-w-11 px-3 py-1.5 text-sm rounded-md font-medium ${
                 currentPage === page
-                  ? 'bg-blue-600 text-white'
-                  : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  ? 'bg-primary-solid text-on-accent'
+                  : 'border border-control text-foreground hover:bg-subtle'
               }`}
             >
               {page}
@@ -79,7 +79,7 @@ export function Pagination({
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="px-2 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="min-h-11 min-w-11 px-2 py-1.5 text-sm rounded-md border border-control text-foreground hover:bg-subtle disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Next
         </button>

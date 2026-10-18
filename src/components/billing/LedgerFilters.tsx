@@ -138,12 +138,12 @@ export function LedgerFilters({ appliedFiltersActive, busy, onApply, onClear }: 
   }
 
   return (
-    <section aria-labelledby="ledger-filter-heading" className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-      <h2 id="ledger-filter-heading" ref={headingRef} tabIndex={-1} className="text-lg font-semibold text-gray-950 outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Filter ledger operations</h2>
-      <p className="mt-1 text-sm text-gray-600">Dates and times use your saved timezone. From is inclusive; To is exclusive.</p>
+    <section aria-labelledby="ledger-filter-heading" className="mb-6 rounded-lg border border-line bg-surface p-4 shadow-sm sm:p-5">
+      <h2 id="ledger-filter-heading" ref={headingRef} tabIndex={-1} className="text-lg font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-focus">Filter ledger operations</h2>
+      <p className="mt-1 text-sm text-muted">Dates and times use your saved timezone. From is inclusive; To is exclusive.</p>
 
       {Object.keys(errors).length > 0 && (
-        <div ref={summaryRef} tabIndex={-1} role="alert" className="state-indicator mt-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-950 outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
+        <div ref={summaryRef} tabIndex={-1} role="alert" className="state-indicator mt-4 rounded-md border border-danger-line bg-danger-soft p-3 text-sm text-danger outline-none focus-visible:ring-2 focus-visible:ring-focus">
           <p className="font-semibold">Check the filter values.</p>
           <ul className="mt-2 list-disc pl-5">
             {Object.entries(errors).map(([field, message]) => {
@@ -168,39 +168,39 @@ export function LedgerFilters({ appliedFiltersActive, busy, onApply, onClear }: 
         <FilterInput id="reservationId" label="Reservation ID" value={draft.reservationId} error={errors.reservationId} describedBy={describedBy('reservationId')} onChange={(value) => setField('reservationId', value)} />
 
         <div className="min-w-0">
-          <label htmlFor="ledger-from" className="block text-sm font-medium text-gray-800">From (your saved timezone, inclusive)</label>
-          <input id="ledger-from" type="datetime-local" value={draft.from} onChange={(event) => setField('from', event.target.value)} aria-invalid={Boolean(errors.from || errors.range)} aria-describedby={errors.from ? 'ledger-from-error' : errors.range ? 'ledger-range-error' : undefined} className="mt-1 min-h-11 w-full min-w-0 rounded-md border border-gray-300 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600" />
-          {errors.from && <p id="ledger-from-error" className="mt-1 text-sm text-red-700">{errors.from}</p>}
+          <label htmlFor="ledger-from" className="block text-sm font-medium text-foreground">From (your saved timezone, inclusive)</label>
+          <input id="ledger-from" type="datetime-local" value={draft.from} onChange={(event) => setField('from', event.target.value)} aria-invalid={Boolean(errors.from || errors.range)} aria-describedby={errors.from ? 'ledger-from-error' : errors.range ? 'ledger-range-error' : undefined} className="mt-1 min-h-11 w-full min-w-0 rounded-md border border-control px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus" />
+          {errors.from && <p id="ledger-from-error" className="mt-1 text-sm text-danger">{errors.from}</p>}
         </div>
         <div className="min-w-0">
-          <label htmlFor="ledger-to" className="block text-sm font-medium text-gray-800">To (your saved timezone, exclusive)</label>
-          <input id="ledger-to" type="datetime-local" value={draft.to} onChange={(event) => setField('to', event.target.value)} aria-invalid={Boolean(errors.to || errors.range)} aria-describedby={errors.to ? 'ledger-to-error' : errors.range ? 'ledger-range-error' : undefined} className="mt-1 min-h-11 w-full min-w-0 rounded-md border border-gray-300 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600" />
-          {errors.to && <p id="ledger-to-error" className="mt-1 text-sm text-red-700">{errors.to}</p>}
-          {errors.range && <p id="ledger-range-error" className="mt-1 text-sm text-red-700">{errors.range}</p>}
+          <label htmlFor="ledger-to" className="block text-sm font-medium text-foreground">To (your saved timezone, exclusive)</label>
+          <input id="ledger-to" type="datetime-local" value={draft.to} onChange={(event) => setField('to', event.target.value)} aria-invalid={Boolean(errors.to || errors.range)} aria-describedby={errors.to ? 'ledger-to-error' : errors.range ? 'ledger-range-error' : undefined} className="mt-1 min-h-11 w-full min-w-0 rounded-md border border-control px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus" />
+          {errors.to && <p id="ledger-to-error" className="mt-1 text-sm text-danger">{errors.to}</p>}
+          {errors.range && <p id="ledger-range-error" className="mt-1 text-sm text-danger">{errors.range}</p>}
         </div>
         <div>
-          <label htmlFor="ledger-transactionType" className="block text-sm font-medium text-gray-800">Transaction type</label>
-          <select id="ledger-transactionType" value={draft.transactionType} onChange={(event) => setField('transactionType', event.target.value)} aria-invalid={Boolean(errors.transactionType)} aria-describedby={describedBy('transactionType')} className="mt-1 min-h-11 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
+          <label htmlFor="ledger-transactionType" className="block text-sm font-medium text-foreground">Transaction type</label>
+          <select id="ledger-transactionType" value={draft.transactionType} onChange={(event) => setField('transactionType', event.target.value)} aria-invalid={Boolean(errors.transactionType)} aria-describedby={describedBy('transactionType')} className="mt-1 min-h-11 w-full rounded-md border border-control bg-surface px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
             <option value="">All transaction types</option>
             {TRANSACTION_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
-          {errors.transactionType && <p id="ledger-transactionType-error" className="mt-1 text-sm text-red-700">{errors.transactionType}</p>}
+          {errors.transactionType && <p id="ledger-transactionType-error" className="mt-1 text-sm text-danger">{errors.transactionType}</p>}
         </div>
         <div>
-          <label htmlFor="ledger-pageSize" className="block text-sm font-medium text-gray-800">Page size</label>
-          <select id="ledger-pageSize" value={draft.pageSize} onChange={(event) => setField('pageSize', event.target.value)} aria-invalid={Boolean(errors.pageSize)} aria-describedby={describedBy('pageSize')} className="mt-1 min-h-11 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
+          <label htmlFor="ledger-pageSize" className="block text-sm font-medium text-foreground">Page size</label>
+          <select id="ledger-pageSize" value={draft.pageSize} onChange={(event) => setField('pageSize', event.target.value)} aria-invalid={Boolean(errors.pageSize)} aria-describedby={describedBy('pageSize')} className="mt-1 min-h-11 w-full rounded-md border border-control bg-surface px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
             <option value="">Server default (20)</option>
             {[10, 20, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}
           </select>
-          {errors.pageSize && <p id="ledger-pageSize-error" className="mt-1 text-sm text-red-700">{errors.pageSize}</p>}
+          {errors.pageSize && <p id="ledger-pageSize-error" className="mt-1 text-sm text-danger">{errors.pageSize}</p>}
         </div>
 
         <div className="flex flex-wrap items-end gap-3 sm:col-span-2 xl:col-span-4">
-          <button id="ledger-apply" ref={applyRef} type="submit" disabled={busy} className="min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60">
+          <button id="ledger-apply" ref={applyRef} type="submit" disabled={busy} className="min-h-11 rounded-md bg-primary-solid px-4 py-2 text-sm font-semibold text-on-accent hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60">
             {busy ? 'Applying…' : 'Apply filters'}
           </button>
           {appliedFiltersActive && (
-            <button type="button" onClick={clear} disabled={busy} className="min-h-11 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:cursor-wait disabled:opacity-60">
+            <button type="button" onClick={clear} disabled={busy} className="min-h-11 rounded-md border border-control bg-surface px-4 py-2 text-sm font-semibold text-foreground hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-wait disabled:opacity-60">
               Clear filters
             </button>
           )}
@@ -221,9 +221,9 @@ function FilterInput({ id, label, value, error, describedBy, onChange }: {
   const inputId = `ledger-${id}`
   return (
     <div className="min-w-0">
-      <label htmlFor={inputId} className="block text-sm font-medium text-gray-800">{label}</label>
-      <input id={inputId} type="text" value={value} onChange={(event) => onChange(event.target.value)} aria-invalid={Boolean(error)} aria-describedby={describedBy} autoComplete="off" spellCheck={false} className="mt-1 min-h-11 w-full min-w-0 rounded-md border border-gray-300 px-3 py-2 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600" />
-      {error && <p id={`ledger-${id}-error`} className="mt-1 text-sm text-red-700">{error}</p>}
+      <label htmlFor={inputId} className="block text-sm font-medium text-foreground">{label}</label>
+      <input id={inputId} type="text" value={value} onChange={(event) => onChange(event.target.value)} aria-invalid={Boolean(error)} aria-describedby={describedBy} autoComplete="off" spellCheck={false} className="mt-1 min-h-11 w-full min-w-0 rounded-md border border-control px-3 py-2 font-mono text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus" />
+      {error && <p id={`ledger-${id}-error`} className="mt-1 text-sm text-danger">{error}</p>}
     </div>
   )
 }

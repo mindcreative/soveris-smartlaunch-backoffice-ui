@@ -49,12 +49,12 @@ function BalanceComparison({ label, current, projected, unchanged = false }: {
   projected: string
   unchanged?: boolean
 }) {
-  return <div className="rounded-md border border-gray-200 p-3">
-    <dt className="font-semibold text-gray-950">{label}{unchanged ? ' — unchanged' : ''}</dt>
+  return <div className="rounded-md border border-line p-3">
+    <dt className="font-semibold text-foreground">{label}{unchanged ? ' — unchanged' : ''}</dt>
     <dd className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-      <span><span className="block text-xs text-gray-600">Current</span>
+      <span><span className="block text-xs text-muted">Current</span>
         <CreditAmount value={current} compact /></span>
-      <span><span className="block text-xs text-gray-600">Projected</span>
+      <span><span className="block text-xs text-muted">Projected</span>
         <CreditAmount value={projected} compact /></span>
     </dd>
   </div>
@@ -173,12 +173,12 @@ export function CreditAdjustmentReversalWorkflow({
 
   return <>
     {(activationPending || workflow.phase === 'opening') && <p role="status" aria-live="polite"
-      className="state-indicator my-4 rounded-md border border-blue-400 bg-blue-50 p-3 text-sm font-semibold text-blue-950">
+      className="state-indicator my-4 rounded-md border border-primary-line bg-selected p-3 text-sm font-semibold text-primary">
       Loading fresh reversal evidence…
     </p>}
 
     {workflow.phase === 'rejected' && !workflow.review && <div role="alert" tabIndex={-1}
-      className="state-indicator my-4 rounded-md border border-red-500 bg-red-50 p-4 text-sm text-red-950">
+      className="state-indicator my-4 rounded-md border border-danger-line bg-danger-soft p-4 text-sm text-danger">
       <p className="font-semibold">Reversal review unavailable</p>
       <p className="mt-1">{rejectionMessage(workflow.disposition)}</p>
     </div>}
@@ -190,43 +190,43 @@ export function CreditAdjustmentReversalWorkflow({
       footer={<div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         {workflow.phase === 'unknown' ? <>
           <button type="button" onClick={() => void workflow.reconcile()} disabled={workflow.busy}
-            className="min-h-11 rounded-md border border-amber-800 px-4 py-2 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-800 disabled:opacity-60">
+            className="min-h-11 rounded-md border border-warning-line px-4 py-2 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning disabled:opacity-60">
             Reconcile
           </button>
           <button type="button" onClick={() => void workflow.retry()} disabled={workflow.busy}
-            className="min-h-11 rounded-md bg-amber-900 px-4 py-2 font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-800 disabled:opacity-60">
+            className="min-h-11 rounded-md bg-warning-solid px-4 py-2 font-semibold text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning disabled:opacity-60">
             Retry same operation
           </button>
         </> : workflow.phase === 'success' ?
           <button ref={cancelRef} data-modal-initial-focus type="button" onClick={close}
-            className="min-h-11 rounded-md border border-green-800 px-4 py-2 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-800">
+            className="min-h-11 rounded-md border border-success-line px-4 py-2 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success">
             Close
           </button> : <>
             <button ref={cancelRef} data-modal-initial-focus type="button" onClick={close}
               disabled={workflow.busy}
-              className="min-h-11 rounded-md border border-gray-400 px-4 py-2 font-semibold text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-700 disabled:cursor-wait disabled:opacity-60">
+              className="min-h-11 rounded-md border border-control px-4 py-2 font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-wait disabled:opacity-60">
               Cancel
             </button>
             <button type="button" onClick={() => void confirm()}
               disabled={workflow.busy || workflow.phase === 'rejected'}
-              className="min-h-11 rounded-md bg-red-800 px-4 py-2 font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-800 disabled:cursor-wait disabled:opacity-60">
+              className="min-h-11 rounded-md bg-danger-solid px-4 py-2 font-semibold text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger disabled:cursor-wait disabled:opacity-60">
               Confirm reversal
             </button>
           </>}
       </div>}>
-      {workflow.review && <div className="min-w-0 space-y-4 text-sm text-gray-800">
+      {workflow.review && <div className="min-w-0 space-y-4 text-sm text-foreground">
         <p id={descriptionId}>
           This appends one immutable compensating adjustment. The original evidence remains unchanged.
         </p>
         <FormErrorSummary ref={summaryRef} errors={fieldErrors} />
         {workflow.error instanceof Error &&
           workflow.error.name === 'CreditAdjustmentReversalChangedError' &&
-          <div role="alert" className="state-indicator rounded-md border border-amber-500 bg-amber-50 p-3 font-semibold text-amber-950">
+          <div role="alert" className="state-indicator rounded-md border border-warning-line bg-warning-soft p-3 font-semibold text-warning">
             Financial evidence changed. Review the updated values before confirming again.
           </div>}
         {workflow.phase === 'rejected' &&
           <div role="alert" tabIndex={-1}
-            className="state-indicator rounded-md border border-red-500 bg-red-50 p-3 text-red-950">
+            className="state-indicator rounded-md border border-danger-line bg-danger-soft p-3 text-danger">
             <p className="font-semibold">Reversal not applied</p>
             <p className="mt-1">{rejectionMessage(workflow.disposition)}</p>
           </div>}
@@ -262,8 +262,8 @@ export function CreditAdjustmentReversalWorkflow({
             projected={workflow.review.projection.projectedReservedBalance} unchanged />
         </dl>
         {workflow.phase !== 'success' && <div>
-          <label htmlFor={reasonId} className="block font-semibold text-gray-950">Reversal reason</label>
-          <p id={`${reasonId}-hint`} className="mt-1 text-gray-600">
+          <label htmlFor={reasonId} className="block font-semibold text-foreground">Reversal reason</label>
+          <p id={`${reasonId}-hint`} className="mt-1 text-muted">
             Required new immutable operator evidence, 1–512 characters. It may match the original reason.
           </p>
           <textarea id={reasonId} rows={4} autoComplete="off" value={workflow.reason}
@@ -274,17 +274,17 @@ export function CreditAdjustmentReversalWorkflow({
               workflow.setReason(event.target.value)
               setFieldErrors([])
             }}
-            className="mt-2 min-h-11 w-full resize-y rounded-md border border-gray-400 px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-700 disabled:bg-gray-100" />
+            className="mt-2 min-h-11 w-full resize-y rounded-md border border-control px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:bg-subtle" />
           {reasonError && <p id={`${reasonId}-error`}
-            className="mt-1 font-medium text-red-800">{reasonError.message}</p>}
+            className="mt-1 font-medium text-danger">{reasonError.message}</p>}
         </div>}
         {workflow.phase === 'unknown' && <div role="alert"
-          className="state-indicator rounded-md border-2 border-amber-700 bg-amber-50 p-4 text-amber-950">
+          className="state-indicator rounded-md border-2 border-warning-line bg-warning-soft p-4 text-warning">
           <p className="font-semibold">Outcome unknown</p>
           <p className="mt-1">Do not start another reversal. Reconcile authoritative history or retry the exact same sealed operation.</p>
         </div>}
         {workflow.phase === 'success' && <div role="status" aria-live="polite"
-          className="state-indicator rounded-md border border-green-700 bg-green-50 p-4 text-green-950">
+          className="state-indicator rounded-md border border-success-line bg-success-soft p-4 text-success">
           <p className="font-semibold">Compensating reversal confirmed</p>
           <p className="mt-1">The immutable reversal is confirmed{workflow.reconciled
             ? ' from exact operation evidence' : ' by its validated receipt'}.</p>
@@ -298,12 +298,12 @@ export function CreditAdjustmentReversalWorkflow({
             <div><dt className="font-semibold">Confirmed saved time</dt>
               <dd><LocalInstant value={workflow.receipt.operationAsOf} /></dd></div>
           </dl>}
-          {!workflow.evidenceAvailable && <p className="mt-2 font-semibold text-amber-950">
+          {!workflow.evidenceAvailable && <p className="mt-2 font-semibold text-warning">
             The confirmation is valid, but refreshed account or family evidence is unavailable.
           </p>}
         </div>}
         {busyLabel && <p role="status" aria-live="polite"
-          className="font-semibold text-indigo-800">{busyLabel}</p>}
+          className="font-semibold text-primary">{busyLabel}</p>}
       </div>}
     </Modal>
   </>

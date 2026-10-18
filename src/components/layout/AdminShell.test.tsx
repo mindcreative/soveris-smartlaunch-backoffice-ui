@@ -1,3 +1,4 @@
+import { AppearanceProvider } from '../../appearance/AppearanceProvider'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -15,7 +16,7 @@ beforeEach(() => {
 describe('authenticated Backoffice shell', () => {
   it('renders private content without a timezone setup screen', async () => {
     render(<MemoryRouter initialEntries={['/dashboard']}>
-      <Routes><Route element={<AdminShell />}>
+      <Routes><Route element={<AppearanceProvider userId="test-user"><AdminShell /></AppearanceProvider>}>
         <Route path="/dashboard" element={<p>Private content</p>} />
       </Route></Routes>
     </MemoryRouter>)

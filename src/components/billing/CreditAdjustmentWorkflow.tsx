@@ -61,12 +61,12 @@ function BalanceComparison({ label, current, projected, unchanged = false }: {
   unchanged?: boolean
 }) {
   return (
-    <div className="min-w-0 rounded-md border border-gray-200 p-3">
-      <dt className="font-semibold text-gray-950">{label}{unchanged ? ' — unchanged' : ''}</dt>
+    <div className="min-w-0 rounded-md border border-line p-3">
+      <dt className="font-semibold text-foreground">{label}{unchanged ? ' — unchanged' : ''}</dt>
       <dd className="mt-2 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
-        <span className="min-w-0"><span className="block text-xs text-gray-600">Current</span>
+        <span className="min-w-0"><span className="block text-xs text-muted">Current</span>
           <CreditAmount value={current} compact /></span>
-        <span className="min-w-0"><span className="block text-xs text-gray-600">Projected</span>
+        <span className="min-w-0"><span className="block text-xs text-muted">Projected</span>
           <CreditAmount value={projected} compact /></span>
       </dd>
     </div>
@@ -151,15 +151,15 @@ export function CreditAdjustmentWorkflow({ clientId, snapshot, accountDataUpdate
           : null
 
   return (
-    <section aria-labelledby="credit-adjustment-heading" className="mt-6 min-w-0 rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+    <section aria-labelledby="credit-adjustment-heading" className="mt-6 min-w-0 rounded-lg border border-line bg-surface p-4 shadow-sm sm:p-5">
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 id="credit-adjustment-heading" className="text-lg font-semibold text-gray-950">Credit adjustment</h2>
-          <p className="mt-1 text-sm text-gray-600">Positive amounts add owned credits. Negative amounts remove owned credits subject to available-balance safety.</p>
+          <h2 id="credit-adjustment-heading" className="text-lg font-semibold text-foreground">Credit adjustment</h2>
+          <p className="mt-1 text-sm text-muted">Positive amounts add owned credits. Negative amounts remove owned credits subject to available-balance safety.</p>
         </div>
         {!expanded && (
           <button type="button" onClick={() => setExpanded(true)} disabled={workflow.hasUnresolvedAttempt}
-            className="min-h-11 rounded-md bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:opacity-60">
+            className="min-h-11 rounded-md bg-primary-hover px-4 py-2 text-sm font-semibold text-on-accent hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-60">
             Adjust credits
           </button>
         )}
@@ -171,8 +171,8 @@ export function CreditAdjustmentWorkflow({ clientId, snapshot, accountDataUpdate
         }} noValidate>
           <FormErrorSummary ref={summaryRef} errors={fieldErrors} />
           <div>
-            <label htmlFor={amountId} className="block text-sm font-semibold text-gray-900">Adjustment amount</label>
-            <p id={`${amountId}-hint`} className="mt-1 text-sm text-gray-600">Use exact abstract credits with up to four decimal places; include a minus sign to remove credits.</p>
+            <label htmlFor={amountId} className="block text-sm font-semibold text-foreground">Adjustment amount</label>
+            <p id={`${amountId}-hint`} className="mt-1 text-sm text-muted">Use exact abstract credits with up to four decimal places; include a minus sign to remove credits.</p>
             <input id={amountId} name="adjustmentAmount" type="text" inputMode="decimal"
               autoComplete="off" value={workflow.amount} disabled={workflow.isBusy || workflow.hasUnresolvedAttempt}
               aria-invalid={Boolean(amountError)}
@@ -181,12 +181,12 @@ export function CreditAdjustmentWorkflow({ clientId, snapshot, accountDataUpdate
                 workflow.setAmount(event.target.value)
                 setFieldErrors((current) => current.filter((item) => item.fieldId !== amountId))
               }}
-              className="mt-2 min-h-11 w-full min-w-0 rounded-md border border-gray-400 px-3 py-2 font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:bg-gray-100" />
-            {amountError && <p id={amountErrorId} className="mt-1 text-sm font-medium text-red-800">{amountError.message}</p>}
+              className="mt-2 min-h-11 w-full min-w-0 rounded-md border border-control px-3 py-2 font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:bg-subtle" />
+            {amountError && <p id={amountErrorId} className="mt-1 text-sm font-medium text-danger">{amountError.message}</p>}
           </div>
           <div>
-            <label htmlFor={reasonId} className="block text-sm font-semibold text-gray-900">Reason</label>
-            <p id={`${reasonId}-hint`} className="mt-1 text-sm text-gray-600">Required immutable operator evidence, 1–512 characters.</p>
+            <label htmlFor={reasonId} className="block text-sm font-semibold text-foreground">Reason</label>
+            <p id={`${reasonId}-hint`} className="mt-1 text-sm text-muted">Required immutable operator evidence, 1–512 characters.</p>
             <textarea id={reasonId} name="adjustmentReason" rows={4}
               autoComplete="off" value={workflow.reason} disabled={workflow.isBusy || workflow.hasUnresolvedAttempt}
               aria-invalid={Boolean(reasonError)}
@@ -195,39 +195,39 @@ export function CreditAdjustmentWorkflow({ clientId, snapshot, accountDataUpdate
                 workflow.setReason(event.target.value)
                 setFieldErrors((current) => current.filter((item) => item.fieldId !== reasonId))
               }}
-              className="mt-2 min-h-11 w-full min-w-0 resize-y rounded-md border border-gray-400 px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:bg-gray-100" />
-            {reasonError && <p id={reasonErrorId} className="mt-1 text-sm font-medium text-red-800">{reasonError.message}</p>}
+              className="mt-2 min-h-11 w-full min-w-0 resize-y rounded-md border border-control px-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:bg-subtle" />
+            {reasonError && <p id={reasonErrorId} className="mt-1 text-sm font-medium text-danger">{reasonError.message}</p>}
           </div>
           <button ref={previewButtonRef} type="submit" disabled={workflow.isBusy || workflow.hasUnresolvedAttempt}
-            className="min-h-11 max-w-full break-words rounded-md bg-indigo-700 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:cursor-wait disabled:opacity-60">
+            className="min-h-11 max-w-full break-words rounded-md bg-primary-hover px-4 py-2 text-sm font-semibold text-on-accent hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-wait disabled:opacity-60">
             {workflow.phase === 'previewing' ? 'Previewing…' : 'Preview adjustment'}
           </button>
         </form>
       )}
 
-      {busyLabel && !modalOpen && !workflow.receipt && <p role="status" aria-live="polite" className="mt-4 text-sm font-semibold text-indigo-800">{busyLabel}</p>}
+      {busyLabel && !modalOpen && !workflow.receipt && <p role="status" aria-live="polite" className="mt-4 text-sm font-semibold text-primary">{busyLabel}</p>}
 
       {workflow.phase === 'rejected' && workflow.error && fieldErrors.length === 0 && (
-        <div role="alert" className="state-indicator mt-4 rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-950">
+        <div role="alert" className="state-indicator mt-4 rounded-md border border-danger-line bg-danger-soft p-4 text-sm text-danger">
           <p className="font-semibold">Adjustment not applied</p><p className="mt-1">{safeErrorMessage(workflow.error)}</p>
         </div>
       )}
 
       {workflow.phase === 'unknown' && (
-        <div role="alert" className="state-indicator mt-4 rounded-md border-2 border-amber-700 bg-amber-50 p-4 text-sm text-amber-950">
+        <div role="alert" className="state-indicator mt-4 rounded-md border-2 border-warning-line bg-warning-soft p-4 text-sm text-warning">
           <p className="font-semibold">Adjustment outcome is not yet known</p>
           <p className="mt-1">Do not create another adjustment. Reconcile authoritative history or retry the exact sealed request.</p>
           <div className="mt-3 flex flex-wrap gap-3">
             <button type="button" onClick={() => void workflow.reconcile()} disabled={workflow.isBusy}
-              className="min-h-11 rounded-md border border-amber-800 px-4 py-2 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-800 disabled:opacity-60">Reconcile outcome</button>
+              className="min-h-11 rounded-md border border-warning-line px-4 py-2 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning disabled:opacity-60">Reconcile outcome</button>
             <button type="button" onClick={() => void workflow.retry()} disabled={workflow.isBusy}
-              className="min-h-11 rounded-md bg-amber-900 px-4 py-2 font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-800 disabled:opacity-60">Retry exact adjustment</button>
+              className="min-h-11 rounded-md bg-warning-solid px-4 py-2 font-semibold text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning disabled:opacity-60">Retry exact adjustment</button>
           </div>
         </div>
       )}
 
       {workflow.receipt && (
-        <div role="status" aria-live="polite" className="state-indicator mt-5 min-w-0 rounded-md border border-green-700 bg-green-50 p-4 text-sm text-green-950">
+        <div role="status" aria-live="polite" className="state-indicator mt-5 min-w-0 rounded-md border border-success-line bg-success-soft p-4 text-sm text-success">
           <h3 className="font-semibold">Credit adjustment committed</h3>
           <p className="mt-2">The validated receipt confirms the immutable operation.</p>
           <dl className="mt-3 space-y-2">
@@ -236,12 +236,12 @@ export function CreditAdjustmentWorkflow({ clientId, snapshot, accountDataUpdate
             <div><dt className="font-semibold">Operation ID</dt><dd className="break-all font-mono">{workflow.receipt.operationId}</dd></div>
           </dl>
           {workflow.phase === 'reconciling'
-            ? <p className="mt-3 font-semibold text-indigo-900">Receipt validated. Refreshing the authoritative Account and operation history…</p>
+            ? <p className="mt-3 font-semibold text-primary">Receipt validated. Refreshing the authoritative Account and operation history…</p>
             : workflow.accountRefreshFailed
-              ? <p className="mt-3 font-semibold text-amber-950">The receipt is valid, but the authoritative Account refresh failed. Displayed snapshot values may be stale.</p>
+              ? <p className="mt-3 font-semibold text-warning">The receipt is valid, but the authoritative Account refresh failed. Displayed snapshot values may be stale.</p>
               : <p className="mt-3">The authoritative Account refresh completed.</p>}
           {workflow.phase === 'success' && <button type="button" onClick={workflow.startAnother}
-            className="mt-4 min-h-11 rounded-md border border-green-800 px-4 py-2 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-800">
+            className="mt-4 min-h-11 rounded-md border border-success-line px-4 py-2 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success">
             Start another adjustment
           </button>}
         </div>
@@ -254,12 +254,12 @@ export function CreditAdjustmentWorkflow({ clientId, snapshot, accountDataUpdate
         footer={<div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <button ref={cancelButtonRef} data-modal-initial-focus type="button" onClick={workflow.cancelReview}
             disabled={workflow.isBusy}
-            className="min-h-11 rounded-md border border-gray-400 px-4 py-2 font-semibold text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:cursor-wait disabled:opacity-60">Cancel</button>
+            className="min-h-11 rounded-md border border-control px-4 py-2 font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-wait disabled:opacity-60">Cancel</button>
           <button type="button" onClick={() => void workflow.confirm()}
             disabled={workflow.isBusy || !workflow.preview?.walletInvariantEligible}
-            className="min-h-11 rounded-md bg-indigo-700 px-4 py-2 font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:cursor-not-allowed disabled:opacity-60">Confirm adjustment</button>
+            className="min-h-11 rounded-md bg-primary-hover px-4 py-2 font-semibold text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-60">Confirm adjustment</button>
         </div>}>
-        {workflow.preview && <div className="min-w-0 space-y-4 text-sm text-gray-800">
+        {workflow.preview && <div className="min-w-0 space-y-4 text-sm text-foreground">
           <p id={modalDescriptionId}>Confirm changes the owned balance and creates immutable adjustment, ledger, and audit evidence. Cancel changes nothing.</p>
           <dl className="space-y-2">
             <div><dt className="font-semibold">Client</dt><dd className="break-all font-mono">{clientId}</dd></div>
@@ -274,10 +274,10 @@ export function CreditAdjustmentWorkflow({ clientId, snapshot, accountDataUpdate
             <BalanceComparison label="Reserved balance" current={workflow.preview.currentReservedBalance} projected={workflow.preview.projectedReservedBalance} unchanged />
           </dl>
           {workflow.preview.walletInvariantEligible
-            ? <p className="state-indicator rounded-md border border-green-300 bg-green-50 p-3 font-semibold text-green-950">This preview is eligible for explicit confirmation.</p>
-            : <p className="state-indicator rounded-md border border-amber-400 bg-amber-50 p-3 font-semibold text-amber-950">This preview is not eligible. Maximum safe debit: <CreditAmount value={workflow.preview.maximumSafeDebit} compact />. Confirm is unavailable.</p>}
+            ? <p className="state-indicator rounded-md border border-success-line bg-success-soft p-3 font-semibold text-success">This preview is eligible for explicit confirmation.</p>
+            : <p className="state-indicator rounded-md border border-warning-line bg-warning-soft p-3 font-semibold text-warning">This preview is not eligible. Maximum safe debit: <CreditAmount value={workflow.preview.maximumSafeDebit} compact />. Confirm is unavailable.</p>}
           {(workflow.phase === 'revalidating' || workflow.phase === 'submitting') &&
-            <p role="status" aria-live="polite" className="font-semibold text-indigo-800">{busyLabel}</p>}
+            <p role="status" aria-live="polite" className="font-semibold text-primary">{busyLabel}</p>}
         </div>}
       </Modal>
     </section>

@@ -75,7 +75,7 @@ describe('Billing adjustment history experience', () => {
       .toEqual(['Reconciliation', 'Account', 'Ledger', 'Usage & expense', 'Adjustments', 'Subscriptions'])
     expect(screen.getByRole('link', { name: 'Adjustments' })).toHaveAttribute('aria-current', 'page')
     const breadcrumbs = screen.getByRole('navigation', { name: 'Breadcrumb' })
-    expect(breadcrumbs).toHaveTextContent(`Billing/Adjustment history/Selected Client ${CLIENT_ID}`)
+    expect(within(breadcrumbs).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Billing', 'Adjustment history', `Selected Client ${CLIENT_ID}`])
     expect(screen.getByRole('table', {
       name: 'Newest-first immutable Billing adjustment history',
     })).toBeInTheDocument()

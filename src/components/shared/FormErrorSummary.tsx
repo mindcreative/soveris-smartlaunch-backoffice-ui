@@ -16,7 +16,7 @@ export const FormErrorSummary = forwardRef<HTMLDivElement, { errors: FormFieldEr
         role="alert"
         tabIndex={-1}
         aria-labelledby={titleId}
-        className="rounded-md border-2 border-red-700 bg-red-50 p-4 text-sm text-red-950 outline-none focus-visible:ring-2 focus-visible:ring-red-700"
+        className="rounded-md border-2 border-danger-line bg-danger-soft p-4 text-sm text-danger outline-none focus-visible:ring-2 focus-visible:ring-danger"
       >
         <h3 id={titleId} className="font-semibold">
           Correct the following before continuing
@@ -26,7 +26,7 @@ export const FormErrorSummary = forwardRef<HTMLDivElement, { errors: FormFieldEr
             <li key={error.fieldId}>
               <a
                 href={`#${error.fieldId}`}
-                className="inline-flex min-h-11 items-center underline decoration-2 underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-700"
+                className="inline-flex min-h-11 items-center underline decoration-2 underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger"
                 onClick={(event) => {
                   event.preventDefault()
                   document.getElementById(error.fieldId)?.focus()

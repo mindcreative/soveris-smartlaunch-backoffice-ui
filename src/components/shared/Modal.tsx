@@ -1,3 +1,4 @@
+import { X } from 'lucide-react'
 import { useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -102,7 +103,7 @@ export function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 [@media(max-height:480px)]:p-2"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/50 p-4 [@media(max-height:480px)]:p-2"
       onMouseDown={(event) => {
         if (closeOnBackdropClick && !closeDisabled && event.target === event.currentTarget) onClose()
       }}
@@ -110,23 +111,21 @@ export function Modal({
       <div
         ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={title ? titleId : undefined}
         aria-label={title ? undefined : 'Dialog'} aria-describedby={descriptionId} tabIndex={-1}
-        className={`flex max-h-[calc(100dvh-2rem)] w-full min-w-0 flex-col overflow-hidden rounded-lg bg-white shadow-xl [@media(max-height:480px)]:block [@media(max-height:480px)]:max-h-[calc(100dvh-1rem)] [@media(max-height:480px)]:overflow-y-auto ${sizeMap[size]}`}
+        className={`flex max-h-[calc(100dvh-2rem)] w-full min-w-0 flex-col overflow-hidden rounded-lg bg-surface shadow-xl [@media(max-height:480px)]:block [@media(max-height:480px)]:max-h-[calc(100dvh-1rem)] [@media(max-height:480px)]:overflow-y-auto ${sizeMap[size]}`}
       >
-        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
-          {title ? <h2 id={titleId} className="min-w-0 break-words text-lg font-semibold text-gray-950">{title}</h2> : <span />}
+        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-line px-4 py-3 sm:px-6 sm:py-4">
+          {title ? <h2 id={titleId} className="min-w-0 break-words text-lg font-semibold text-foreground">{title}</h2> : <span />}
           <button
-            ref={closeRef} type="button" onClick={onClose} disabled={closeDisabled} aria-label={closeLabel}
-            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-gray-600 hover:bg-gray-100 hover:text-gray-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:cursor-wait disabled:opacity-50"
+            ref={closeRef} type="button" onClick={onClose} disabled={closeDisabled} aria-label={closeLabel} title={closeLabel}
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-muted hover:bg-subtle hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-wait disabled:opacity-50"
           >
-            <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X aria-hidden="true" className="h-5 w-5" />
           </button>
         </div>
         {/* At high zoom or with a mobile keyboard open, scroll the whole
             dialog so fixed header/footer chrome cannot squeeze out the fields. */}
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 [@media(max-height:480px)]:overflow-visible" tabIndex={0}>{children}</div>
-        {footer && <div className="shrink-0 border-t border-gray-200 px-4 py-4 sm:px-6">{footer}</div>}
+        {footer && <div className="shrink-0 border-t border-line px-4 py-4 sm:px-6">{footer}</div>}
       </div>
     </div>, portalRef.current
   )

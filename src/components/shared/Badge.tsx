@@ -6,12 +6,12 @@ interface BadgeProps {
 }
 
 const variantClasses: Record<string, string> = {
-  default: 'bg-blue-100 text-blue-800',
-  success: 'bg-green-100 text-green-800',
-  warning: 'bg-yellow-100 text-yellow-800',
-  error: 'bg-red-100 text-red-800',
-  info: 'bg-indigo-100 text-indigo-800',
-  neutral: 'bg-gray-100 text-gray-800',
+  default: 'bg-selected text-primary',
+  success: 'bg-success-soft text-success',
+  warning: 'bg-warning-soft text-warning',
+  error: 'bg-danger-soft text-danger',
+  info: 'bg-selected text-primary',
+  neutral: 'bg-subtle text-foreground',
 }
 
 const sizeClasses: Record<string, string> = {

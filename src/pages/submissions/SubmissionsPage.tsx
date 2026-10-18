@@ -37,7 +37,7 @@ const SubmissionsPage: FC = () => {
         render: (_value: unknown, row: Record<string, unknown>) => (
           <button
             onClick={() => setSelectedSubmissionId(String(row.id))}
-            className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+            className="text-sm text-primary hover:text-primary hover:underline"
           >
             {String(row.email)}
           </button>
@@ -100,12 +100,12 @@ const SubmissionsPage: FC = () => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-900">Submissions</h1>
+        <h1 className="text-xl font-semibold text-foreground">Submissions</h1>
         <div className="flex items-center gap-3">
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as SubmissionStatusType | '')}
-            className="text-sm border border-gray-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="text-sm border border-control rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-focus"
           >
             <option value="">All Statuses</option>
             <option value="pending">Pending</option>

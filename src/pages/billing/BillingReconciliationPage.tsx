@@ -8,7 +8,7 @@ import type { ReconciliationAction, ReconciliationCase } from '../../types/recon
 import { BillingWorkspaceNav } from '../../components/billing/BillingWorkspaceNav'
 import { Modal } from '../../components/shared/Modal'
 import { FormErrorSummary, type FormFieldError } from '../../components/shared/FormErrorSummary'
-const control = 'min-h-11 min-w-11 max-w-full break-words rounded-md border border-gray-500 bg-white px-3 py-2 text-sm text-gray-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600 disabled:opacity-60'
+const control = 'min-h-11 min-w-11 max-w-full break-words rounded-md border border-control bg-surface px-3 py-2 text-sm text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-focus disabled:opacity-60'
 const label = (key: string) => key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').replace(/^./, c => c.toUpperCase())
 function EvidenceValue({ value }: { value: unknown }) {
   if (value === null) return <span>Not recorded</span>
@@ -27,11 +27,11 @@ function CaseEvidence({ item }: { item: ReconciliationCase }) {
     ['Immutable finding evidence', item.evidence], ['Trusted provider proofs', item.providerProofs], ['Operator resolution audit', item.operatorResolution],
     ['Evidence keys', item.evidenceKeys], ['Evidence fingerprint', item.evidenceFingerprint],
   ] as const
-  return <section aria-label="Case evidence" className="mt-6 min-w-0 rounded-md border border-gray-500 p-4 text-sm text-gray-950">
+  return <section aria-label="Case evidence" className="mt-6 min-w-0 rounded-md border border-control p-4 text-sm text-foreground">
     <h2 ref={heading} tabIndex={-1} className="text-lg font-semibold focus-visible:outline focus-visible:outline-2">Immutable case evidence</h2>
     <p className="my-2 break-all">Case: {item.finding.findingId}</p>
     <p>Accepted evidence survives later capability changes. Capability loss does not authorize financial or execution changes.</p>
-    {sections.map(([title, value]) => <details key={title} className="min-w-0 border-b border-gray-300 py-2"><summary className="min-h-11 cursor-pointer py-3 font-semibold focus-visible:outline focus-visible:outline-2">{title}</summary><EvidenceValue value={value} /></details>)}
+    {sections.map(([title, value]) => <details key={title} className="min-w-0 border-b border-control py-2"><summary className="min-h-11 cursor-pointer py-3 font-semibold focus-visible:outline focus-visible:outline-2">{title}</summary><EvidenceValue value={value} /></details>)}
     <h3 className="mt-4 font-semibold">Server action blockers</h3>
     {item.actionBlockers.length ? <ul>{item.actionBlockers.map(blocker => <li key={blocker}>{label(blocker)}</li>)}</ul> : <p>No blockers reported at evaluation time.</p>}
   </section>
@@ -75,18 +75,18 @@ function Workspace({ clientId }: { clientId: string }) {
     setReasonError([]); void state.submit(state.reason)
   }
   if (state.denied) return <div ref={outcomeRegion} role="alert" tabIndex={-1}><h1>Reconciliation access denied</h1><p>Private case data has been cleared. Current billing:reconcile authorization is required.</p></div>
-  return <div className="mx-auto min-w-0 max-w-7xl break-words text-gray-950">
+  return <div className="mx-auto min-w-0 max-w-7xl break-words text-foreground">
     <BillingWorkspaceNav clientId={clientId} />
     <h1 ref={heading} tabIndex={-1} className="text-2xl font-bold focus-visible:outline focus-visible:outline-2">Reconciliation cases</h1>
     <p className="my-3 break-all">Selected Client: {clientId}</p>
-    <form onSubmit={applyFilters} className="space-y-4 rounded-md border border-gray-500 p-4" aria-label="Reconciliation filters" aria-describedby="filter-context">
+    <form onSubmit={applyFilters} className="space-y-4 rounded-md border border-control p-4" aria-label="Reconciliation filters" aria-describedby="filter-context">
       <p id="filter-context">Apply filters to start a new snapshot. Unsaved filter changes do not change the displayed results.</p>
       <FormErrorSummary ref={summary} errors={errors} />
       <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <label className="min-w-0">Finding type<select className={`${control} mt-1 w-full`} value={type} onChange={e => setType(e.target.value)}>{['', ...FINDING_TYPES].map(v => <option key={v} value={v}>{v ? label(v) : 'All types'}</option>)}</select></label>
         <label>Severity<select className={`${control} mt-1 w-full`} value={severity} onChange={e => setSeverity(e.target.value)}>{['', 'warning', 'error', 'critical'].map(v => <option key={v} value={v}>{v ? label(v) : 'All severities'}</option>)}</select></label>
         <label>Resolution status<select className={`${control} mt-1 w-full`} value={status} onChange={e => setStatus(e.target.value)}>{['', 'open', 'resolved'].map(v => <option key={v} value={v}>{v ? label(v) : 'All statuses'}</option>)}</select></label>
-        <label>Minimum age (seconds)<input id="minimum-age" inputMode="numeric" value={age} onChange={e => setAge(e.target.value)} className={`${control} mt-1 w-full`} aria-invalid={errors.length > 0} aria-describedby={errors.length ? 'minimum-age-error' : undefined} />{errors.length > 0 && <span id="minimum-age-error" className="block text-red-950">{errors[0]!.message}</span>}</label>
+        <label>Minimum age (seconds)<input id="minimum-age" inputMode="numeric" value={age} onChange={e => setAge(e.target.value)} className={`${control} mt-1 w-full`} aria-invalid={errors.length > 0} aria-describedby={errors.length ? 'minimum-age-error' : undefined} />{errors.length > 0 && <span id="minimum-age-error" className="block text-danger">{errors[0]!.message}</span>}</label>
         <label>Cases per page<select className={`${control} mt-1 w-full`} value={size} onChange={e => setSize(e.target.value)}>{['20', '50', '100'].map(v => <option key={v}>{v}</option>)}</select></label>
       </div>
       <button className={control} disabled={state.busy || state.uncertain}>Apply filters</button>
@@ -98,18 +98,18 @@ function Workspace({ clientId }: { clientId: string }) {
       {state.page && <p>Snapshot as of {state.page.asOf}. State evaluated at {state.page.evaluatedAt}. {state.items.length} cases loaded. {state.page.nextCursor ? 'More cases available.' : 'End of results.'}</p>}
       {state.error && <p>{state.items.length ? 'Partial results retained. Refresh failed; evidence and actions may be stale.' : 'Cases could not be verified or loaded. Refresh to try again.'}</p>}
     </div>
-    {state.receipt && <section aria-label="Confirmed resolution state" className="my-4 min-w-0 rounded border border-gray-500 p-4"><h2 className="font-semibold">Confirmed resolution state</h2><EvidenceValue value={state.receipt.afterState} /></section>}
-    {state.uncertain && <div className="my-4 rounded border-2 border-gray-700 p-4"><p>The exact confirmed command is retained for this actor and Client. Closing or navigating clears local recovery state; consult the case audit before any later resolution.</p><button className={control} disabled={state.busy} onClick={() => void state.replay()}>Check same operation</button></div>}
+    {state.receipt && <section aria-label="Confirmed resolution state" className="my-4 min-w-0 rounded border border-control p-4"><h2 className="font-semibold">Confirmed resolution state</h2><EvidenceValue value={state.receipt.afterState} /></section>}
+    {state.uncertain && <div className="my-4 rounded border-2 border-control p-4"><p>The exact confirmed command is retained for this actor and Client. Closing or navigating clears local recovery state; consult the case audit before any later resolution.</p><button className={control} disabled={state.busy} onClick={() => void state.replay()}>Check same operation</button></div>}
     <button className={control} disabled={state.busy || state.uncertain} onClick={() => void state.load()}>Refresh cases</button>
     {state.page && state.items.length === 0 && !state.busy && <p role="status" className="my-4">No reconciliation cases match these filters.</p>}
     {state.items.length > 0 && <>
-      <div className="mt-4 hidden md:block"><table className="w-full table-fixed text-left text-sm"><caption className="py-3 text-left font-semibold">Reconciliation cases for the selected Client</caption><thead><tr>{['Case and type', 'Age', 'Severity', 'Status', 'Details'].map(v => <th scope="col" key={v} className="border-b border-gray-500 p-2">{v}</th>)}</tr></thead><tbody>{state.items.map(item => <tr key={item.finding.findingId}><th scope="row" className="break-all border-b border-gray-300 p-2">{item.finding.findingId}<br />{label(item.finding.findingType)}</th><td className="border-b p-2">{item.finding.ageSeconds} seconds</td><td className="border-b p-2">{label(item.finding.severity)}</td><td className="border-b p-2">{label(item.finding.resolutionStatus)}</td><td className="border-b p-2"><button className={`${control} w-full break-words`} disabled={state.busy} onClick={() => state.select(item)} aria-label={`Inspect case ${item.finding.findingId}`}>Inspect case</button></td></tr>)}</tbody></table></div>
-      <ul className="mt-4 space-y-3 md:hidden" aria-label="Reconciliation cases">{state.items.map(item => <li key={item.finding.findingId} className="min-w-0 rounded border border-gray-500 p-3"><p className="break-all">Case: {item.finding.findingId}</p><p>{label(item.finding.findingType)}; {item.finding.ageSeconds} seconds old; {label(item.finding.severity)}; {label(item.finding.resolutionStatus)}</p><button className={`${control} mt-2`} disabled={state.busy} onClick={() => state.select(item)} aria-label={`Inspect case ${item.finding.findingId}`}>Inspect case</button></li>)}</ul>
+      <div className="mt-4 hidden md:block"><table className="w-full table-fixed text-left text-sm"><caption className="py-3 text-left font-semibold">Reconciliation cases for the selected Client</caption><thead><tr>{['Case and type', 'Age', 'Severity', 'Status', 'Details'].map(v => <th scope="col" key={v} className="border-b border-control p-2">{v}</th>)}</tr></thead><tbody>{state.items.map(item => <tr key={item.finding.findingId}><th scope="row" className="break-all border-b border-control p-2">{item.finding.findingId}<br />{label(item.finding.findingType)}</th><td className="border-b p-2">{item.finding.ageSeconds} seconds</td><td className="border-b p-2">{label(item.finding.severity)}</td><td className="border-b p-2">{label(item.finding.resolutionStatus)}</td><td className="border-b p-2"><button className={`${control} w-full break-words`} disabled={state.busy} onClick={() => state.select(item)} aria-label={`Inspect case ${item.finding.findingId}`}>Inspect case</button></td></tr>)}</tbody></table></div>
+      <ul className="mt-4 space-y-3 md:hidden" aria-label="Reconciliation cases">{state.items.map(item => <li key={item.finding.findingId} className="min-w-0 rounded border border-control p-3"><p className="break-all">Case: {item.finding.findingId}</p><p>{label(item.finding.findingType)}; {item.finding.ageSeconds} seconds old; {label(item.finding.severity)}; {label(item.finding.resolutionStatus)}</p><button className={`${control} mt-2`} disabled={state.busy} onClick={() => state.select(item)} aria-label={`Inspect case ${item.finding.findingId}`}>Inspect case</button></li>)}</ul>
     </>}
     {state.page?.nextCursor && <button className={`${control} mt-4`} disabled={state.busy || state.uncertain} onClick={() => void state.load(undefined, true)}>Load more cases</button>}
     {state.selected && <><CaseEvidence item={state.selected} /><div className="mt-3 flex flex-wrap gap-3" aria-label="Server-authorized resolution actions">{state.selected.allowedActions.map(action => <button key={action} className={control} disabled={state.busy || state.uncertain} onClick={event => { actionTrigger.current = event.currentTarget; setReasonError([]); void state.review(state.selected!, action as ReconciliationAction) }}>{ACTION_LABELS[action as ReconciliationAction]}</button>)}{state.selected.allowedActions.length === 0 && <p>No resolution action is currently authorized by the server.</p>}</div></>}
     <Modal isOpen={!!state.confirmation} title="Confirm case action" onClose={state.closeConfirmation} closeDisabled={state.busy} closeOnBackdropClick={false} initialFocusRef={cancel} returnFocusRef={actionTrigger} descriptionId="resolution-effect" footer={<div className="flex flex-wrap gap-3"><button ref={cancel} className={control} disabled={state.busy} onClick={state.closeConfirmation}>Cancel confirmation</button>{!state.uncertain && <button className={control} disabled={state.busy} onClick={confirm}>{state.busy ? 'Validating resolution…' : 'Confirm resolution'}</button>}</div>}>
-      {state.confirmation && <div className="min-w-0 space-y-4 break-words text-sm text-gray-950">
+      {state.confirmation && <div className="min-w-0 space-y-4 break-words text-sm text-foreground">
         <p className="break-all">Client: {clientId}</p><p className="break-all">Case: {state.confirmation.item.finding.findingId}</p><p>Action: {ACTION_LABELS[state.confirmation.action]}</p><p id="resolution-effect">{state.confirmation.effect}</p>
         <FormErrorSummary ref={reasonSummary} errors={reasonError} />
         <label className="block" htmlFor="resolution-reason">Reason (required)</label><textarea id="resolution-reason" required value={state.reason} disabled={state.busy || state.uncertain} onChange={e => state.setReason(e.target.value)} aria-invalid={reasonError.length > 0} aria-describedby="reason-help" className={`${control} w-full`} />

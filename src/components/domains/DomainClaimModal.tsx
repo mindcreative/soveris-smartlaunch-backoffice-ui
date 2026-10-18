@@ -11,8 +11,8 @@ import type { ClientCapabilities } from '../../types/billing'
 import { Modal } from '../shared/Modal'
 import { FormErrorSummary, type FormFieldError } from '../shared/FormErrorSummary'
 
-export const domainButton = 'min-h-11 rounded-md border border-gray-400 bg-white px-4 py-2 text-sm font-medium text-gray-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:opacity-50'
-export const domainInput = 'mt-1 min-h-11 w-full rounded-md border border-gray-400 bg-white px-3 py-2 text-gray-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600'
+export const domainButton = 'min-h-11 rounded-md border border-control bg-surface px-4 py-2 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-50'
+export const domainInput = 'mt-1 min-h-11 w-full rounded-md border border-control bg-surface px-3 py-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
 export function DomainClaimModal({ scope, open, canReadProducts, capabilities, revalidatePolicy, onClose, onCreated }: {
   scope: DomainScope; open: boolean; canReadProducts: boolean; capabilities?: ClientCapabilities; revalidatePolicy?: () => Promise<ClientCapabilities | undefined>; onClose: () => void; onCreated: (id: string) => void
 }) {
@@ -107,21 +107,21 @@ export function DomainClaimModal({ scope, open, canReadProducts, capabilities, r
     <button type="submit" form="domain-claim-form" className={domainButton} disabled={(create.isPending || pending) || denied || !featureAllowed || now < retryUntil.current || target === 'product' && (!canReadProducts || !productId || Boolean(products.error))}>{pending ? 'Checking claim eligibility…' : create.isPending ? 'Claiming domain…' : uncertain ? 'Retry exact claim' : 'Claim domain'}</button>
   </div>}>
     <form id="domain-claim-form" tabIndex={-1} noValidate onSubmit={submit} className="min-w-0 space-y-4">
-      <p className="break-all text-sm text-gray-700">Active Client: {scope.clientId}. A claim reserves the hostname; ownership verification alone does not activate serving.</p>
+      <p className="break-all text-sm text-foreground">Active Client: {scope.clientId}. A claim reserves the hostname; ownership verification alone does not activate serving.</p>
       <FormErrorSummary ref={summary} errors={errors} />
-      {!featureAllowed && <p className="text-sm text-gray-700">This binding type is unavailable or its current policy could not be confirmed.</p>}
-      {now < retryUntil.current && <p className="text-sm text-gray-700">Server retry wait: {Math.ceil((retryUntil.current - now) / 1000)} seconds.</p>}
-      {uncertain && <p className="text-sm text-amber-950">Entries are locked while this operation is unresolved. A refresh will use authorized reads and will never submit a new claim automatically.</p>}
+      {!featureAllowed && <p className="text-sm text-foreground">This binding type is unavailable or its current policy could not be confirmed.</p>}
+      {now < retryUntil.current && <p className="text-sm text-foreground">Server retry wait: {Math.ceil((retryUntil.current - now) / 1000)} seconds.</p>}
+      {uncertain && <p className="text-sm text-warning">Entries are locked while this operation is unresolved. A refresh will use authorized reads and will never submit a new claim automatically.</p>}
       <label className="block text-sm font-medium">Hostname<input ref={initialFocus} id="domain-host" className={domainInput} value={host} maxLength={1024} required disabled={(create.isPending || pending) || uncertain || denied} aria-invalid={errors.some(e => e.fieldId === 'domain-host')} aria-describedby={errors.some(e => e.fieldId === 'domain-host') ? 'domain-host-error' : undefined} onChange={e => change(() => setHost(e.target.value))} /></label>
-      {errors.filter(e => e.fieldId === 'domain-host').map(e => <p key={e.fieldId} id="domain-host-error" className="text-sm text-red-900">{e.message}</p>)}
+      {errors.filter(e => e.fieldId === 'domain-host').map(e => <p key={e.fieldId} id="domain-host-error" className="text-sm text-danger">{e.message}</p>)}
       <label className="block text-sm font-medium">Binding target<select className={domainInput} value={target} disabled={(create.isPending || pending) || uncertain || denied} onChange={e => change(() => { setTarget(e.target.value as 'client' | 'product'); setProductId(''); setPage(1) })}><option value="client">Client</option><option value="product" disabled={!canReadProducts}>Product</option></select></label>
-      {!canReadProducts && <p className="text-sm text-gray-700">Product selection requires products:view separately from domains:create. You can still claim an eligible Client binding.</p>}
+      {!canReadProducts && <p className="text-sm text-foreground">Product selection requires products:view separately from domains:create. You can still claim an eligible Client binding.</p>}
       {target === 'product' && <div className="space-y-2"><label className="block text-sm font-medium">Product<select id="domain-product" value={productId} className={domainInput} disabled={(create.isPending || pending) || uncertain || products.isFetching || Boolean(products.error)} onChange={e => change(() => setProductId(e.target.value))}><option value="">Choose an active Product</option>{!products.error && products.data?.items.map(p => <option key={p.id} value={p.id}>{p.name} ({p.slug})</option>)}</select></label>
         {products.isFetching && <p role="status">Loading authorized Products…</p>}{Boolean(products.error) && <p role="alert">Product selection is unavailable. Check Product access or use an eligible Client binding.</p>}
         {products.data && <nav aria-label="Product selection pages" className="flex flex-wrap items-center gap-2"><button type="button" className={domainButton} disabled={page <= 1 || products.isFetching || uncertain} onClick={() => change(() => { setPage(p => p - 1); setProductId('') })}>Previous Products</button><span>Page {page} of {products.data.totalPages || 1}</span><button type="button" className={domainButton} disabled={page >= products.data.totalPages || products.isFetching || uncertain} onClick={() => change(() => { setPage(p => p + 1); setProductId('') })}>Next Products</button></nav>}
       </div>}
       <label className="block text-sm font-medium">Verification method<select className={domainInput} value={method} disabled={(create.isPending || pending) || uncertain || denied} onChange={e => change(() => setMethod(e.target.value as 'cname' | 'txt'))}><option value="cname">CNAME</option><option value="txt">TXT</option></select></label>
-      <p className="text-sm text-gray-700">TXT proves ownership and requires separate routing. Apex routing depends on your DNS provider’s supported record types.</p>
+      <p className="text-sm text-foreground">TXT proves ownership and requires separate routing. Apex routing depends on your DNS provider’s supported record types.</p>
       {(create.isPending || pending) && <p role="status">Claiming domain…</p>}
     </form>
   </Modal>

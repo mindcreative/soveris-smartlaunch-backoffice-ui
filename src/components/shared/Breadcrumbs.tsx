@@ -1,3 +1,4 @@
+import { ChevronRight } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 export interface BreadcrumbItem {
@@ -8,16 +9,16 @@ export interface BreadcrumbItem {
 export function Breadcrumbs({ items }: { items: readonly BreadcrumbItem[] }) {
   return (
     <nav aria-label="Breadcrumb" className="mb-4 overflow-x-auto">
-      <ol className="flex min-w-max items-center gap-2 text-sm text-gray-600">
+      <ol className="flex min-w-max items-center gap-2 text-sm text-muted">
         {items.map((item, index) => {
           const current = index === items.length - 1
           return (
             <li key={`${item.label}-${index}`} className="flex items-center gap-2">
-              {index > 0 && <span aria-hidden="true">/</span>}
+              {index > 0 && <ChevronRight aria-hidden="true" size={16} />}
               {item.href && !current ? (
                 <Link
                   to={item.href}
-                  className="min-h-11 inline-flex items-center rounded px-1 font-medium text-indigo-700 hover:underline"
+                  className="min-h-11 inline-flex items-center rounded px-1 font-medium text-primary hover:underline"
                 >
                   {item.label}
                 </Link>

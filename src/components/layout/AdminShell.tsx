@@ -33,7 +33,7 @@ export function AdminShell() {
 
   if (isLoading || !isInitialized) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-app">
         <LoadingSpinner size="lg" message="Restoring your session…" />
       </div>
     )
@@ -42,7 +42,7 @@ export function AdminShell() {
   if (!isAuthenticated) return null
 
   return (
-    <div className="min-h-screen min-w-0 bg-gray-50">
+    <div className="min-h-screen min-w-0 bg-app">
       <Sidebar />
 
       {mobileNavigationOpen && (
@@ -50,7 +50,7 @@ export function AdminShell() {
           <button
             type="button"
             aria-label="Close navigation overlay"
-            className="absolute inset-0 h-full w-full bg-gray-950/40"
+            className="absolute inset-0 h-full w-full bg-overlay/40"
             onClick={() => {
               setMobileNavigationOpen(false)
               menuButtonRef.current?.focus()

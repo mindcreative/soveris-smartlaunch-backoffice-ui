@@ -1,9 +1,10 @@
 @import 'tailwindcss';
+@import './appearance/tokens.css';
 
 /* Global styles for the back-office application */
 @layer base {
   body {
-    @apply m-0 font-sans antialiased text-slate-900 bg-white;
+    @apply m-0 font-sans antialiased text-foreground bg-app;
   }
 
   #root {
@@ -32,5 +33,69 @@
 @layer components {
   .page-container {
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8;
+  }
+}
+
+@layer base {
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+  input:not([type='checkbox']):not([type='radio']), select, textarea {
+    background-color: var(--surface); color: var(--foreground);
+  }
+  input, select, textarea, progress { accent-color: var(--primary-solid); }
+  input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
+  button:disabled, input:disabled, select:disabled, textarea:disabled, button[aria-disabled='true'] {
+    color: var(--disabled); background-color: var(--disabled-surface); opacity: 1;
+  }
+}
+@layer components {
+  .header-menu-trigger { @apply relative flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-md px-2 text-foreground hover:bg-hover focus-visible:ring-2 focus-visible:ring-focus; }
+  .header-menu { @apply absolute right-0 top-full z-50 mt-2 w-64 max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-lg border border-control bg-surface p-1 text-foreground shadow-lg; }
+  .header-menu-item { @apply flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-hover focus:bg-selected focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus; }
+  /* The padded wrapper bridges the pointer path from trigger to tooltip. */
+  .header-tooltip { @apply absolute right-0 top-full z-50 pt-2; }
+  .header-tooltip-content { @apply block whitespace-nowrap rounded border border-control bg-surface px-2 py-1 text-xs text-foreground shadow-sm; }
+}
+.brand-dark { display: none; }
+[data-theme='dark'] .brand-light { display: none; }
+[data-theme='dark'] .brand-dark { display: block; }
+/* Existing and future notifications inherit the root mode, including body portals. */
+:root {
+  --toastify-color-light: var(--surface); --toastify-color-dark: var(--surface);
+  --toastify-text-color-light: var(--foreground); --toastify-text-color-dark: var(--foreground);
+  --toastify-color-info: var(--info); --toastify-color-success: var(--success);
+  --toastify-color-warning: var(--warning); --toastify-color-error: var(--danger);
+  --toastify-color-progress-light: var(--primary); --toastify-color-progress-dark: var(--primary);
+}
+.Toastify__toast { background: var(--surface); color: var(--foreground); border: 1px solid var(--control); }
+.Toastify__close-button { color: var(--foreground); opacity: 1; min-width: 44px; min-height: 44px; }
+@media (forced-colors: active) {
+  :focus-visible { outline-color: Highlight; }
+  .header-menu, .header-menu-trigger, .Toastify__toast { border: 1px solid CanvasText; }
+}
+/* Disabled is a semantic state; do not fade meaningful labels below contrast. */
+button:disabled, input:disabled, select:disabled, textarea:disabled, button[aria-disabled='true'] {
+  color: var(--disabled); background-color: var(--disabled-surface); opacity: 1;
+}
+
+/* Shared pointer feedback also covers plain buttons and feature CSS. Keep this
+   unlayered so utility backgrounds and legacy same-color hover rules cannot
+   suppress it. Filled actions retain their semantic role and inverse text.
+   The full-screen navigation scrim keeps its translucent overlay color. */
+button { --button-hover: var(--hover); }
+button.bg-primary-solid { --button-hover: var(--primary-hover); }
+button.bg-primary-hover { --button-hover: var(--primary-solid); }
+button.bg-success-solid { --button-hover: var(--success-hover); }
+button.bg-warning-solid { --button-hover: var(--warning-hover); }
+button.bg-danger-solid { --button-hover: var(--danger-hover); }
+button.bg-info-solid { --button-hover: var(--info-hover); }
+@media (hover: hover) {
+  button:enabled:not([aria-disabled='true'], [class~='bg-overlay/40']):hover {
+    background-color: var(--button-hover);
+  }
+}
+@media (hover: hover) and (forced-colors: active) {
+  button:enabled:not([aria-disabled='true'], [class~='bg-overlay/40']):hover {
+    background-color: Highlight;
+    color: HighlightText;
   }
 }

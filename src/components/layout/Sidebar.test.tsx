@@ -40,3 +40,12 @@ describe('Billing sidebar Client context', () => {
       expect(screen.getByTestId('current-route')).toHaveTextContent(`/billing/clients/${actorClient}/account`)
     })
 })
+
+it('removes Themes and duplicate identity; keeps Domains after Products and a Dashboard brand link', () => {
+  render(<MemoryRouter><Sidebar /></MemoryRouter>)
+  expect(screen.queryByRole('link', { name: 'Themes' })).not.toBeInTheDocument()
+  expect(screen.queryByText('Logged in as')).not.toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Soveris SmartLaunch Dashboard' })).toHaveAttribute('href', '/dashboard')
+  const links = screen.getAllByRole('link').map(link => link.textContent)
+  expect(links.indexOf('Domains')).toBe(links.indexOf('Products') + 1)
+})

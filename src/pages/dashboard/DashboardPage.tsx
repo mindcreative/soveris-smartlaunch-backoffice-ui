@@ -1,3 +1,4 @@
+import { RefreshCw } from 'lucide-react'
 import type { FC } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
@@ -25,19 +26,17 @@ const DashboardPage: FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-foreground">
             Welcome back, {user?.displayName || 'User'}
           </h1>
-          <p className="mt-1 text-sm text-gray-500">Here's what's happening with your backoffice today.</p>
+          <p className="mt-1 text-sm text-muted">Here's what's happening in your workspace today.</p>
         </div>
         <button
           onClick={handleRefresh}
           disabled={metricsLoading || healthLoading}
-          className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+          className="inline-flex items-center px-3 py-2 text-sm font-medium text-foreground bg-surface border border-control rounded-md hover:bg-subtle disabled:opacity-50"
         >
-          <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
+          <RefreshCw aria-hidden="true" className="w-4 h-4 mr-1.5" />
           Refresh
         </button>
       </div>
@@ -46,10 +45,10 @@ const DashboardPage: FC = () => {
       {metricsLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
-              <div className="h-4 bg-gray-200 rounded w-20 mb-2"></div>
-              <div className="h-8 bg-gray-200 rounded w-24 mb-1"></div>
-              <div className="h-3 bg-gray-200 rounded w-16"></div>
+            <div key={i} className="bg-surface rounded-lg border border-line p-6 animate-pulse">
+              <div className="h-4 bg-hover rounded w-20 mb-2"></div>
+              <div className="h-8 bg-hover rounded w-24 mb-1"></div>
+              <div className="h-3 bg-hover rounded w-16"></div>
             </div>
           ))}
         </div>
@@ -87,44 +86,44 @@ const DashboardPage: FC = () => {
       )}
 
       {/* System Health */}
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="px-4 py-3 border-b border-gray-200">
-          <h2 className="text-sm font-semibold text-gray-900">System Health</h2>
+      <div className="bg-surface rounded-lg border border-line">
+        <div className="px-4 py-3 border-b border-line">
+          <h2 className="text-sm font-semibold text-foreground">System Health</h2>
         </div>
         {healthLoading ? (
           <div className="p-4 space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="animate-pulse flex items-center justify-between">
-                <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-                <div className="h-5 bg-gray-200 rounded w-1/6"></div>
+                <div className="h-4 bg-hover rounded w-1/3"></div>
+                <div className="h-5 bg-hover rounded w-1/6"></div>
               </div>
             ))}
           </div>
         ) : healthError ? (
           <ErrorDisplay message={healthError.message} onRetry={handleRefresh} />
         ) : health ? (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-line">
             <div className="px-4 py-3 flex items-center justify-between">
-              <span className="text-sm text-gray-700">API</span>
+              <span className="text-sm text-foreground">API</span>
               <Badge variant={health.status === 'healthy' ? 'success' : 'error'}>
                 {health.status}
               </Badge>
             </div>
             <div className="px-4 py-3 flex items-center justify-between">
-              <span className="text-sm text-gray-700">Database</span>
+              <span className="text-sm text-foreground">Database</span>
               <Badge variant={health.database === 'ok' ? 'success' : 'error'}>
                 {health.database}
               </Badge>
             </div>
             <div className="px-4 py-3 flex items-center justify-between">
-              <span className="text-sm text-gray-700">Redis</span>
+              <span className="text-sm text-foreground">Redis</span>
               <Badge variant={health.redis === 'ok' ? 'success' : 'error'}>
                 {health.redis}
               </Badge>
             </div>
           </div>
         ) : (
-          <div className="p-6 text-center text-sm text-gray-500">Health data unavailable</div>
+          <div className="p-6 text-center text-sm text-muted">Health data unavailable</div>
         )}
       </div>
     </div>

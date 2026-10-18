@@ -144,12 +144,12 @@ export function AdjustmentHistoryFilters({
 
   return (
     <section aria-labelledby="adjustment-history-filter-heading"
-      className="mb-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+      className="mb-6 rounded-lg border border-line bg-surface p-4 shadow-sm sm:p-5">
       <h2 id="adjustment-history-filter-heading" ref={headingRef} tabIndex={-1}
-        className="text-lg font-semibold text-gray-950 outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
+        className="text-lg font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-focus">
         Filter adjustment history
       </h2>
-      <p className="mt-1 text-sm text-gray-600">
+      <p className="mt-1 text-sm text-muted">
         Dates and times use your saved timezone. From is inclusive; To is exclusive.
       </p>
       <div className="mt-4"><FormErrorSummary ref={summaryRef} errors={summaryErrors} /></div>
@@ -184,11 +184,11 @@ export function AdjustmentHistoryFilters({
 
         <div className="flex flex-wrap items-end gap-3 sm:col-span-2 xl:col-span-3">
           <button type="submit" disabled={busy}
-            className="min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60">
+            className="min-h-11 rounded-md bg-primary-solid px-4 py-2 text-sm font-semibold text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-60">
             {busy ? 'Applying…' : 'Apply filters'}
           </button>
           {appliedFiltersActive && <button type="button" onClick={clear} disabled={busy}
-            className="min-h-11 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:cursor-wait disabled:opacity-60">
+            className="min-h-11 rounded-md border border-control bg-surface px-4 py-2 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-wait disabled:opacity-60">
             Clear filters
           </button>}
         </div>
@@ -203,12 +203,12 @@ function DateField({ field, label, value, error, onChange }: {
 }) {
   const id = fieldId(field)
   return <div className="min-w-0">
-    <label htmlFor={id} className="block text-sm font-medium text-gray-800">{label}</label>
+    <label htmlFor={id} className="block text-sm font-medium text-foreground">{label}</label>
     <input id={id} type="datetime-local" step="0.000001" value={value}
       onChange={(event) => onChange(event.target.value)} aria-invalid={Boolean(error)}
       aria-describedby={error ? `${id}-error` : undefined}
-      className="mt-1 min-h-11 w-full min-w-0 rounded-md border border-gray-300 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600" />
-    {error && <p id={`${id}-error`} className="mt-1 text-sm text-red-700">{error}</p>}
+      className="mt-1 min-h-11 w-full min-w-0 rounded-md border border-control px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus" />
+    {error && <p id={`${id}-error`} className="mt-1 text-sm text-danger">{error}</p>}
   </div>
 }
 
@@ -218,12 +218,12 @@ function TextField({ field, label, value, error, onChange, mono = true }: {
 }) {
   const id = fieldId(field)
   return <div className="min-w-0">
-    <label htmlFor={id} className="block text-sm font-medium text-gray-800">{label}</label>
+    <label htmlFor={id} className="block text-sm font-medium text-foreground">{label}</label>
     <input id={id} type="text" value={value} onChange={(event) => onChange(event.target.value)}
       aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined}
       autoComplete="off" spellCheck={false}
-      className={`mt-1 min-h-11 w-full min-w-0 rounded-md border border-gray-300 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 ${mono ? 'font-mono' : ''}`} />
-    {error && <p id={`${id}-error`} className="mt-1 text-sm text-red-700">{error}</p>}
+      className={`mt-1 min-h-11 w-full min-w-0 rounded-md border border-control px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${mono ? 'font-mono' : ''}`} />
+    {error && <p id={`${id}-error`} className="mt-1 text-sm text-danger">{error}</p>}
   </div>
 }
 
@@ -233,12 +233,12 @@ function SelectField({ field, label, value, error, onChange, options }: {
 }) {
   const id = fieldId(field)
   return <div className="min-w-0">
-    <label htmlFor={id} className="block text-sm font-medium text-gray-800">{label}</label>
+    <label htmlFor={id} className="block text-sm font-medium text-foreground">{label}</label>
     <select id={id} value={value} onChange={(event) => onChange(event.target.value)}
       aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined}
-      className="mt-1 min-h-11 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">
+      className="mt-1 min-h-11 w-full rounded-md border border-control bg-surface px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
       {options.map(([option, text]) => <option key={option} value={option}>{text}</option>)}
     </select>
-    {error && <p id={`${id}-error`} className="mt-1 text-sm text-red-700">{error}</p>}
+    {error && <p id={`${id}-error`} className="mt-1 text-sm text-danger">{error}</p>}
   </div>
 }

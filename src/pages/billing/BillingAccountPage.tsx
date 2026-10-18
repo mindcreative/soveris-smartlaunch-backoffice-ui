@@ -92,18 +92,18 @@ function CanonicalBillingAccountPage({
           <h1
             ref={headingRef}
             tabIndex={-1}
-            className="text-2xl font-bold text-gray-950 outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"
+            className="text-2xl font-bold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             Account overview
           </h1>
-          <p className="mt-1 break-all text-sm text-gray-600">Selected Client: {clientId}</p>
+          <p className="mt-1 break-all text-sm text-muted">Selected Client: {clientId}</p>
         </div>
         {snapshot && (
           <button
             type="button"
             onClick={() => void query.refetch()}
             disabled={query.isFetching}
-            className="min-h-11 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:cursor-wait disabled:opacity-60"
+            className="min-h-11 rounded-md border border-control bg-surface px-4 py-2 text-sm font-semibold text-foreground hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-wait disabled:opacity-60"
           >
             {query.isFetching ? 'Refreshing…' : 'Refresh snapshot'}
           </button>
@@ -111,13 +111,13 @@ function CanonicalBillingAccountPage({
       </div>
 
       {query.isFetching && snapshot && (
-        <p role="status" aria-label="Refreshing account snapshot" aria-live="polite" className="mb-4 text-sm font-medium text-indigo-700">
+        <p role="status" aria-label="Refreshing account snapshot" aria-live="polite" className="mb-4 text-sm font-medium text-primary">
           Refreshing account snapshot…
         </p>
       )}
 
       {snapshot && (query.isFetching || query.isStale || query.isError) && (
-        <div role="status" className="state-indicator mb-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+        <div role="status" className="state-indicator mb-4 rounded-md border border-warning-line bg-warning-soft p-3 text-sm text-warning">
           {query.isError
             ? 'Refresh failed. Cached snapshot may be stale; values remain tied to the displayed Snapshot as of time.'
             : 'Cached snapshot may be stale. Values remain tied to the displayed Snapshot as of time.'}
@@ -164,8 +164,8 @@ function DurableBillingAccountPage({
       <Breadcrumbs items={accountBreadcrumbs(clientId)} />
       <BillingWorkspaceNav clientId={clientId} />
       <div className="mb-6 min-w-0">
-        <h1 className="text-2xl font-bold text-gray-950">Account overview</h1>
-        <p className="mt-1 break-all text-sm text-gray-600">Selected Client: {clientId}</p>
+        <h1 className="text-2xl font-bold text-foreground">Account overview</h1>
+        <p className="mt-1 break-all text-sm text-muted">Selected Client: {clientId}</p>
       </div>
 
       {status === 404 && (

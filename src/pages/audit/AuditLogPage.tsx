@@ -33,11 +33,11 @@ interface FilterSelectProps {
 function FilterSelect({ label, value, options, onChange, placeholder = 'All' }: FilterSelectProps) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs font-medium text-gray-600">{label}</label>
+      <label className="text-xs font-medium text-muted">{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        className="px-3 py-2 border border-control rounded-md text-sm text-foreground bg-surface focus:outline-none focus:ring-2 focus:ring-focus focus:border-primary-line"
       >
         <option value="">{placeholder}</option>
         {options.map((opt) => (
@@ -57,12 +57,12 @@ function DateFilter({ label, value, onChange }: {
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs font-medium text-gray-600">{label}</label>
+      <label className="text-xs font-medium text-muted">{label}</label>
       <input
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        className="px-3 py-2 border border-control rounded-md text-sm text-foreground bg-surface focus:outline-none focus:ring-2 focus:ring-focus focus:border-primary-line"
       />
     </div>
   )
@@ -100,30 +100,30 @@ const RESULT_STATUS_OPTIONS = [
 function getStatusBadgeClass(resultStatus?: string): string {
   switch (resultStatus) {
     case 'Success':
-      return 'bg-green-100 text-green-800'
+      return 'bg-success-soft text-success'
     case 'Failure':
-      return 'bg-red-100 text-red-800'
+      return 'bg-danger-soft text-danger'
     case 'Pending':
-      return 'bg-yellow-100 text-yellow-800'
+      return 'bg-warning-soft text-warning'
     default:
-      return 'bg-gray-100 text-gray-800'
+      return 'bg-subtle text-foreground'
   }
 }
 
 function getActionBadgeClass(action: string): string {
   switch (action) {
     case 'CREATE':
-      return 'bg-blue-100 text-blue-800'
+      return 'bg-selected text-primary'
     case 'UPDATE':
-      return 'bg-yellow-100 text-yellow-800'
+      return 'bg-warning-soft text-warning'
     case 'DELETE':
-      return 'bg-red-100 text-red-800'
+      return 'bg-danger-soft text-danger'
     case 'LOGIN':
-      return 'bg-green-100 text-green-800'
+      return 'bg-success-soft text-success'
     case 'LOGOUT':
-      return 'bg-gray-100 text-gray-800'
+      return 'bg-subtle text-foreground'
     default:
-      return 'bg-indigo-100 text-indigo-800'
+      return 'bg-selected text-primary'
   }
 }
 
@@ -205,7 +205,7 @@ export function AuditLogPage() {
       render: (_value, row) => {
         const r = row as AuditLogEntry
         return (
-          <span className="text-gray-600 whitespace-nowrap">
+          <span className="text-muted whitespace-nowrap">
             <LocalInstant value={r.createdAt} />
           </span>
         )
@@ -218,7 +218,7 @@ export function AuditLogPage() {
       render: (_value, row) => {
         const r = row as AuditLogEntry
         return (
-          <span className="text-gray-700">{r.userName || r.userId || '-'}</span>
+          <span className="text-foreground">{r.userName || r.userId || '-'}</span>
         )
       },
     },
@@ -242,10 +242,10 @@ export function AuditLogPage() {
       render: (_value, row) => {
         const r = row as AuditLogEntry
         return (
-          <span className="text-gray-700">
+          <span className="text-foreground">
             {r.entityType}
             {r.entityId && (
-              <span className="text-gray-400 ml-1 text-xs">({r.entityId.slice(0, 8)}...)</span>
+              <span className="text-muted ml-1 text-xs">({r.entityId.slice(0, 8)}...)</span>
             )}
           </span>
         )
@@ -272,7 +272,7 @@ export function AuditLogPage() {
       render: (_value, row) => {
         const r = row as AuditLogEntry
         return (
-          <span className="text-gray-500 font-mono text-xs">{r.ipAddress || '-'}</span>
+          <span className="text-muted font-mono text-xs">{r.ipAddress || '-'}</span>
         )
       },
     },
@@ -298,14 +298,14 @@ export function AuditLogPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Audit Logs</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-foreground">Audit Logs</h1>
+        <p className="mt-1 text-sm text-muted">
           Search and filter system activity records. Admin access only.
         </p>
       </div>
 
       {/* Search Bar */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
+      <div className="bg-surface rounded-lg border border-line p-4">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1">
@@ -317,7 +317,7 @@ export function AuditLogPage() {
                   setFilters((prev) => ({ ...prev, search: e.target.value }))
                   setCurrentPage(1)
                 }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-2 border border-control rounded-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-focus focus:border-primary-line"
               />
             </div>
           </div>
@@ -380,7 +380,7 @@ export function AuditLogPage() {
                   })
                   setCurrentPage(1)
                 }}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 self-end"
+                className="px-4 py-2 text-sm font-medium text-foreground bg-subtle border border-control rounded-md hover:bg-hover self-end"
               >
                 Clear Filters
               </button>
@@ -402,7 +402,7 @@ export function AuditLogPage() {
       {!error && (
         <>
           {isLoading ? (
-            <div className="bg-white rounded-lg border border-gray-200">
+            <div className="bg-surface rounded-lg border border-line">
               <div className="p-8 flex items-center justify-center">
                 <LoadingSpinner />
               </div>
@@ -414,7 +414,7 @@ export function AuditLogPage() {
               icon="search"
             />
           ) : (
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <div className="bg-surface rounded-lg border border-line overflow-hidden">
               <DataTable<Record<string, unknown>>
                 columns={columns}
                 data={filteredData}
@@ -423,20 +423,20 @@ export function AuditLogPage() {
                 emptyMessage="No audit logs match your filters."
               />
               {/* Pagination */}
-              <div className="border-t border-gray-200 px-4 py-3 flex items-center justify-between">
+              <div className="border-t border-line px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500">Show</span>
+                  <span className="text-sm text-muted">Show</span>
                   <select
                     value={pageSize}
                     onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                    className="px-2 py-1 border border-gray-300 rounded-md text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-2 py-1 border border-control rounded-md text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-focus"
                   >
                     <option value={10}>10</option>
                     <option value={25}>25</option>
                     <option value={50}>50</option>
                     <option value={100}>100</option>
                   </select>
-                  <span className="text-sm text-gray-500">per page</span>
+                  <span className="text-sm text-muted">per page</span>
                 </div>
                 <Pagination
                   currentPage={currentPage}
@@ -463,7 +463,7 @@ export function AuditLogPage() {
         footer={
           <button
             onClick={() => setSelectedLog(null)}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+            className="px-4 py-2 text-sm font-medium text-on-accent bg-primary-solid border border-transparent rounded-md hover:bg-primary-hover"
           >
             Close
           </button>
@@ -474,19 +474,19 @@ export function AuditLogPage() {
             {/* Basic Info */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <dt className="text-sm font-medium text-gray-500">ID</dt>
-                <dd className="mt-1 text-sm text-gray-900 font-mono">{selectedLog.id}</dd>
+                <dt className="text-sm font-medium text-muted">ID</dt>
+                <dd className="mt-1 text-sm text-foreground font-mono">{selectedLog.id}</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500">Timestamp</dt>
-                <dd className="mt-1 text-sm text-gray-900"><LocalInstant value={selectedLog.createdAt} /></dd>
+                <dt className="text-sm font-medium text-muted">Timestamp</dt>
+                <dd className="mt-1 text-sm text-foreground"><LocalInstant value={selectedLog.createdAt} /></dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500">User</dt>
-                <dd className="mt-1 text-sm text-gray-900">{selectedLog.userName || selectedLog.userId || '-'}</dd>
+                <dt className="text-sm font-medium text-muted">User</dt>
+                <dd className="mt-1 text-sm text-foreground">{selectedLog.userName || selectedLog.userId || '-'}</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500">Action</dt>
+                <dt className="text-sm font-medium text-muted">Action</dt>
                 <dd className="mt-1">
                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getActionBadgeClass(selectedLog.action)}`}>
                     {selectedLog.action}
@@ -494,28 +494,28 @@ export function AuditLogPage() {
                 </dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500">Resource Type</dt>
-                <dd className="mt-1 text-sm text-gray-900">{selectedLog.entityType || '-'}</dd>
+                <dt className="text-sm font-medium text-muted">Resource Type</dt>
+                <dd className="mt-1 text-sm text-foreground">{selectedLog.entityType || '-'}</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500">Resource ID</dt>
-                <dd className="mt-1 text-sm text-gray-900 font-mono">{selectedLog.entityId || '-'}</dd>
+                <dt className="text-sm font-medium text-muted">Resource ID</dt>
+                <dd className="mt-1 text-sm text-foreground font-mono">{selectedLog.entityId || '-'}</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500">IP Address</dt>
-                <dd className="mt-1 text-sm text-gray-900 font-mono">{selectedLog.ipAddress || '-'}</dd>
+                <dt className="text-sm font-medium text-muted">IP Address</dt>
+                <dd className="mt-1 text-sm text-foreground font-mono">{selectedLog.ipAddress || '-'}</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-gray-500">User Agent</dt>
-                <dd className="mt-1 text-xs text-gray-500 break-all">{selectedLog.userAgent || '-'}</dd>
+                <dt className="text-sm font-medium text-muted">User Agent</dt>
+                <dd className="mt-1 text-xs text-muted break-all">{selectedLog.userAgent || '-'}</dd>
               </div>
             </div>
 
             {/* Details JSON */}
             {selectedLog.details && Object.keys(selectedLog.details).length > 0 && (
               <div>
-                <dt className="text-sm font-medium text-gray-500 mb-2">Details / Metadata</dt>
-                <pre className="bg-gray-50 border border-gray-200 rounded-md p-4 text-xs text-gray-800 overflow-x-auto whitespace-pre-wrap">
+                <dt className="text-sm font-medium text-muted mb-2">Details / Metadata</dt>
+                <pre className="bg-subtle border border-line rounded-md p-4 text-xs text-foreground overflow-x-auto whitespace-pre-wrap">
                   {JSON.stringify(selectedLog.details, null, 2)}
                 </pre>
               </div>

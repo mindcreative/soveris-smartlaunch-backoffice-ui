@@ -64,11 +64,11 @@ function ProductImageUploadField({
     : 'JPEG, PNG or WebP. At least 400 × 400 px; source and retained image each at most 1 MiB. A square ratio is recommended.'
   const active = upload?.phase === 'uploading' || upload?.phase === 'processing'
 
-  return <div className="space-y-2 rounded-md border border-indigo-200 bg-indigo-50/50 p-3">
-    <label htmlFor={inputId} className="block text-sm font-medium text-gray-950">
+  return <div className="space-y-2 rounded-md border border-primary-line bg-selected/50 p-3">
+    <label htmlFor={inputId} className="block text-sm font-medium text-foreground">
       {currentSrc ? `Replace ${role} image` : `Upload ${role} image`}
     </label>
-    <p id={`${inputId}-guidance`} className="text-xs text-gray-700">{guidance}</p>
+    <p id={`${inputId}-guidance`} className="text-xs text-foreground">{guidance}</p>
     <input
       id={inputId}
       type="file"
@@ -80,10 +80,10 @@ function ProductImageUploadField({
         if (file) onUpload(pointer, role, file)
         event.target.value = ''
       }}
-      className="block min-h-11 w-full rounded-md border border-gray-300 bg-white p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-indigo-100 file:px-3 file:py-2 file:font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:opacity-50"
+      className="block min-h-11 w-full rounded-md border border-control bg-surface p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-selected file:px-3 file:py-2 file:font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-50"
     />
     {upload && <div id={`${inputId}-status`} className="space-y-2" role="status" aria-live="polite">
-      <p className="break-words text-sm text-gray-800">{upload.message}</p>
+      <p className="break-words text-sm text-foreground">{upload.message}</p>
       {(upload.phase === 'uploading' || upload.phase === 'processing') && <progress
         aria-label={`${role} image upload progress`}
         max={100}
@@ -93,20 +93,20 @@ function ProductImageUploadField({
       {upload.previewUrl && <img
         src={upload.previewUrl}
         alt={currentAlt ? `Private preview: ${currentAlt}` : `Private ${role} image preview`}
-        className="max-h-48 max-w-full rounded border border-gray-300 object-contain"
+        className="max-h-48 max-w-full rounded border border-control object-contain"
       />}
       <div className="flex flex-wrap gap-2">
         {(upload.phase === 'uncertain' || upload.phase === 'error' || upload.phase === 'processing') && <button
           type="button"
           disabled={disabled}
           onClick={() => onRetry(pointer)}
-          className="min-h-11 rounded-md border border-indigo-400 px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:opacity-50"
+          className="min-h-11 rounded-md border border-primary-line px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-50"
         >Check status and retry safely</button>}
         <button
           type="button"
           disabled={disabled}
           onClick={() => onCancel(pointer)}
-          className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:opacity-50"
+          className="min-h-11 rounded-md border border-control px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-50"
         >{active ? 'Cancel upload' : 'Clear private preview'}</button>
       </div>
     </div>}
@@ -121,13 +121,13 @@ function Input({ label, path, value, errors, disabled, multiline, type = 'text',
   const error = errors.find((issue) => issue.path === path)
   const id = pointerToFieldId(path)
   const errorId = `${id}-error`
-  const classes = `mt-1 min-h-11 w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 ${error ? 'border-red-600' : 'border-gray-300'}`
+  const classes = `mt-1 min-h-11 w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${error ? 'border-danger-line' : 'border-control'}`
   const common = { id, value, disabled, 'aria-invalid': error ? true : undefined, 'aria-describedby': error ? errorId : undefined, onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange(event.target.value), onBlur, className: classes }
-  return <div><label htmlFor={id} className="block text-sm font-medium text-gray-900">{label}</label>{multiline ? <textarea {...common} rows={3} maxLength={max} /> : <input {...common} type={type} min={min} max={max} maxLength={type === 'number' ? undefined : max} />}{error && <p id={errorId} className="mt-1 text-sm text-red-800">{issueMessage(error)}</p>}</div>
+  return <div><label htmlFor={id} className="block text-sm font-medium text-foreground">{label}</label>{multiline ? <textarea {...common} rows={3} maxLength={max} /> : <input {...common} type={type} min={min} max={max} maxLength={type === 'number' ? undefined : max} />}{error && <p id={errorId} className="mt-1 text-sm text-danger">{issueMessage(error)}</p>}</div>
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return <fieldset className="space-y-4 rounded-lg border border-gray-300 p-4"><legend className="px-1 font-semibold text-gray-950">{title}</legend>{children}</fieldset>
+  return <fieldset className="space-y-4 rounded-lg border border-control p-4"><legend className="px-1 font-semibold text-foreground">{title}</legend>{children}</fieldset>
 }
 
 function profile(field: EditableFormField): string {
@@ -176,7 +176,7 @@ export function ProductContentFields({
     onChange(draft as unknown as ProductContentV1, pointer)
   }
   const field = (label: string, path: string, current: string | number, set: (draft: EditableContent, value: string) => void, options: Partial<Parameters<typeof Input>[0]> = {}) => <Input label={label} path={path} value={current} errors={errors} disabled={disabled} onChange={(next) => update(path, (draft) => set(draft, next))} onBlur={() => onBlur(path)} {...options} />
-  const buttonClass = 'min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:opacity-50'
+  const buttonClass = 'min-h-11 rounded-md border border-control px-3 py-2 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-50'
 
   return <div className="space-y-5">
     <Section title="Hero">
@@ -185,7 +185,7 @@ export function ProductContentFields({
       <div className="grid gap-4 sm:grid-cols-2">{field('Primary action label', '/hero/cta/label', content.hero.cta.label, (draft, next) => { draft.hero.cta.label = next }, { max: 120 })}{field('Primary action URL', '/hero/cta/href', content.hero.cta.href, (draft, next) => { draft.hero.cta.href = next }, { max: 2048, type: 'url' })}</div>
       <div className="grid gap-4 sm:grid-cols-2">{field('Background image path', '/hero/backgroundImage/src', content.hero.backgroundImage.src, (draft, next) => { draft.hero.backgroundImage.src = next }, { max: 2048 })}{field('Background image alternative text', '/hero/backgroundImage/alt', content.hero.backgroundImage.alt, (draft, next) => { draft.hero.backgroundImage.alt = next }, { max: 120 })}</div>
       <ProductImageUploadField pointer="/hero/backgroundImage" role="hero" currentSrc={content.hero.backgroundImage.src} currentAlt={content.hero.backgroundImage.alt} disabled={disabled} upload={imageUploads['/hero/backgroundImage']} onUpload={onImageUpload} onRetry={onImageRetry} onCancel={onImageCancel} />
-      {content.hero.secondaryCta ? <div className="space-y-3 rounded-md bg-gray-50 p-3"><div className="grid gap-4 sm:grid-cols-2">{field('Secondary action label', '/hero/secondaryCta/label', content.hero.secondaryCta.label, (draft, next) => { draft.hero.secondaryCta!.label = next }, { max: 120 })}{field('Secondary action URL', '/hero/secondaryCta/href', content.hero.secondaryCta.href, (draft, next) => { draft.hero.secondaryCta!.href = next }, { max: 2048 })}</div><button type="button" disabled={disabled} onClick={() => update('/hero/secondaryCta', (draft) => { delete draft.hero.secondaryCta })} className={buttonClass}>Remove secondary action</button></div> : <button id={pointerToFieldId('/hero/secondaryCta')} type="button" disabled={disabled} onClick={() => update('/hero/secondaryCta', (draft) => { draft.hero.secondaryCta = { label: '', href: '' } })} className={buttonClass}>Add secondary action</button>}
+      {content.hero.secondaryCta ? <div className="space-y-3 rounded-md bg-subtle p-3"><div className="grid gap-4 sm:grid-cols-2">{field('Secondary action label', '/hero/secondaryCta/label', content.hero.secondaryCta.label, (draft, next) => { draft.hero.secondaryCta!.label = next }, { max: 120 })}{field('Secondary action URL', '/hero/secondaryCta/href', content.hero.secondaryCta.href, (draft, next) => { draft.hero.secondaryCta!.href = next }, { max: 2048 })}</div><button type="button" disabled={disabled} onClick={() => update('/hero/secondaryCta', (draft) => { delete draft.hero.secondaryCta })} className={buttonClass}>Remove secondary action</button></div> : <button id={pointerToFieldId('/hero/secondaryCta')} type="button" disabled={disabled} onClick={() => update('/hero/secondaryCta', (draft) => { draft.hero.secondaryCta = { label: '', href: '' } })} className={buttonClass}>Add secondary action</button>}
       {content.hero.trustText !== undefined ? <div className="space-y-2">{field('Trust text', '/hero/trustText', content.hero.trustText, (draft, next) => { draft.hero.trustText = next }, { max: 500 })}<button type="button" disabled={disabled} onClick={() => update('/hero/trustText', (draft) => { delete draft.hero.trustText })} className={buttonClass}>Remove trust text</button></div> : <button id={pointerToFieldId('/hero/trustText')} type="button" disabled={disabled} onClick={() => update('/hero/trustText', (draft) => { draft.hero.trustText = '' })} className={buttonClass}>Add trust text</button>}
     </Section>
 
@@ -194,7 +194,7 @@ export function ProductContentFields({
         {content.features.items.map((item, index) => {
           const base = `/features/items/${index}`
           const imagePointer = `${base}/image`
-          return <div key={index} className="space-y-3 rounded-md border border-gray-200 p-3">
+          return <div key={index} className="space-y-3 rounded-md border border-line p-3">
             <h4 className="font-medium">Feature {index + 1}</h4>
             {field('Feature title', `${base}/title`, item.title, (draft, next) => { draft.features!.items[index]!.title = next }, { max: 120 })}
             {field('Feature description', `${base}/description`, item.description, (draft, next) => { draft.features!.items[index]!.description = next }, { max: 500, multiline: true })}
@@ -218,16 +218,16 @@ export function ProductContentFields({
 
     <Section title="Questions (optional)">
       {!content.questions ? <button id={pointerToFieldId('/questions')} type="button" disabled={disabled} onClick={() => update('/questions', (draft) => { draft.questions = { heading: '', items: [] } })} className={buttonClass}>Add Questions section</button> : <>{field('Questions heading', '/questions/heading', content.questions.heading, (draft, next) => { draft.questions!.heading = next }, { max: 120 })}{content.questions.description !== undefined ? field('Questions description', '/questions/description', content.questions.description, (draft, next) => { draft.questions!.description = next }, { max: 500, multiline: true }) : <button type="button" disabled={disabled} onClick={() => update('/questions/description', (draft) => { draft.questions!.description = '' })} className={buttonClass}>Add Questions description</button>}
-        {content.questions.items.map((item, index) => { const base = `/questions/items/${index}`; return <div key={index} className="space-y-3 rounded-md border border-gray-200 p-3">{field(`Question ${index + 1}`, `${base}/question`, item.question, (draft, next) => { draft.questions!.items[index]!.question = next }, { max: 120 })}{field('Answer', `${base}/answer`, item.answer, (draft, next) => { draft.questions!.items[index]!.answer = next }, { max: 2000, multiline: true })}<button type="button" disabled={disabled} onClick={() => update(base, (draft) => { draft.questions!.items.splice(index, 1) })} className={buttonClass}>Remove question {index + 1}</button></div> })}
+        {content.questions.items.map((item, index) => { const base = `/questions/items/${index}`; return <div key={index} className="space-y-3 rounded-md border border-line p-3">{field(`Question ${index + 1}`, `${base}/question`, item.question, (draft, next) => { draft.questions!.items[index]!.question = next }, { max: 120 })}{field('Answer', `${base}/answer`, item.answer, (draft, next) => { draft.questions!.items[index]!.answer = next }, { max: 2000, multiline: true })}<button type="button" disabled={disabled} onClick={() => update(base, (draft) => { draft.questions!.items.splice(index, 1) })} className={buttonClass}>Remove question {index + 1}</button></div> })}
         <div className="flex flex-wrap gap-2"><button id={pointerToFieldId('/questions/items')} type="button" disabled={disabled || content.questions.items.length >= 20} onClick={() => update('/questions/items', (draft) => { draft.questions!.items.push({ question: '', answer: '' }) })} className={buttonClass}>Add question</button><button type="button" disabled={disabled} onClick={() => update('/questions', (draft) => { delete draft.questions })} className={buttonClass}>Remove Questions section</button></div>
       </>}
     </Section>
 
     <Section title="Form (required to publish)">
       {!content.form ? <button id={pointerToFieldId('/form')} type="button" disabled={disabled} onClick={() => update('/form', (draft) => { draft.form = { title: '', submitLabel: '', schema: { type: 'object', properties: {}, additionalProperties: false } } })} className={buttonClass}>Add Form section</button> : <>{field('Form title', '/form/title', content.form.title, (draft, next) => { draft.form!.title = next }, { max: 120 })}{content.form.description !== undefined ? field('Form description', '/form/description', content.form.description, (draft, next) => { draft.form!.description = next }, { max: 500, multiline: true }) : <button type="button" disabled={disabled} onClick={() => update('/form/description', (draft) => { draft.form!.description = '' })} className={buttonClass}>Add Form description</button>}{field('Submit button label', '/form/submitLabel', content.form.submitLabel, (draft, next) => { draft.form!.submitLabel = next }, { max: 120 })}
-        {Object.entries(content.form.schema.properties).sort(([, a], [, b]) => a.order - b.order).map(([name, formField]) => { const escaped = name.replace(/~/g, '~0').replace(/\//g, '~1'); const base = `/form/schema/properties/${escaped}`; const kind = profile(formField); const enumValues = formField.type === 'array' ? formField.items?.enum ?? [] : formField.enum ?? []; return <div key={name} className="space-y-3 rounded-md border border-gray-200 p-3"><h4 className="font-medium">Form field: {name}</h4>
+        {Object.entries(content.form.schema.properties).sort(([, a], [, b]) => a.order - b.order).map(([name, formField]) => { const escaped = name.replace(/~/g, '~0').replace(/\//g, '~1'); const base = `/form/schema/properties/${escaped}`; const kind = profile(formField); const enumValues = formField.type === 'array' ? formField.items?.enum ?? [] : formField.enum ?? []; return <div key={name} className="space-y-3 rounded-md border border-line p-3"><h4 className="font-medium">Form field: {name}</h4>
           {field('Field name', `${base}/name`, name, (draft, next) => { const current = draft.form!.schema.properties[name]!; delete draft.form!.schema.properties[name]; draft.form!.schema.properties[next] = current; draft.form!.schema.required = draft.form!.schema.required?.map((required) => required === name ? next : required) })}
-          <div><label htmlFor={pointerToFieldId(base)} className="block text-sm font-medium text-gray-900">Field profile</label><select id={pointerToFieldId(base)} value={kind} disabled={disabled} onChange={(event) => update(base, (draft) => { draft.form!.schema.properties[name] = newField(event.target.value, formField.order) })} onBlur={() => onBlur(base)} className="mt-1 min-h-11 w-full rounded-md border border-gray-300 px-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600"><option value="text">Text</option><option value="email">Email</option><option value="textarea">Textarea</option><option value="select">Select</option><option value="radio">Radio</option><option value="checkbox">Checkbox</option></select></div>
+          <div><label htmlFor={pointerToFieldId(base)} className="block text-sm font-medium text-foreground">Field profile</label><select id={pointerToFieldId(base)} value={kind} disabled={disabled} onChange={(event) => update(base, (draft) => { draft.form!.schema.properties[name] = newField(event.target.value, formField.order) })} onBlur={() => onBlur(base)} className="mt-1 min-h-11 w-full rounded-md border border-control px-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"><option value="text">Text</option><option value="email">Email</option><option value="textarea">Textarea</option><option value="select">Select</option><option value="radio">Radio</option><option value="checkbox">Checkbox</option></select></div>
           {field('Field label', `${base}/title`, formField.title, (draft, next) => { draft.form!.schema.properties[name]!.title = next }, { max: 120 })}{field('Field order', `${base}/order`, formField.order, (draft, next) => { draft.form!.schema.properties[name]!.order = Number(next) }, { type: 'number', min: 1, max: 20 })}
           {formField.type === 'string' ? <div className="grid gap-4 sm:grid-cols-2">{field('Minimum length (optional)', `${base}/minLength`, formField.minLength ?? '', (draft, next) => { if (next === '') delete draft.form!.schema.properties[name]!.minLength; else draft.form!.schema.properties[name]!.minLength = Number(next) }, { type: 'number', min: 0, max: formField.maxLength })}{field('Maximum length', `${base}/maxLength`, formField.maxLength ?? 120, (draft, next) => { draft.form!.schema.properties[name]!.maxLength = Number(next) }, { type: 'number', min: 1, max: kind === 'textarea' ? 2000 : 500 })}</div> : <div className="grid gap-4 sm:grid-cols-2">{field('Minimum selections (optional)', `${base}/minItems`, formField.minItems ?? '', (draft, next) => { if (next === '') delete draft.form!.schema.properties[name]!.minItems; else draft.form!.schema.properties[name]!.minItems = Number(next) }, { type: 'number', min: 0, max: 20 })}{field('Maximum selections', `${base}/maxItems`, formField.maxItems ?? 1, (draft, next) => { draft.form!.schema.properties[name]!.maxItems = Number(next) }, { type: 'number', min: 1, max: 20 })}</div>}
           {['select', 'radio', 'checkbox'].includes(kind) && <>{field('Options (one identifier per line)', `${base}/${formField.type === 'array' ? 'items/enum' : 'enum'}`, enumValues.join('\n'), (draft, next) => { const target = draft.form!.schema.properties[name]!; if (target.type === 'array') target.items!.enum = parseLines(next); else target.enum = parseLines(next) }, { multiline: true })}{field('Option labels (optional, option=Label)', `${base}/ui:enumLabels`, labelsText(formField['ui:enumLabels']), (draft, next) => { const labels = parseLabels(next); const target = draft.form!.schema.properties[name]!; if (labels) target['ui:enumLabels'] = labels; else delete target['ui:enumLabels'] }, { multiline: true })}</>}
@@ -240,7 +240,7 @@ export function ProductContentFields({
     </Section>
 
     <Section title="Footer (optional)">
-      {!content.footer ? <button id={pointerToFieldId('/footer')} type="button" disabled={disabled} onClick={() => update('/footer', (draft) => { draft.footer = [{ heading: '', links: [] }] })} className={buttonClass}>Add Footer</button> : <>{content.footer.map((section, sectionIndex) => { const base = `/footer/${sectionIndex}`; return <div key={sectionIndex} className="space-y-3 rounded-md border border-gray-200 p-3">{field(`Footer section ${sectionIndex + 1} heading`, `${base}/heading`, section.heading, (draft, next) => { draft.footer![sectionIndex]!.heading = next }, { max: 120 })}{section.links.map((link, linkIndex) => <div key={linkIndex} className="grid gap-3 rounded bg-gray-50 p-3 sm:grid-cols-2">{field('Footer link name', `${base}/links/${linkIndex}/name`, link.name, (draft, next) => { draft.footer![sectionIndex]!.links[linkIndex]!.name = next }, { max: 120 })}{field('Footer link URL', `${base}/links/${linkIndex}/href`, link.href, (draft, next) => { draft.footer![sectionIndex]!.links[linkIndex]!.href = next }, { max: 2048 })}<button type="button" disabled={disabled} onClick={() => update(`${base}/links/${linkIndex}`, (draft) => { draft.footer![sectionIndex]!.links.splice(linkIndex, 1) })} className={buttonClass}>Remove footer link {linkIndex + 1}</button></div>)}<button id={pointerToFieldId(`${base}/links`)} type="button" disabled={disabled || section.links.length >= 8} onClick={() => update(`${base}/links`, (draft) => { draft.footer![sectionIndex]!.links.push({ name: '', href: '' }) })} className={buttonClass}>Add footer link</button><button type="button" disabled={disabled} onClick={() => update(base, (draft) => { draft.footer!.splice(sectionIndex, 1) })} className={buttonClass}>Remove footer section {sectionIndex + 1}</button></div> })}<div className="flex flex-wrap gap-2"><button type="button" disabled={disabled || content.footer.length >= 4} onClick={() => update('/footer', (draft) => { draft.footer!.push({ heading: '', links: [] }) })} className={buttonClass}>Add footer section</button><button type="button" disabled={disabled} onClick={() => update('/footer', (draft) => { delete draft.footer })} className={buttonClass}>Remove Footer</button></div></>}
+      {!content.footer ? <button id={pointerToFieldId('/footer')} type="button" disabled={disabled} onClick={() => update('/footer', (draft) => { draft.footer = [{ heading: '', links: [] }] })} className={buttonClass}>Add Footer</button> : <>{content.footer.map((section, sectionIndex) => { const base = `/footer/${sectionIndex}`; return <div key={sectionIndex} className="space-y-3 rounded-md border border-line p-3">{field(`Footer section ${sectionIndex + 1} heading`, `${base}/heading`, section.heading, (draft, next) => { draft.footer![sectionIndex]!.heading = next }, { max: 120 })}{section.links.map((link, linkIndex) => <div key={linkIndex} className="grid gap-3 rounded bg-subtle p-3 sm:grid-cols-2">{field('Footer link name', `${base}/links/${linkIndex}/name`, link.name, (draft, next) => { draft.footer![sectionIndex]!.links[linkIndex]!.name = next }, { max: 120 })}{field('Footer link URL', `${base}/links/${linkIndex}/href`, link.href, (draft, next) => { draft.footer![sectionIndex]!.links[linkIndex]!.href = next }, { max: 2048 })}<button type="button" disabled={disabled} onClick={() => update(`${base}/links/${linkIndex}`, (draft) => { draft.footer![sectionIndex]!.links.splice(linkIndex, 1) })} className={buttonClass}>Remove footer link {linkIndex + 1}</button></div>)}<button id={pointerToFieldId(`${base}/links`)} type="button" disabled={disabled || section.links.length >= 8} onClick={() => update(`${base}/links`, (draft) => { draft.footer![sectionIndex]!.links.push({ name: '', href: '' }) })} className={buttonClass}>Add footer link</button><button type="button" disabled={disabled} onClick={() => update(base, (draft) => { draft.footer!.splice(sectionIndex, 1) })} className={buttonClass}>Remove footer section {sectionIndex + 1}</button></div> })}<div className="flex flex-wrap gap-2"><button type="button" disabled={disabled || content.footer.length >= 4} onClick={() => update('/footer', (draft) => { draft.footer!.push({ heading: '', links: [] }) })} className={buttonClass}>Add footer section</button><button type="button" disabled={disabled} onClick={() => update('/footer', (draft) => { delete draft.footer })} className={buttonClass}>Remove Footer</button></div></>}
     </Section>
 
     <Section title="SEO (optional)">

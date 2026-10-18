@@ -1,5 +1,5 @@
 import type { FC } from 'react'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useId } from 'react'
 import { useOverviewMetrics } from '@/hooks/useQueryHooks'
 import { StatCard } from '@/components/shared/StatCard'
 import { DataTable } from '@/components/shared/DataTable'
@@ -14,14 +14,16 @@ function DateFilter({ label, value, onChange }: {
   value: string
   onChange: (value: string) => void
 }) {
+  const id = useId()
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-xs font-medium text-gray-600">{label}</label>
+      <label htmlFor={id} className="text-xs font-medium text-muted">{label}</label>
       <input
+        id={id}
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        className="px-3 py-2 border border-control rounded-md text-sm text-foreground bg-surface focus:outline-none focus:ring-2 focus:ring-focus focus:border-primary-line"
       />
     </div>
   )
@@ -79,7 +81,7 @@ const AnalyticsPage: FC = () => {
       {
         key: 'verified',
         label: 'Verified',
-        render: (value: unknown) => <span className="text-green-600 font-medium">{String(value)}</span>,
+        render: (value: unknown) => <span className="text-success font-medium">{String(value)}</span>,
       },
       {
         key: 'conversionRate',
@@ -106,7 +108,7 @@ const AnalyticsPage: FC = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold text-gray-900">Analytics</h1>
+      <h1 className="text-xl font-semibold text-foreground">Analytics</h1>
 
       {/* Date Range Filter */}
       <div className="flex flex-wrap items-end gap-4">
@@ -123,7 +125,7 @@ const AnalyticsPage: FC = () => {
         {hasFilters && (
           <button
             onClick={() => { setFromDate(''); setToDate('') }}
-            className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-3 py-2 text-sm font-medium text-foreground bg-surface border border-control rounded-md hover:bg-subtle focus:outline-none focus:ring-2 focus:ring-focus focus:border-primary-line"
           >
             Clear
           </button>
@@ -149,7 +151,7 @@ const AnalyticsPage: FC = () => {
 
           {/* Top Products Table */}
           <div>
-            <h2 className="text-base font-semibold text-gray-900 mb-3">Product Breakdown</h2>
+            <h2 className="text-base font-semibold text-foreground mb-3">Product Breakdown</h2>
             {!topProductsData.length ? (
               <EmptyState
                 icon="chart-bar"

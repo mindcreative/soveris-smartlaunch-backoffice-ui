@@ -46,7 +46,6 @@ export const NAV_ITEMS = [
   { key: 'analytics', label: 'Analytics', path: '/analytics' },
   { key: 'products', label: 'Products', path: '/products' },
   { key: 'images', label: 'Images', path: '/images' },
-  { key: 'themes', label: 'Themes', path: '/themes' },
   { key: 'ai', label: 'AI Tools', path: '/ai' },
   { key: 'users', label: 'Users', path: '/users' },
   { key: 'audit', label: 'Audit Logs', path: '/audit' }

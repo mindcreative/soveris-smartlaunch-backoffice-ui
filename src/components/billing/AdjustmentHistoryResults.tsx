@@ -7,8 +7,8 @@ function TypeAndRelationship({ item }: { item: CreditAdjustmentHistoryItem }) {
   if (item.operationType === 'reversal') {
     return (
       <div className="min-w-0 space-y-1">
-        <p className="font-semibold text-gray-950">Reversal</p>
-        <p className="select-text break-all font-mono text-xs text-gray-700">
+        <p className="font-semibold text-foreground">Reversal</p>
+        <p className="select-text break-all font-mono text-xs text-foreground">
           Reversal of {item.originalAdjustmentId}
         </p>
       </div>
@@ -17,8 +17,8 @@ function TypeAndRelationship({ item }: { item: CreditAdjustmentHistoryItem }) {
 
   return (
     <div className="min-w-0 space-y-1">
-      <p className="font-semibold text-gray-950">Original adjustment</p>
-      <p className="select-text break-all font-mono text-xs text-gray-700">
+      <p className="font-semibold text-foreground">Original adjustment</p>
+      <p className="select-text break-all font-mono text-xs text-foreground">
         {item.reversalAdjustmentId === null
           ? 'No linked reversal in this snapshot'
           : `Reversed by ${item.reversalAdjustmentId}`}
@@ -30,8 +30,8 @@ function TypeAndRelationship({ item }: { item: CreditAdjustmentHistoryItem }) {
 function ReasonAndActor({ item }: { item: CreditAdjustmentHistoryItem }) {
   return (
     <div className="min-w-0 space-y-2 text-sm">
-      <p className="break-words text-gray-900"><span className="font-semibold">Reason: </span>{item.reason}</p>
-      <p className="select-text break-all text-gray-900"><span className="font-semibold">Performed by: </span>{item.performedBy}</p>
+      <p className="break-words text-foreground"><span className="font-semibold">Reason: </span>{item.reason}</p>
+      <p className="select-text break-all text-foreground"><span className="font-semibold">Performed by: </span>{item.performedBy}</p>
     </div>
   )
 }
@@ -50,7 +50,7 @@ function Balances({ item }: { item: CreditAdjustmentHistoryItem }) {
     <dl className="space-y-2">
       {BALANCES.map(([key, label]) => (
         <div key={key} className="min-w-0">
-          <dt className="text-xs font-semibold text-gray-600">{label}:</dt>
+          <dt className="text-xs font-semibold text-muted">{label}:</dt>
           <dd className="mt-0.5"><CreditAmount value={String(item[key])} compact /></dd>
         </div>
       ))}
@@ -76,7 +76,7 @@ function IdentifiersAndVersions({ item }: { item: CreditAdjustmentHistoryItem })
       {IDENTIFIERS.map(([key, label]) => (
         <div key={key} className="min-w-0">
           <dt className="sr-only">{label}</dt>
-          <dd className="select-text break-all font-mono text-gray-900">{label}: {String(item[key])}</dd>
+          <dd className="select-text break-all font-mono text-foreground">{label}: {String(item[key])}</dd>
         </div>
       ))}
     </dl>
@@ -85,7 +85,7 @@ function IdentifiersAndVersions({ item }: { item: CreditAdjustmentHistoryItem })
 
 function ImmutableExplanation() {
   return (
-    <p className="mb-3 max-w-4xl text-sm text-gray-700">
+    <p className="mb-3 max-w-4xl text-sm text-foreground">
       This is immutable operational evidence. Corrections are recorded as separate compensating rows,
       preserving the original adjustment and its relationship.
     </p>
@@ -95,7 +95,7 @@ function ImmutableExplanation() {
 function NarrowField({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-xs font-semibold uppercase tracking-wide text-gray-600">{label}</dt>
+      <dt className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</dt>
       <dd className="mt-1 min-w-0">{children}</dd>
     </div>
   )
@@ -121,7 +121,7 @@ function ReversalAction({ item, onReviewReversal }: {
     <button type="button"
       aria-label={`Review reversal for original adjustment ${item.adjustmentId}`}
       onClick={(event) => onReviewReversal?.(item, event.currentTarget)}
-      className="min-h-11 rounded-md border border-gray-400 bg-white px-3 py-2 text-sm font-semibold text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-700">
+      className="min-h-11 rounded-md border border-control bg-surface px-3 py-2 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
       Review reversal
     </button>
   )
@@ -134,33 +134,33 @@ export function AdjustmentHistoryResults({
 }: AdjustmentHistoryResultsProps) {
   return (
     <section aria-labelledby="adjustment-history-results-heading" className="min-w-0">
-      <h2 id="adjustment-history-results-heading" className="mb-2 text-lg font-semibold text-gray-950">
+      <h2 id="adjustment-history-results-heading" className="mb-2 text-lg font-semibold text-foreground">
         Adjustment history evidence
       </h2>
       <ImmutableExplanation />
 
       <div tabIndex={0} role="region" aria-label="Scrollable adjustment history table"
-        className="hidden overflow-x-auto rounded-lg border border-gray-300 bg-white outline-none focus-visible:ring-2 focus-visible:ring-indigo-700 md:block">
+        className="hidden overflow-x-auto rounded-lg border border-control bg-surface outline-none focus-visible:ring-2 focus-visible:ring-focus md:block">
         <table className="w-full min-w-[90rem] table-fixed border-collapse">
           <caption className="sr-only">Newest-first immutable Billing adjustment history</caption>
-          <thead className="border-b border-gray-300 bg-gray-100">
+          <thead className="border-b border-control bg-subtle">
             <tr>
-              <th scope="col" className="w-44 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700">Time</th>
-              <th scope="col" className="w-64 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700">Type and relationship</th>
-              <th scope="col" className="w-64 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700">Signed credits</th>
-              <th scope="col" className="w-80 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700">Reason and actor</th>
-              <th scope="col" className="w-80 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700">Balances before and after</th>
-              <th scope="col" className="w-96 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700">Immutable identifiers and wallet versions</th>
+              <th scope="col" className="w-44 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-foreground">Time</th>
+              <th scope="col" className="w-64 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-foreground">Type and relationship</th>
+              <th scope="col" className="w-64 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-foreground">Signed credits</th>
+              <th scope="col" className="w-80 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-foreground">Reason and actor</th>
+              <th scope="col" className="w-80 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-foreground">Balances before and after</th>
+              <th scope="col" className="w-96 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-foreground">Immutable identifiers and wallet versions</th>
               {canAdjust && <th scope="col"
-                className="w-48 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-700">
+                className="w-48 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-foreground">
                 Action
               </th>}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-300">
+          <tbody className="divide-y divide-control">
             {items.map((item) => (
               <tr key={item.adjustmentId} data-adjustment-id={item.adjustmentId} className="align-top">
-                <td className="px-3 py-4 text-sm text-gray-900"><LocalInstant value={item.operationAsOf} /></td>
+                <td className="px-3 py-4 text-sm text-foreground"><LocalInstant value={item.operationAsOf} /></td>
                 <td className="px-3 py-4"><TypeAndRelationship item={item} /></td>
                 <td className="px-3 py-4"><CreditAmount value={item.amount} signed compact /></td>
                 <td className="px-3 py-4"><ReasonAndActor item={item} /></td>
@@ -179,7 +179,7 @@ export function AdjustmentHistoryResults({
       <ol aria-label="Newest-first immutable Billing adjustment history" className="space-y-4 md:hidden">
         {items.map((item) => (
           <li key={item.adjustmentId} data-adjustment-id={item.adjustmentId}
-            className="min-w-0 rounded-lg border border-gray-300 bg-white p-4 shadow-sm">
+            className="min-w-0 rounded-lg border border-control bg-surface p-4 shadow-sm">
             <dl className="space-y-4">
               <NarrowField label="Time"><LocalInstant value={item.operationAsOf} /></NarrowField>
               <NarrowField label="Type and relationship"><TypeAndRelationship item={item} /></NarrowField>

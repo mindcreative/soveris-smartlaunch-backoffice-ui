@@ -1,8 +1,10 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { NotificationIcon, NotificationClose } from './appearance/NotificationIcon'
+import { AppearanceProvider, useAppearance } from './appearance/AppearanceProvider'
+import { BrowserRouter, Routes, Route, Navigate, useMatch } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
-import { AuthProvider } from './hooks/useAuth'
+import { AuthProvider, useAuth } from './hooks/useAuth'
 import { AdminShell } from './components/layout/AdminShell'
 import Login from './pages/login/LoginPage'
 import Dashboard from './pages/dashboard/DashboardPage'
@@ -38,9 +40,9 @@ function ProtectedRoute({
   return <>{children}</>
 }
 
-function App() {
+function Application() {
+  const { mode } = useAppearance()
   return (
-    <BrowserRouter>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <Routes>
@@ -66,13 +68,6 @@ function App() {
               <Route path="/billing/clients/:clientId/adjustments" element={<BillingAdjustmentHistoryPage />} />
               <Route path="/billing/clients/:clientId/subscriptions" element={<BillingSubscriptionPage />} />
 
-              {/* Placeholder routes for future pages */}
-              <Route path="/themes" element={
-                <div className="space-y-4">
-                  <h1 className="text-xl font-semibold text-gray-900">Themes</h1>
-                  <p className="text-gray-500">Theme management coming soon.</p>
-                </div>
-              } />
               <Route path="/ai" element={<AiImageJobsPage />} />
               <Route path="/ai/image-jobs/:jobId" element={<AiImageJobsPage />} />
               {/* Audit Logs - Admin only */}
@@ -94,6 +89,8 @@ function App() {
           </Routes>
 
           <ToastContainer
+            icon={NotificationIcon}
+            closeButton={NotificationClose}
             position="top-right"
             autoClose={3000}
             hideProgressBar={false}
@@ -103,13 +100,24 @@ function App() {
             pauseOnFocusLoss
             draggable
             pauseOnHover
-            theme="light"
+            theme={mode}
           />
         </AuthProvider>
 
       </QueryClientProvider>
-    </BrowserRouter>
   )
 }
 
-export default App
+function SessionAppearance() {
+  const isLogin = !!useMatch('/login')
+  const { user, isAuthenticated, isInitialized, accessToken } = useAuth()
+  // Match the existing auth restoration policy without making appearance an
+  // authority for access. Login always stays on System, including submit/restore.
+  const restoringUser = !isInitialized && !!accessToken
+  const userId = !isLogin && (isAuthenticated || restoringUser) ? user?.id || null : null
+  return <AppearanceProvider userId={userId}><Application /></AppearanceProvider>
+}
+
+export default function App() {
+  return <BrowserRouter><SessionAppearance /></BrowserRouter>
+}

@@ -41,8 +41,8 @@ function LedgerPageFrame({ clientId, children, headingRef }: {
       <Breadcrumbs items={ledgerBreadcrumbs(clientId)} />
       <BillingWorkspaceNav clientId={clientId} />
       <div className="mb-6 min-w-0">
-        <h1 ref={headingRef} tabIndex={headingRef ? -1 : undefined} className="text-2xl font-bold text-gray-950 outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Ledger history</h1>
-        <p className="mt-1 break-all text-sm text-gray-600">Selected Client: {clientId}</p>
+        <h1 ref={headingRef} tabIndex={headingRef ? -1 : undefined} className="text-2xl font-bold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-focus">Ledger history</h1>
+        <p className="mt-1 break-all text-sm text-muted">Selected Client: {clientId}</p>
       </div>
       {children}
     </div>
@@ -149,40 +149,40 @@ function CanonicalLedgerPage({ clientId }: { clientId: string }) {
 
       {!query.isPending && !initialError && !rowsPresent && !filtersActive && <EmptyState title="No ledger operations" description="No immutable credit operations exist for this authorized Client scope." />}
       {!query.isPending && !initialError && !rowsPresent && filtersActive && (
-        <section role="status" aria-labelledby="no-ledger-matches" className="rounded-lg border border-gray-200 bg-white p-6 text-center">
-          <h2 id="no-ledger-matches" className="text-lg font-semibold text-gray-950">No ledger operations match these filters</h2>
-          <p className="mt-2 text-sm text-gray-600">The Client scope remains selected and the applied filters are preserved.</p>
-          <button type="button" onClick={clearFilters} className="mt-4 min-h-11 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Clear filters</button>
+        <section role="status" aria-labelledby="no-ledger-matches" className="rounded-lg border border-line bg-surface p-6 text-center">
+          <h2 id="no-ledger-matches" className="text-lg font-semibold text-foreground">No ledger operations match these filters</h2>
+          <p className="mt-2 text-sm text-muted">The Client scope remains selected and the applied filters are preserved.</p>
+          <button type="button" onClick={clearFilters} className="mt-4 min-h-11 rounded-md border border-control bg-surface px-4 py-2 text-sm font-semibold text-foreground hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">Clear filters</button>
         </section>
       )}
 
       {rowsPresent && (
         <>
-          <div role="status" className="state-indicator mb-4 rounded-md border border-blue-300 bg-blue-50 p-3 text-sm text-blue-950">
+          <div role="status" className="state-indicator mb-4 rounded-md border border-primary-line bg-selected p-3 text-sm text-primary">
             <p>Results snapshot as of {query.asOf && <LocalInstant value={query.asOf} />}.</p>
             <p className="mt-1">Rows are shown newest first in server order. Signed credits show the available-credit effect; “Owned balance after” is authoritative after that operation and is not necessarily the current balance.</p>
           </div>
           {(query.isStale || laterError) && (
-            <div role="status" className="state-indicator mb-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+            <div role="status" className="state-indicator mb-4 rounded-md border border-warning-line bg-warning-soft p-3 text-sm text-warning">
               This view may be stale. Displayed rows remain tied to the original results snapshot.
-              <button type="button" onClick={() => void startTraversal(filters, 'Refreshing from a fresh ledger snapshot.')} className="ml-2 min-h-11 rounded-md border border-amber-700 px-3 py-2 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Refresh</button>
+              <button type="button" onClick={() => void startTraversal(filters, 'Refreshing from a fresh ledger snapshot.')} className="ml-2 min-h-11 rounded-md border border-warning-line px-3 py-2 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">Refresh</button>
             </div>
           )}
           <LedgerResults items={query.items} />
           {laterError && (
-            <div role="alert" className="state-indicator mt-4 rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-950">
+            <div role="alert" className="state-indicator mt-4 rounded-md border border-danger-line bg-danger-soft p-4 text-sm text-danger">
               <p className="font-semibold">{continuationInvalid ? 'This ledger view can no longer be continued' : 'More ledger operations could not be loaded'}</p>
               <p className="mt-1">The already validated rows above remain tied to this results snapshot.</p>
-              {continuationInvalid ? <button type="button" onClick={() => void startTraversal(filters, 'Starting a fresh ledger snapshot.')} className="mt-3 min-h-11 rounded-md bg-red-700 px-4 py-2 font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Start fresh</button> : <button type="button" onClick={() => void loadMore()} className="mt-3 min-h-11 rounded-md bg-red-700 px-4 py-2 font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">Retry loading more</button>}
+              {continuationInvalid ? <button type="button" onClick={() => void startTraversal(filters, 'Starting a fresh ledger snapshot.')} className="mt-3 min-h-11 rounded-md bg-danger-solid px-4 py-2 font-semibold text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">Start fresh</button> : <button type="button" onClick={() => void loadMore()} className="mt-3 min-h-11 rounded-md bg-danger-solid px-4 py-2 font-semibold text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">Retry loading more</button>}
             </div>
           )}
           {!laterError && query.hasNextPage && (
             <div className="mt-5">
-              <button type="button" onClick={() => void loadMore()} disabled={query.isFetchingNextPage} aria-describedby="ledger-pagination-status" className="min-h-11 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:cursor-wait disabled:opacity-60">{query.isFetchingNextPage ? 'Loading more…' : 'Load more'}</button>
-              <p id="ledger-pagination-status" role="status" className="mt-2 text-sm text-gray-600">{query.isFetchingNextPage ? 'Loading the next cursor page.' : 'More results are available from this snapshot.'}</p>
+              <button type="button" onClick={() => void loadMore()} disabled={query.isFetchingNextPage} aria-describedby="ledger-pagination-status" className="min-h-11 rounded-md border border-control bg-surface px-4 py-2 text-sm font-semibold text-foreground hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-wait disabled:opacity-60">{query.isFetchingNextPage ? 'Loading more…' : 'Load more'}</button>
+              <p id="ledger-pagination-status" role="status" className="mt-2 text-sm text-muted">{query.isFetchingNextPage ? 'Loading the next cursor page.' : 'More results are available from this snapshot.'}</p>
             </div>
           )}
-          {!laterError && !query.hasNextPage && <p ref={endRef} tabIndex={-1} role="status" className="state-indicator mt-5 rounded-md border border-gray-300 bg-gray-50 p-3 text-sm font-medium text-gray-800 outline-none focus-visible:ring-2 focus-visible:ring-indigo-600">End of ledger results.</p>}
+          {!laterError && !query.hasNextPage && <p ref={endRef} tabIndex={-1} role="status" className="state-indicator mt-5 rounded-md border border-control bg-subtle p-3 text-sm font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-focus">End of ledger results.</p>}
         </>
       )}
     </LedgerPageFrame>

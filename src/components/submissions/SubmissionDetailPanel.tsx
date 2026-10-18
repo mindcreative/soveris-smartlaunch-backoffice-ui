@@ -1,3 +1,4 @@
+import { X } from 'lucide-react'
 import { useEffect, useCallback } from 'react'
 import { LoadingSpinner } from '../shared/LoadingSpinner'
 import { ErrorDisplay } from '../shared/ErrorDisplay'
@@ -73,27 +74,25 @@ export function SubmissionDetailPanel({
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-black/40 transition-opacity"
+        className="fixed inset-0 z-40 bg-overlay/40 transition-opacity"
         onClick={handleBackdropClick}
         aria-hidden="true"
       />
       <aside
-        className="fixed top-0 right-0 z-50 h-full w-full max-w-lg bg-white shadow-2xl overflow-hidden flex flex-col"
+        className="fixed top-0 right-0 z-50 h-full w-full max-w-lg bg-surface shadow-2xl overflow-hidden flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-label="Submission details"
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
-          <h2 className="text-lg font-semibold text-gray-900">Submission Details</h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-line shrink-0">
+          <h2 className="text-lg font-semibold text-foreground">Submission Details</h2>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100 transition-colors"
-            aria-label="Close panel"
+            className="min-h-11 min-w-11 p-1.5 text-muted hover:text-muted rounded-md hover:bg-subtle transition-colors"
+            aria-label="Close panel" title="Close panel"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X aria-hidden="true" className="w-5 h-5" />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto">
@@ -108,76 +107,76 @@ export function SubmissionDetailPanel({
           ) : submission ? (
             <div className="px-6 py-5 space-y-6">
               <section>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Identity</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted mb-3">Identity</h3>
                 <dl className="space-y-3">
                   <div>
-                    <dt className="text-sm text-gray-500">ID</dt>
-                    <dd className="text-sm font-mono text-gray-900 break-all mt-0.5">{submission.id}</dd>
+                    <dt className="text-sm text-muted">ID</dt>
+                    <dd className="text-sm font-mono text-foreground break-all mt-0.5">{submission.id}</dd>
                   </div>
                   <div>
-                    <dt className="text-sm text-gray-500">Email</dt>
-                    <dd className="text-sm text-gray-900 mt-0.5">{submission.email}</dd>
+                    <dt className="text-sm text-muted">Email</dt>
+                    <dd className="text-sm text-foreground mt-0.5">{submission.email}</dd>
                   </div>
                   {submission.name && (
                     <div>
-                      <dt className="text-sm text-gray-500">Name</dt>
-                      <dd className="text-sm text-gray-900 mt-0.5">{submission.name}</dd>
+                      <dt className="text-sm text-muted">Name</dt>
+                      <dd className="text-sm text-foreground mt-0.5">{submission.name}</dd>
                     </div>
                   )}
                   {(submission as unknown as Record<string, unknown>).productName ? (
                     <div>
-                      <dt className="text-sm text-gray-500">Product</dt>
-                      <dd className="text-sm text-gray-900 mt-0.5">{(submission as unknown as Record<string, unknown>).productName as string}</dd>
+                      <dt className="text-sm text-muted">Product</dt>
+                      <dd className="text-sm text-foreground mt-0.5">{(submission as unknown as Record<string, unknown>).productName as string}</dd>
                     </div>
                   ) : submission.product ? (
                     <div>
-                      <dt className="text-sm text-gray-500">Product</dt>
-                      <dd className="text-sm text-gray-900 mt-0.5">{submission.product}</dd>
+                      <dt className="text-sm text-muted">Product</dt>
+                      <dd className="text-sm text-foreground mt-0.5">{submission.product}</dd>
                     </div>
                   ) : null}
                 </dl>
               </section>
               <section>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Status</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted mb-3">Status</h3>
                 <Badge variant={statusInfo.variant} size="md">{statusInfo.label}</Badge>
               </section>
               <section>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Timestamps</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted mb-3">Timestamps</h3>
                 <dl className="space-y-2">
                   <div>
-                    <dt className="text-sm text-gray-500">Submitted</dt>
-                    <dd className="text-sm text-gray-900 mt-0.5">{formatDate(submission.createdAt)}</dd>
+                    <dt className="text-sm text-muted">Submitted</dt>
+                    <dd className="text-sm text-foreground mt-0.5">{formatDate(submission.createdAt)}</dd>
                   </div>
                   {submission.updatedAt && (
                     <div>
-                      <dt className="text-sm text-gray-500">Last Updated</dt>
-                      <dd className="text-sm text-gray-900 mt-0.5">{formatDate(submission.updatedAt)}</dd>
+                      <dt className="text-sm text-muted">Last Updated</dt>
+                      <dd className="text-sm text-foreground mt-0.5">{formatDate(submission.updatedAt)}</dd>
                     </div>
                   )}
                   {submission.expiresAt && (
                     <div>
-                      <dt className="text-sm text-gray-500">Expires At</dt>
-                      <dd className="text-sm text-gray-900 mt-0.5">{formatDate(submission.expiresAt)}</dd>
+                      <dt className="text-sm text-muted">Expires At</dt>
+                      <dd className="text-sm text-foreground mt-0.5">{formatDate(submission.expiresAt)}</dd>
                     </div>
                   )}
                 </dl>
               </section>
               {submission.formData && Object.keys(submission.formData).length > 0 && (
                 <section>
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Form Data</h3>
-                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted mb-3">Form Data</h3>
+                  <div className="border border-line rounded-lg overflow-hidden">
                     <table className="text-sm w-full">
-                      <thead className="bg-gray-50">
+                      <thead className="bg-subtle">
                         <tr>
-                          <th className="text-left px-4 py-2 font-medium text-gray-600 border-b border-gray-200">Field</th>
-                          <th className="text-left px-4 py-2 font-medium text-gray-600 border-b border-gray-200">Value</th>
+                          <th className="text-left px-4 py-2 font-medium text-muted border-b border-line">Field</th>
+                          <th className="text-left px-4 py-2 font-medium text-muted border-b border-line">Value</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-line">
                         {Object.entries(submission.formData).map(([key, value]) => (
                           <tr key={key}>
-                            <td className="px-4 py-2 font-mono text-xs text-gray-600 bg-gray-50/50 border-r border-gray-100">{key}</td>
-                            <td className="px-4 py-2 text-gray-900 break-all max-w-xs">
+                            <td className="px-4 py-2 font-mono text-xs text-muted bg-subtle/50 border-r border-line">{key}</td>
+                            <td className="px-4 py-2 text-foreground break-all max-w-xs">
                               {value === null || value === undefined
                                 ? '\u2014'
                                 : typeof value === 'object'
@@ -193,11 +192,11 @@ export function SubmissionDetailPanel({
               )}
               {(submission as unknown as Record<string, unknown>).isVerified !== undefined && (
                 <section>
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Backend Field</h3>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted mb-3">Backend Field</h3>
                   <dl className="space-y-2">
                     <div>
-                      <dt className="text-sm text-gray-500">isVerified</dt>
-                      <dd className="text-sm font-mono text-gray-900 mt-0.5">
+                      <dt className="text-sm text-muted">isVerified</dt>
+                      <dd className="text-sm font-mono text-foreground mt-0.5">
                         {String((submission as unknown as Record<string, unknown>).isVerified)}
                       </dd>
                     </div>

@@ -92,7 +92,7 @@ test('Billing sidebar keeps a selected Client distinct from the signed-in Client
 
   await page.goto(accountPath(CLIENT_B))
   await expect(page.getByText(`Selected Client: ${CLIENT_B}`)).toBeVisible()
-  await page.getByRole('navigation', { name: 'Back-Office', exact: true })
+  await page.getByRole('navigation', { name: 'SmartLaunch', exact: true })
     .getByRole('link', { name: 'Billing', exact: true }).click()
 
   await expect(page).toHaveURL(accountPath(CLIENT_B))
