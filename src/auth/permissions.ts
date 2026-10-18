@@ -5,7 +5,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly string[]> = {
     'dashboard:view',
     'domains:view', 'domains:create', 'domains:verify', 'domains:update', 'domains:delete',
     'users:view', 'users:create', 'users:edit', 'users:delete',
-    'products:view', 'products:create', 'products:update',
+    'products:view', 'products:create', 'products:update', 'products:delete',
     'submissions:view', 'submissions:edit', 'submissions:delete',
     'submissions:approve', 'submissions:reject',
     'analytics:view', 'audit:view',

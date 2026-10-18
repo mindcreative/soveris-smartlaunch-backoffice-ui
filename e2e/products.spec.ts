@@ -45,6 +45,57 @@ test.beforeEach(async ({ page }) => {
   await installTimeZoneRoute(page)
 })
 
+test('archives, closes, reloads and reopens the product before reactivating with fresh revision', async ({ page }) => {
+  let selected = product({ publicationStatus: 'published', contentSchemaVersion: 1 })
+  const updates: unknown[] = []
+  const contentWrites: string[] = []
+  await page.route('**/api/backoffice/**', async route => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    if (path.endsWith('/me/timezone')) { await route.fallback(); return }
+    if (path === `/api/backoffice/clients/${CLIENT_ID}/product-removals`) {
+      await json(route, { items: [], nextCursor: null })
+    } else if (path === `/api/backoffice/clients/${CLIENT_ID}/products`) {
+      await json(route, { items: [selected], page: 1, pageSize: 20, totalCount: 1, totalPages: 1 })
+    } else if (path === `/api/backoffice/products/${PRODUCT_ID}`) {
+      if (request.method() === 'PUT') {
+        const body = request.postDataJSON()
+        expect(body.expectedRevision).toBe(selected.revision)
+        updates.push(body)
+        selected = { ...selected, status: body.status, revision: selected.revision + 1 }
+      }
+      await json(route, selected)
+    } else if (path === `/api/backoffice/content/${PRODUCT_ID}` && request.method() === 'GET') {
+      await json(route, { productId: PRODUCT_ID, schemaVersion: 1, revision: 1, content: origin,
+        draft: { schemaVersion: 1, revision: 7, content: origin } })
+    } else {
+      if (request.method() !== 'GET') contentWrites.push(path)
+      await route.abort()
+    }
+  })
+  await page.goto('/products')
+  await page.getByRole('button', { name: 'Edit Origin' }).first().click()
+  let editor = page.getByRole('dialog', { name: 'Edit Origin' })
+  await editor.getByRole('button', { name: 'Archive product' }).click()
+  await expect(editor.getByRole('button', { name: 'Reactivate product' })).toBeEnabled()
+  await editor.getByRole('button', { name: 'Close', exact: true }).click()
+  await page.reload()
+  await page.getByRole('button', { name: 'Edit Origin' }).first().click()
+  editor = page.getByRole('dialog', { name: 'Edit Origin' })
+  await expect(editor.getByLabel('Hero title')).toBeDisabled()
+  await expect(editor.getByRole('button', { name: 'Save draft' })).toBeDisabled()
+  await expect(editor.getByRole('button', { name: 'Update published' })).toBeDisabled()
+  await page.keyboard.press('Control+s')
+  await editor.getByRole('button', { name: 'Reactivate product' }).click()
+  await expect(editor.getByLabel('Hero title')).toBeEnabled()
+  await expect(editor.getByRole('button', { name: 'Archive product' })).toBeEnabled()
+  expect(updates).toEqual([
+    expect.objectContaining({ expectedRevision: 3, status: 'archived' }),
+    expect.objectContaining({ expectedRevision: 4, status: 'active' }),
+  ])
+  expect(contentWrites).toEqual([])
+})
+
 test('creates, edits, saves and publishes through exact commands without AI calls', async ({ page }) => {
   let selected = product()
   let draftRevision = 7

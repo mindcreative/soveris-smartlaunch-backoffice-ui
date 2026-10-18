@@ -66,9 +66,9 @@ function wrapper(queryClient: QueryClient) {
   }
 }
 
-function renderEditor() {
+function renderEditor(selectedProduct: Product = product) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  render(<ProductEditorModal clientId={CLIENT_ID} product={product} onClose={vi.fn()} />, {
+  render(<ProductEditorModal clientId={CLIENT_ID} product={selectedProduct} onClose={vi.fn()} />, {
     wrapper: wrapper(queryClient),
   })
   return queryClient
@@ -93,6 +93,33 @@ describe('ProductEditorModal', () => {
       createObjectURL: vi.fn(() => 'blob:private-preview'),
       revokeObjectURL: vi.fn(),
     })
+  })
+
+  it('reopens an archived product read-only and reactivates before allowing content commands', async () => {
+    const archived: Product = { ...product, status: 'archived', revision: 4 }
+    vi.mocked(contentApi.getProduct).mockResolvedValue(archived)
+    const update = vi.spyOn(contentApi, 'updateProduct').mockImplementation(async () => {
+      const active: Product = { ...product, revision: 5 }
+      vi.mocked(contentApi.getProduct).mockResolvedValue(active)
+      return active
+    })
+    const save = vi.spyOn(contentApi, 'saveContentDraft')
+    const publish = vi.spyOn(contentApi, 'publishContent')
+    const user = userEvent.setup()
+    renderEditor(archived)
+    expect(await screen.findByLabelText('Hero title')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled()
+    await user.keyboard('{Control>}s{/Control}')
+    expect(save).not.toHaveBeenCalled()
+    expect(publish).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Reactivate product' }))
+    await waitFor(() => expect(update).toHaveBeenCalledWith(PRODUCT_ID, expect.objectContaining({
+      expectedRevision: 4, status: 'active', name: 'Origin', slug: 'origin',
+    })))
+    await waitFor(() => expect(screen.getByLabelText('Hero title')).toBeEnabled())
+    expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Archive product' })).toBeEnabled()
   })
 
   it('image Apply reauthorizes retained adoption after source loss and saves only chosen src/alt', async () => {

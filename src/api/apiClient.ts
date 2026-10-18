@@ -1,3 +1,4 @@
+import { normalizeRemovalProblem } from './productRemovalProblem'
 import { normalizeDomainProblem } from './domainProblem'
 import axios, {
   type AxiosInstance,
@@ -193,7 +194,7 @@ export class ApiClient {
     }
 
     if (error && typeof error === 'object' && 'response' in error) {
-      const axiosError = error as { response?: AxiosResponse<unknown>; config?: { url?: string } }
+      const axiosError = error as { response?: AxiosResponse<unknown>; config?: { url?: string; method?: string } }
       const responseData = decodeErrorBody(axiosError.response?.data)
       const status = axiosError.response?.status
       const fallbackCode = status ? `HTTP_${status}` : 'API_ERROR'
@@ -210,6 +211,9 @@ export class ApiClient {
       if (responseData && typeof responseData === 'object') {
         const envelope = responseData as ApiErrorResponse
         const requestPath = axiosError.config?.url ?? axiosError.response?.config?.url ?? ''
+        if (/\/(?:removal-preview|product-removals)(?:\/|$)/.test(requestPath) ||
+            (axiosError.config?.method?.toLowerCase() === 'delete' && /\/products\/[^/]+$/.test(requestPath)))
+          return normalizeRemovalProblem(axiosError.response?.data, status)
         if (/(?:^|\/)domains(?:\/|$)/.test(requestPath))
           return normalizeDomainProblem(envelope, status, retryAfterSeconds)
 

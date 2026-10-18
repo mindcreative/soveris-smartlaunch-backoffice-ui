@@ -143,6 +143,7 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
 
   const editorKey = product ? `${clientId}:${product.id}` : ''
   const pending = applyBusy || validateDraft.isPending || saveDraft.isPending || publish.isPending || updateProduct.isPending
+  const archived = (authoritativeProduct ?? product)?.status === 'archived'
   const identityValid = Boolean(name.trim() && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug.trim()))
   const secondaryButton = 'min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 disabled:opacity-50'
   const primaryButton = 'min-h-11 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-600 focus-visible:ring-offset-2 disabled:opacity-50'
@@ -205,7 +206,7 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
   }
 
   const handleSave = useCallback(async () => {
-    if (!working || !authoritativeContent || pending) return
+    if (!working || !authoritativeContent || pending || archived) return
     setCommandErrorText('')
     setStatusText('')
     if (!validate('draft')) return
@@ -226,10 +227,10 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
     } catch (error) {
       if (currentGeneration === generation.current) fail(error)
     }
-  }, [authoritativeContent, authoritativeProduct, pending, product, saveDraft, validate, working])
+  }, [archived, authoritativeContent, authoritativeProduct, pending, product, saveDraft, validate, working])
 
   const handleApplyGeneratedImage = useCallback(async (selection: VerifiedGeneratedImageSelection, signal: AbortSignal): Promise<AiApplyOutcome> => {
-    if (!working || !authoritativeContent || !authoritativeProduct || pending || dirty || imageUploadUnresolved) {
+    if (!working || !authoritativeContent || !authoritativeProduct || authoritativeProduct.status !== 'active' || pending || dirty || imageUploadUnresolved) {
       setCommandErrorText('Finish or cancel image uploads and save unrelated draft edits, then recapture the image destination before Apply.')
       return { kind: 'review' }
     }
@@ -301,7 +302,7 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
   }, [authoritativeContent, authoritativeProduct, clientId, contentQuery, detailQuery, dirty, hasPermission, imageUploadUnresolved, pending, productId, queryClient, saveDraft, user?.id, validateDraft, working])
 
   const handleApplyGenerated = useCallback(async (selection: VerifiedAiApplySelection): Promise<AiApplyOutcome> => {
-    if (!working || !authoritativeContent || !authoritativeProduct || pending || dirty) {
+    if (!working || !authoritativeContent || !authoritativeProduct || authoritativeProduct.status !== 'active' || pending || dirty) {
       setCommandErrorText(dirty
         ? 'Save or resolve unrelated working-draft edits before Apply. Nothing was written.'
         : 'Apply is unavailable while another editor action is running.')
@@ -448,7 +449,7 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
   }, [handleSave, product])
 
   const handlePublish = async () => {
-    if (!working || !authoritativeContent || !authoritativeProduct || pending) return
+    if (!working || !authoritativeContent || !authoritativeProduct || pending || archived) return
     setCommandErrorText('')
     setStatusText('')
     if (dirty) {
@@ -593,8 +594,8 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
   const currentProduct = authoritativeProduct ?? product
   const footer = working && currentProduct ? <div className="flex flex-wrap items-center justify-end gap-3">
     <button type="button" onClick={onClose} disabled={pending} className={secondaryButton}>Close</button>
-    <button type="button" onClick={() => void handleSave()} disabled={pending} className={secondaryButton}>{saveDraft.isPending ? 'Saving draft…' : 'Save draft'}</button>
-    <button type="button" onClick={() => void handlePublish()} disabled={pending} className={primaryButton}>{publish.isPending ? 'Publishing…' : currentProduct.publicationStatus === 'published' ? 'Update published' : 'Publish'}</button>
+    <button type="button" onClick={() => void handleSave()} disabled={pending || archived} className={secondaryButton}>{saveDraft.isPending ? 'Saving draft…' : 'Save draft'}</button>
+    <button type="button" onClick={() => void handlePublish()} disabled={pending || archived} className={primaryButton}>{publish.isPending ? 'Publishing…' : currentProduct.publicationStatus === 'published' ? 'Update published' : 'Publish'}</button>
   </div> : undefined
 
   return <Modal isOpen={Boolean(product)} onClose={onClose} closeDisabled={pending} title={product ? `Edit ${product.name}` : 'Edit product'} size="2xl" footer={footer}>
@@ -617,13 +618,14 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
       <ProductErrorSummary ref={summaryRef} errors={validationErrors} />
       {warningText.length > 0 && <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"><p className="font-medium">Draft guidance</p><ul className="list-disc pl-5">{warningText.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>}
       <div aria-live="polite" role="status" className="min-h-6 text-sm font-medium text-gray-700">{applyBusy || validateDraft.isPending ? 'Applying generated content…' : pending ? saveDraft.isPending ? 'Saving draft…' : publish.isPending ? 'Publishing…' : 'Updating product…' : statusText}</div>
-      <ProductAiGenerationPanel clientId={clientId} product={currentProduct} working={working} draftRevision={authoritativeContent.draft?.revision ?? 0} dirty={dirty} applyPending={applyBusy || validateDraft.isPending || saveDraft.isPending} onApply={handleApplyGenerated} />
+      {archived && <p className="text-sm text-gray-700">Reactivate this product before editing content, uploading images or publishing. Its saved content is preserved.</p>}
+      {!archived && <><ProductAiGenerationPanel clientId={clientId} product={currentProduct} working={working} draftRevision={authoritativeContent.draft?.revision ?? 0} dirty={dirty} applyPending={applyBusy || validateDraft.isPending || saveDraft.isPending} onApply={handleApplyGenerated} />
       <ProductGeneratedImagePanel key={`${user?.id}:${clientId}:${productId}`} clientId={clientId} productId={productId} working={working}
-        draftRevision={authoritativeContent.draft?.revision ?? 0} dirty={dirty} applyPending={pending || imageUploadUnresolved} onApply={handleApplyGeneratedImage} />
+        draftRevision={authoritativeContent.draft?.revision ?? 0} dirty={dirty} applyPending={pending || imageUploadUnresolved} onApply={handleApplyGeneratedImage} /></>}
       <ProductContentFields
         value={working}
         errors={validationErrors}
-        disabled={pending}
+        disabled={pending || archived}
         onChange={onContentChange}
         onBlur={onFieldBlur}
         imageUploads={imageUploads.uploads}
