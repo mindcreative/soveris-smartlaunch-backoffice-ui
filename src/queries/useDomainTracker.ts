@@ -7,6 +7,7 @@ import { DomainTracker } from './domainTracker'
 import { clearPrivateClientScope } from './billingQueries'
 import { domainKeys, assertDomainScope } from './domainQueries'
 import { blockDomainAuthority, domainScopeCurrent, type DomainScope } from './domainScope'
+import { useAuthStore } from '../stores/authStore'
 
 interface Entry { tracker: DomainTracker; owners: number; teardown: ReturnType<typeof setTimeout> | null }
 const registries = new WeakMap<QueryClient, Map<string, Entry>>()
@@ -20,7 +21,8 @@ function entry(client: QueryClient, scope: DomainScope, id: string): Entry {
       current: () => domainScopeCurrent(scope),
       read: async (signal, additionalRequest) => {
         assertDomainScope(scope, signal)
-        const retained = client.getQueryData<DomainRelease>(domainKeys.receipt(scope, id))
+        const canReadRelease = useAuthStore.getState().hasPermission('domains:delete')
+        const retained = canReadRelease ? client.getQueryData<DomainRelease>(domainKeys.receipt(scope, id)) : undefined
         if (!retained) {
           try {
             const domain = await domainsApi.detail(scope.clientId, id, signal)
@@ -28,7 +30,7 @@ function entry(client: QueryClient, scope: DomainScope, id: string): Entry {
             return { kind: 'domain', domain }
           } catch (error) {
             assertDomainScope(scope, signal)
-            if ((error as ApiError).status !== 404) throw error
+            if ((error as ApiError).status !== 404 || !canReadRelease) throw error
             // The ordinary job can disappear before cleanup. A 404 never means
             // released. Count the second HTTP GET against the same hard budget.
             if (!additionalRequest()) throw new DOMException('Status budget exhausted', 'AbortError')

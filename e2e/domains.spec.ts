@@ -1,3 +1,6 @@
+import { currentAuthorityFixture } from '../src/test/authorityFixtures'
+import { installCurrentSession } from './currentSession'
+import { clientFixturePermissions, viewerFixturePermissions } from '../src/test/authorityFixtures'
 import { expect, test, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { readFileSync } from 'node:fs'
@@ -5,12 +8,8 @@ const fixtures = JSON.parse(readFileSync(new URL('../src/api/__fixtures__/domain
 const body = (name: string) => JSON.parse(fixtures.cases.find((c: { name: string }) => c.name === name).responseBody)
 const initial = body('detail'), capabilities = body('capabilities'), schedule = body('verify')
 const CLIENT = initial.clientId, ID = initial.id, ACTOR = '01990000-0000-7000-8000-000000000001'
-async function session(page: Page, role = 'Admin') {
-  await page.addInitScript(({ clientId, actor, role }) => {
-    const user = { id: actor, clientId, role, displayName: 'Domain operator', email: 'domain@example.test', accessToken: 'fixture-token', refreshToken: 'fixture-refresh', expiresIn: 3600 }
-    localStorage.setItem('backoffice_access_token', 'fixture-token')
-    localStorage.setItem('backoffice-auth-persist', JSON.stringify({ state: { user, accessToken: 'fixture-token', refreshTokenValue: 'fixture-refresh' }, version: 0 }))
-  }, { clientId: CLIENT, actor: ACTOR, role })
+async function session(page: Page, role: 'ClientAdmin' | 'Editor' | 'Viewer' = 'ClientAdmin') {
+  await installCurrentSession(page, { id: ACTOR, clientId: CLIENT, role, permissions: role === 'Viewer' ? viewerFixturePermissions : clientFixturePermissions })
 }
 function activeDomain() {
   const active = body('primary')
@@ -25,7 +24,7 @@ test('claim, proof, Active, primary and durable release use exact commands and s
   test.setTimeout(90000); await session(page)
   let current = structuredClone(initial), claimed = false, verifying = false, proofReads = 0, releasing = false, releaseReads = 0
   const requests: Array<{ method: string; path: string; body: string | null }> = []
-  await page.route('**/api/backoffice/**', async route => {
+  await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/, async route => {
     const request = route.request(), url = new URL(request.url()), method = request.method()
     requests.push({ method, path: url.pathname, body: request.postData() })
     const reply = async (data: unknown, status = 200, location?: string) => route.fulfill({ status, contentType: status >= 400 ? 'application/problem+json' : 'application/json', headers: { 'Access-Control-Expose-Headers': 'Location,Retry-After,X-Correlation-Id', 'Cache-Control': 'no-store', ...(location && { Location: location }) }, body: JSON.stringify(data) })
@@ -93,7 +92,7 @@ test('claim, proof, Active, primary and durable release use exact commands and s
 test('keyboard, reflow, text spacing, text scaling and alternate media preserve claim/error focus', async ({ page }, info) => {
   await session(page); await page.setViewportSize({ width: 320, height: 720 })
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
-  await page.route('**/api/backoffice/**', async route => {
+  await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/, async route => {
     const path = new URL(route.request().url()).pathname
     const data = path.endsWith('/capabilities') ? capabilities : route.request().method() === 'POST' ? { code: 'invalid_hostname', detail: 'Hostname invalid.' } : { items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 }
     await route.fulfill({ status: route.request().method() === 'POST' ? 422 : 200, contentType: 'application/json', body: JSON.stringify(data) })
@@ -125,7 +124,7 @@ test('ambiguous create and Retry retain exact identities; DNS, TLS and policy st
   const claimCapabilities = { ...capabilities,
     limits: capabilities.limits.map((limit: { key: string; value: number }) => limit.key === 'hostnames' ? { ...limit, value: 1 } : limit),
   }
-  await page.route('**/api/backoffice/**', async route => {
+  await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/, async route => {
     const r = route.request(), path = new URL(r.url()).pathname
     const reply = (data: unknown, status = 200, location?: string) => route.fulfill({ status, contentType: 'application/json', headers: { 'Access-Control-Expose-Headers': 'Location,Retry-After', ...(location && { Location: location }) }, body: JSON.stringify(data) })
     if (path.endsWith('/capabilities')) return reply({ ...claimCapabilities,
@@ -168,7 +167,7 @@ test('lost DELETE reconciles action-required receipt, recovery and a distinct sa
   let releasing = false, recovered = false, deletes = 0
   const newId = '01990000-0000-7000-8000-000000000003'
   const receipt = { ...body('release-status'), state: 'action_required', nextAttemptAt: null, lastErrorCode: 'provider_failure' }
-  await page.route('**/api/backoffice/**', async route => {
+  await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/, async route => {
     const request = route.request(), path = new URL(request.url()).pathname
     const reply = (data: unknown, status = 200, location?: string) => route.fulfill({ status, contentType: 'application/json', headers: { 'Access-Control-Expose-Headers': 'Location', ...(location && { Location: location }) }, body: JSON.stringify(data) })
     if (path.endsWith('/capabilities')) return reply(capabilities)
@@ -198,7 +197,7 @@ for (const action of ['claim', 'verify', 'retry', 'primary', 'release'] as const
   let commands = 0
   const ready = activeDomain()
   const domain = { ...ready, authority: { ...ready.authority, canVerify: true, verifyReason: null, canRetry: true, retryReason: null } }
-  await page.route('**/api/backoffice/**', async route => {
+  await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/, async route => {
     const r = route.request(), path = new URL(r.url()).pathname
     if ((r.method() === 'POST' || r.method() === 'DELETE' || r.method() === 'PUT') && path.includes('/domains')) { commands++; return route.fulfill({ status: 403, contentType: 'application/problem+json', body: '{"code":"insufficient_permissions"}' }) }
     const data = path.endsWith('/capabilities') ? capabilities : path.endsWith(`/clients/${CLIENT}/domains`) ? { items: [], page: 1, pageSize: 20, totalCount: 0, totalPages: 0 } : domain
@@ -213,18 +212,18 @@ for (const action of ['claim', 'verify', 'retry', 'primary', 'release'] as const
     await page.getByRole('button', { name: action === 'primary' ? 'Make primary' : 'Release domain', exact: true }).click()
     await page.getByRole('dialog').getByRole('button', { name: action === 'primary' ? 'Confirm primary' : 'Confirm release', exact: true }).click()
   } else await page.getByRole('button', { name: action === 'verify' ? 'Verify now' : 'Retry verification', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeVisible()
   await expect(page.getByRole('dialog')).toHaveCount(0); await expect(page.getByText(initial.host, { exact: true })).toHaveCount(0)
   await expect(page.getByLabel('Ownership record text')).toHaveCount(0)
   await page.evaluate(id => { history.pushState({}, '', `/domains/${id}`); dispatchEvent(new PopStateEvent('popstate')) }, ID)
-  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible(); expect(commands).toBe(1)
+  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeVisible(); expect(commands).toBe(1)
 })
 
 
 test('configuration outage keeps serving unconfirmed and release separate from feature eligibility', async ({ page }) => {
   await session(page)
   let outage = true
-  await page.route('**/api/backoffice/**', async route => {
+  await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/, async route => {
     const path = new URL(route.request().url()).pathname
     if (outage) return route.fulfill({ status: 503, contentType: 'application/problem+json', headers: { 'Retry-After': '1' }, body: '{"code":"configuration_unavailable"}' })
     const active = activeDomain()
@@ -245,12 +244,12 @@ test('auth refresh closes confirmations; logout and a different Client fence hel
   const otherClient = '01990000-0000-7000-8000-000000000004'
   let clientId = CLIENT, hold = false, commands = 0
   let held: import('@playwright/test').Route | undefined
-  await page.route('**/api/backoffice/**', async route => {
+  await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/, async route => {
     const request = route.request(), path = new URL(request.url()).pathname
     const reply = (data: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) })
     if (path.endsWith('/auth/login')) {
       clientId = otherClient
-      return reply({ accessToken: 'other-token', refreshToken: 'other-refresh', expiresIn: 3600, user: { id: ACTOR, displayName: 'Other Client operator', role: 'Admin', clientId } })
+      return reply({ accessToken: 'other-token', refreshToken: 'other-refresh', expiresIn: 3600, user: currentAuthorityFixture({id:ACTOR,displayName:'Other Client operator',clientId}) })
     }
     if (path.endsWith('/auth/logout')) return reply({})
     if (path.endsWith('/capabilities')) return reply({ ...capabilities, clientId })

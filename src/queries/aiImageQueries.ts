@@ -1,3 +1,4 @@
+import { privateObjectUrl, releasePrivateObjectUrl } from '../auth/authorityEpoch'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   AiImageContractError,
@@ -417,7 +418,7 @@ export function useAiImageJobTracker({
     previewBusyRef.current = false
     accessRef.current = null
     const url = stateRef.current.previewUrl
-    if (url) URL.revokeObjectURL(url)
+    if (url) releasePrivateObjectUrl(url)
   }, [])
   const purge = useCallback((phase: AiImageTrackerPhase, message: string) => {
     generationRef.current += 1
@@ -577,9 +578,9 @@ export function useAiImageJobTracker({
       .then((blob) => {
         if (controller.signal.aborted || generation !== generationRef.current) return
         const prior = stateRef.current.previewUrl
-        if (prior) URL.revokeObjectURL(prior)
+        if (prior) releasePrivateObjectUrl(prior)
         accessRef.current = null
-        const previewUrl = URL.createObjectURL(blob)
+        const previewUrl = privateObjectUrl(blob)
         previewBusyRef.current = false
         replace((value) => ({ ...value, previewPhase: 'ready', previewUrl, message: 'Private preview loaded. It is not attached to a product.' }))
       })

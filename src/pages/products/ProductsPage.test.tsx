@@ -1,3 +1,5 @@
+import { viewerFixturePermissions } from '../../test/authorityFixtures'
+import { clientFixturePermissions } from '../../test/authorityFixtures'
 import type { PropsWithChildren } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
@@ -35,7 +37,7 @@ describe('ProductsPage', () => {
     useAuthStore.setState({
       user: {
         id: 'operator', email: 'operator@example.com', displayName: 'Operator',
-        role: 'Admin', clientId: CLIENT_ID, accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600,
+        role: 'ClientAdmin', permissions: clientFixturePermissions, clientId: CLIENT_ID, accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600,
       },
       isAuthenticated: true, isInitialized: true, isLoading: false,
     })
@@ -78,7 +80,7 @@ describe('ProductsPage', () => {
   it('fails closed without products:view', async () => {
     useAuthStore.setState((state) => ({
       ...state,
-      user: state.user ? { ...state.user, role: 'Viewer' } : null,
+      user: state.user ? { ...state.user, role: 'Viewer', permissions: viewerFixturePermissions,platformPermissions:[] } : null,
     }))
     // Viewer currently has products:view; use an absent authenticated user to
     // exercise the durable direct-navigation denial.

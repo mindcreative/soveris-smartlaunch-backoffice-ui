@@ -1,15 +1,13 @@
+import { installCurrentSession } from './currentSession'
 import { expect,test,type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { client,product,preview,receipt } from '../src/test/fixtures/productRemoval'
 import { installTimeZoneRoute,fulfillLocal } from './localPresentationMocks'
 async function setup(page:Page,mode:'success'|'unknown'|'denied'|'uncommitted'='success'){
  let deleted=false,stored:typeof receipt|null=null,deletes=0,refreshes=0
- await page.addInitScript(({client})=>{
-  const user={id:'01990000-0000-7000-8000-000000000005',clientId:client,role:'Admin',email:'admin@example.test',displayName:'Admin',accessToken:'token',refreshToken:'refresh',expiresIn:3600}
-  if(!localStorage.getItem('backoffice-auth-persist')){localStorage.setItem('backoffice-auth-persist',JSON.stringify({state:{user,accessToken:'token',refreshTokenValue:'refresh'},version:0}));localStorage.setItem('backoffice_access_token','token');localStorage.setItem('backoffice_refresh_token','refresh')}
- },{client})
+ await installCurrentSession(page, { clientId: client })
  await installTimeZoneRoute(page)
- await page.route('**/api/backoffice/**',async route=>{
+ await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/,async route=>{
   const path=new URL(route.request().url()).pathname,method=route.request().method()
   if(path.endsWith('/me/timezone')){await route.fallback();return}
   let body:unknown={},status=200
@@ -116,7 +114,7 @@ for (const unavailable of [false, true]) {
   const second = '01990000-0000-7000-8000-000000000099'
   const commands: Array<{ path: string; body: string }> = []
   const reads: string[] = []
-  await page.route('**/api/backoffice/**', async route => {
+  await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/, async route => {
    const request = route.request()
    const path = new URL(request.url()).pathname
    let body: unknown

@@ -16,7 +16,6 @@ import Users from './pages/users/UsersPage'
 import { AuditLogPage } from './pages/audit'
 import Forbidden from './pages/error/ForbiddenPage'
 import { useAuthGuard } from './hooks/useAuthGuard'
-import type { UserRole } from './types/auth'
 import { queryClient } from './queryClient'
 import { BillingAccountPage, BillingIndexPage } from './pages/billing/BillingAccountPage'
 import { BillingLedgerBoundaryPage } from './pages/billing/BillingLedgerBoundaryPage'
@@ -28,12 +27,12 @@ import { BillingReconciliationPage } from './pages/billing/BillingReconciliation
 // Protected route wrapper with role-based access
 function ProtectedRoute({
   children,
-  requiredRole,
+  requiredPermission,
 }: {
   children: React.ReactNode
-  requiredRole?: UserRole
+  requiredPermission?: string
 }) {
-  const { hasAccess } = useAuthGuard({ requiredRole })
+  const { hasAccess } = useAuthGuard({ requiredPermission })
   if (!hasAccess()) {
     return <Navigate to="/forbidden" replace />
   }
@@ -74,7 +73,7 @@ function Application() {
               <Route
                 path="/audit"
                 element={
-                  <ProtectedRoute requiredRole="Admin">
+                  <ProtectedRoute requiredPermission="audit:view">
                     <AuditLogPage />
                   </ProtectedRoute>
                 }

@@ -13,39 +13,12 @@ export interface UsePermissionsReturn {
   canAccessSubmissions: boolean
 }
 
-const roleHierarchy: Record<UserRole, number> = { Viewer: 0, Editor: 1, Admin: 2 }
-
 export function usePermissions(): UsePermissionsReturn {
-  const currentRole = useAuthStore((s) => s.user?.role) ?? 'Viewer'
-
-  const hasRole = (role: UserRole): boolean => {
-    return roleHierarchy[currentRole] >= roleHierarchy[role]
-  }
-
-  const hasAnyRole = (roles: UserRole[]): boolean => {
-    return roles.includes(currentRole)
-  }
-
-  const hasAllRoles = (roles: UserRole[]): boolean => {
-    return roles.every((r) => hasRole(r))
-  }
-
-  const canWrite = hasRole('Editor')
-  const canManageUsers = hasRole('Admin')
-  const canAccessSettings = hasRole('Admin')
-  const canAccessProducts = hasRole('Viewer')
-  const canAccessAnalytics = hasRole('Viewer')
-  const canAccessSubmissions = hasRole('Viewer')
-
-  return {
-    hasRole,
-    hasAnyRole,
-    hasAllRoles,
-    canWrite,
-    canManageUsers,
-    canAccessSettings,
-    canAccessProducts,
-    canAccessAnalytics,
-    canAccessSubmissions,
-  }
+  const current = useAuthStore(s => s.user)
+  const has = useAuthStore(s => s.hasPermission)
+  const hasRole = (role: UserRole) => current?.role === role
+  const hasAnyRole = (roles: UserRole[]) => Boolean(current && roles.includes(current.role))
+  return { hasRole,hasAnyRole,hasAllRoles: roles => roles.every(hasRole),
+    canWrite: has('products:update'),canManageUsers: has('users:view'),canAccessSettings: has('clients:update'),
+    canAccessProducts: has('products:view'),canAccessAnalytics: has('analytics:view'),canAccessSubmissions: has('submissions:view') }
 }

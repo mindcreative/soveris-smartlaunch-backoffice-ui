@@ -132,8 +132,8 @@ export function BillingReconciliationPage() {
     return () => { window.removeEventListener('auth:refreshed', reset); window.removeEventListener('auth:cleared', reset) }
   }, [])
   const { user, isAuthenticated, hasPermission, accessToken } = useAuth()
-  if (!isAuthenticated || !hasPermission('billing:reconcile')) return <div><h1>Reconciliation access unavailable</h1><p>Current billing:reconcile permission is required.</p></div>
+  if (!isAuthenticated || !hasPermission('platform:billing:reconcile')) return <div><h1>Reconciliation access unavailable</h1><p>Current billing:reconcile permission is required.</p></div>
   if (!isReconciliationClient(clientId)) return <div><h1>Invalid Client context</h1><p>Open a canonical Client reconciliation URL.</p></div>
-  if (!user || (user.role !== 'Admin' && user.clientId !== clientId)) return <div><h1>Reconciliation access unavailable</h1><p>This Client is outside your current authorized scope.</p></div>
+  if (!user || (user.clientId !== clientId && !hasPermission('platform:billing:reconcile'))) return <div><h1>Reconciliation access unavailable</h1><p>This Client is outside your current authorized scope.</p></div>
   return <Workspace key={`${authorityEpoch}:${location.key}:${clientId}:${user.id}:${user.clientId}:${user.role}:${accessToken}`} clientId={clientId} />
 }

@@ -84,7 +84,7 @@ function HistoryPageFrame({ clientId, children, headingRef }: {
 function CanonicalAdjustmentHistoryPage({ clientId }: { clientId: string }) {
   const { hasPermission, user } = useAuth()
   const canView = hasPermission('billing:view')
-  const canAdjust = hasPermission('billing:adjust')
+  const canAdjust = hasPermission('platform:billing:adjust')
   const headingRef = useRef<HTMLHeadingElement>(null)
   const reversalReturnFocusRef = useRef<HTMLElement | null>(null)
   const endRef = useRef<HTMLParagraphElement>(null)
@@ -332,8 +332,12 @@ function PermissionAwareAdjustmentHistoryPage({ clientId }: { clientId: string }
 }
 
 export function BillingAdjustmentHistoryPage() {
+  const {user,hasPermission}=useAuth()
   const { clientId: routeClientId } = useParams()
   const clientId = canonicalizeGuid(routeClientId)
+  if(clientId && user && canonicalizeGuid(user.clientId)!==clientId && !hasPermission('platform:billing:view'))
+    return <Forbidden message="This Client is outside your current financial scope." />
+
   if (!clientId)
     return <EmptyState title="Client context unavailable"
       description="A valid Client URL is required for the Billing workspace." />

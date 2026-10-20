@@ -8,6 +8,7 @@ export interface BackOfficeUser {
   isActive: boolean
   createdAt: LocalInstantValue
   updatedAt: LocalInstantValue
+  clientRoleId?: string
   clientId: string
   timeZoneId: string
 }
@@ -18,7 +19,7 @@ export type CreatedBackOfficeUser = Pick<BackOfficeUser,
   'id' | 'email' | 'displayName' | 'role' | 'timeZoneId'>
 export interface UpdatedBackOfficeUser { message: string }
 
-export type UserRole = 'Admin' | 'Editor' | 'Viewer'
+export type UserRole = import('./auth').UserRole
 
 export interface CreateUserRequest {
   email: string

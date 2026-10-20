@@ -1,49 +1,10 @@
-import type { UserRole } from '../types/auth'
+import type { AuthUser } from '../types/auth'
 
-export const ROLE_PERMISSIONS: Record<UserRole, readonly string[]> = {
-  Admin: [
-    'dashboard:view',
-    'domains:view', 'domains:create', 'domains:verify', 'domains:update', 'domains:delete',
-    'users:view', 'users:create', 'users:edit', 'users:delete',
-    'products:view', 'products:create', 'products:update', 'products:delete',
-    'submissions:view', 'submissions:edit', 'submissions:delete',
-    'submissions:approve', 'submissions:reject',
-    'analytics:view', 'audit:view',
-    'ai:view', 'ai:create',
-    'settings:view', 'settings:edit',
-    'themes:view', 'themes:edit',
-    'theme:view', 'theme:edit',
-    'clients:view', 'clients:create', 'clients:edit', 'clients:delete',
-    'billing:view', 'billing:subscription', 'billing:adjust', 'billing:reconcile',
-  ],
-  Editor: [
-    'dashboard:view',
-    'domains:view', 'domains:create', 'domains:verify', 'domains:update',
-    'products:view', 'products:create', 'products:update',
-    'submissions:view', 'submissions:edit',
-    'submissions:approve', 'submissions:reject',
-    'analytics:view',
-    'ai:view', 'ai:create',
-  ],
-  Viewer: [
-    'dashboard:view',
-    'domains:view',
-    'products:view',
-    'submissions:view',
-    'analytics:view',
-    'audit:view',
-    'settings:view',
-    'themes:view',
-  ],
+// Rights are projected by the current server session. Display role names never confer rights.
+export function hasPermission(user: Pick<AuthUser, 'permissions' | 'platformPermissions'> | null | undefined, permission: string): boolean {
+  if (!permission || permission.includes('*')) return false
+  return Boolean(user?.permissions?.includes(permission) || user?.platformPermissions?.includes(permission))
 }
-
-export function hasRolePermission(role: UserRole | undefined, permission: string): boolean {
-  return role ? ROLE_PERMISSIONS[role].includes(permission) : false
-}
-
-export function hasAnyRolePermission(
-  role: UserRole | undefined,
-  permissions: readonly string[]
-): boolean {
-  return permissions.some((permission) => hasRolePermission(role, permission))
+export function hasAnyPermission(user: Pick<AuthUser, 'permissions' | 'platformPermissions'> | null | undefined, permissions: readonly string[]): boolean {
+  return permissions.some(permission => hasPermission(user, permission))
 }

@@ -1,3 +1,4 @@
+import { clientFixturePermissions } from '../../test/authorityFixtures'
 import { createRef } from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -6,7 +7,7 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { TopBar } from './TopBar'
 import { AppearanceProvider } from '../../appearance/AppearanceProvider'
 const logout = vi.fn()
-vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: { displayName: 'Operator', email: 'operator@example.test', role: 'Admin' }, logout }) }))
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: { displayName: 'Operator', email: 'operator@example.test', role: 'ClientAdmin', permissions: clientFixturePermissions }, logout }) }))
 beforeEach(() => { localStorage.clear() })
 function setup() {
   render(<MemoryRouter initialEntries={['/domains']}><AppearanceProvider userId="test-user"><TopBar onOpenMobileNavigation={() => {}} menuButtonRef={createRef()} /></AppearanceProvider><button>Outside</button></MemoryRouter>)
@@ -28,7 +29,7 @@ it('shows one identity menu and mutually excludes menus; outside click keeps tar
   await user.click(screen.getByRole('button', { name: /User menu/ }))
   expect(screen.queryByRole('menu', { name: 'Appearance' })).toBeNull()
   expect(screen.getByRole('menu', { name: 'User menu' })).toHaveTextContent('operator@example.test')
-  expect(screen.getByText('Admin')).toBeVisible()
+  expect(screen.getByText('ClientAdmin')).toBeVisible()
   await user.click(screen.getByRole('button', { name: 'Outside' }))
   expect(screen.getByRole('button', { name: 'Outside' })).toHaveFocus(); expect(screen.queryByRole('menu')).toBeNull()
   await user.click(screen.getByRole('button', { name: /User menu/ }))

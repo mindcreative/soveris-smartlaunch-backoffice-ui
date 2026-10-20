@@ -1,3 +1,4 @@
+import { clientFixturePermissions } from '../test/authorityFixtures'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient, type ApiError } from './apiClient'
 import { useAuthStore } from '../stores/authStore'
@@ -93,7 +94,7 @@ function currentAccount() {
 beforeEach(() => {
   vi.restoreAllMocks()
   useAuthStore.setState({ user: {
-    id: ACTOR, clientId: CLIENT, email: 'actor@example.test', displayName: 'Actor', role: 'Admin',
+    id: ACTOR, clientId: CLIENT, email: 'actor@example.test', displayName: 'Actor', role: 'ClientAdmin', permissions: clientFixturePermissions,
     accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600,
   } })
 })

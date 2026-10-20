@@ -57,16 +57,13 @@ export async function refreshToken(request: RefreshTokenRequest): Promise<AuthRe
   return response.data as AuthResponse
 }
 
-// NOTE: /auth/me is not implemented in the API. Use getCurrentUser from JWT payload instead.
-// export async function getCurrentUser(): Promise<AuthUser> {
-//   const response = await apiClient.get('/auth/me')
-//   return response.data as AuthUser
-// }
-
-// NOTE: /auth/logout is not implemented in the API. Token revocation uses /auth/revoke.
-// export async function logout(): Promise<void> {
-//   await apiClient.post('/auth/logout')
-// }
+export async function currentAuthority(): Promise<AuthUser> {
+  const response = await apiClient.get<AuthUser>('/auth/current', { retryOnUnauthorized: false })
+  return response.data
+}
+export async function revoke(refreshToken: string): Promise<void> {
+  await apiClient.post('/auth/revoke', { refreshToken }, { retryOnUnauthorized: false })
+}
 
 // ==================== USERS ENDPOINTS ====================
 
@@ -507,9 +504,16 @@ export async function updateClient(id: string, data: Partial<Client>): Promise<C
       updatedAt: localInstantDateTime(binding.instant(envelope.client.updatedAt)) }) }
 }
 
-export async function getClientDashboard(id: string): Promise<Record<string, unknown>> {
+export interface ClientWorkspaceDashboard {
+  clientId: string
+  products: number
+  totalSubmissions: number
+  verifiedSubmissions: number
+}
+
+export async function getClientDashboard(id: string): Promise<ClientWorkspaceDashboard> {
   const response = await apiClient.get(`/clients/${id}/dashboard`)
-  return response.data as Record<string, unknown>
+  return response.data as ClientWorkspaceDashboard
 }
 
 // ==================== SETTINGS ENDPOINTS ====================
@@ -555,37 +559,8 @@ export async function updateTheme(productId: string, data: Partial<ThemeConfig>)
   return response.data as ThemeConfig
 }
 
-// ==================== HEALTH ENDPOINTS ====================
-
-export async function checkHealth(): Promise<{
-  status: string
-  database: string
-  redis: string
-  uptime: number
-  version: string
-}> {
-  const response = await apiClient.get('/health')
-  return response.data as {
-    status: string
-    database: string
-    redis: string
-    uptime: number
-    version: string
-  }
-}
-
-export async function checkReadiness(): Promise<Record<string, unknown>> {
-  const response = await apiClient.get('/ready')
-  return response.data as Record<string, unknown>
-}
-
-export async function checkLiveness(): Promise<Record<string, unknown>> {
-  const response = await apiClient.get('/live')
-  return response.data as Record<string, unknown>
-}
-
 // Export all endpoint functions as a namespace for convenience
-export const authApi = { login, refreshToken }
+export const authApi = { login, refreshToken, currentAuthority, revoke }
 export const usersApi = { getUsers, getUser, createUser, updateUser, deactivateUser, resetUserPassword, getUserAuditLog }
 export const contentApi = {
   getProducts,
@@ -604,4 +579,3 @@ export const auditApi = { getAuditLogs, getAuditLogById, getEntityAuditLog }
 export const clientsApi = { getClient, updateClient, getClientDashboard }
 export const settingsApi = { getSettings, updateSettings }
 export const themeApi = { getTheme, updateTheme }
-export const healthApi = { checkHealth, checkReadiness, checkLiveness }

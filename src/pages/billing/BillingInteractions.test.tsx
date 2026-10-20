@@ -1,3 +1,6 @@
+import { currentAuthorityFixture } from '../../test/authorityFixtures'
+import { viewerFixturePermissions } from '../../test/authorityFixtures'
+import { clientFixturePermissions } from '../../test/authorityFixtures'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -26,15 +29,15 @@ function snapshot(clientId: string, ownedBalance: string): BillingAccountSnapsho
   }
 }
 
-function setSession(role: 'Admin' | 'Viewer' = 'Admin') {
+function setSession(role: 'ClientAdmin' | 'Viewer' = 'ClientAdmin') {
   useAuthStore.setState({
     accessToken: 'token',
     refreshTokenValue: 'refresh',
     user: {
-      id: 'operator',
+      id: '01990000-0000-7000-8000-000000000001',
       email: 'operator@example.com',
       displayName: 'Operator',
-      role,
+      role,permissions:role==='ClientAdmin'?clientFixturePermissions:[],platformPermissions:role==='ClientAdmin'?['platform:billing:adjust','platform:billing:view']:[],
       clientId: CLIENT_A,
       accessToken: 'token',
       refreshToken: 'refresh',
@@ -80,7 +83,7 @@ describe('Billing interactions and private transitions', () => {
     await user.click(await screen.findByRole('button', { name: 'Adjust credits' }))
     await user.type(screen.getByLabelText('Reason'), 'Private correction')
 
-    useAuthStore.setState((state) => ({ user: state.user ? { ...state.user, role: 'Viewer' } : null }))
+    useAuthStore.setState((state) => ({ user: state.user ? { ...state.user, role: 'Viewer', permissions: viewerFixturePermissions,platformPermissions:[] } : null }))
 
     await waitFor(() => expect(screen.queryByLabelText('Reason')).not.toBeInTheDocument())
     expect(screen.queryByText('Private correction')).not.toBeInTheDocument()
@@ -228,11 +231,11 @@ describe('Billing interactions and private transitions', () => {
       accessToken: 'new-token',
       refreshToken: 'new-refresh',
       expiresIn: 3600,
-      user: {
-        id: 'operator',
+      user: { ...currentAuthorityFixture(),
+        id: '01990000-0000-7000-8000-000000000001',
         email: 'operator@example.com',
         displayName: 'Operator',
-        role: 'Admin',
+        role: 'ClientAdmin', permissions: clientFixturePermissions, platformPermissions: ['platform:billing:adjust', 'platform:billing:view'],
         clientId: CLIENT_A,
         accessToken: 'new-token',
         refreshToken: 'new-refresh',
@@ -266,8 +269,8 @@ describe('Billing interactions and private transitions', () => {
       accessToken: 'new-token',
       refreshToken: 'new-refresh',
       expiresIn: 3600,
-      user: {
-        id: 'operator', email: 'operator@example.com', displayName: 'Operator', role: 'Admin',
+      user: { ...currentAuthorityFixture(),
+        id: '01990000-0000-7000-8000-000000000001', email: 'operator@example.com', displayName: 'Operator', role: 'ClientAdmin', permissions: clientFixturePermissions, platformPermissions: ['platform:billing:adjust', 'platform:billing:view'],
         clientId: CLIENT_A, accessToken: 'new-token', refreshToken: 'new-refresh', expiresIn: 3600,
       },
     })

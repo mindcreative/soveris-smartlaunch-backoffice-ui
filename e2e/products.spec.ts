@@ -1,3 +1,5 @@
+import { installCurrentSession } from './currentSession'
+import { clientFixturePermissions, viewerFixturePermissions } from '../src/test/authorityFixtures'
 import { fulfillLocal, installTimeZoneRoute } from './localPresentationMocks'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page, type Route } from '@playwright/test'
@@ -18,17 +20,7 @@ function product(overrides: Record<string, unknown> = {}) {
 }
 
 async function installAdminSession(page: Page): Promise<void> {
-  await page.addInitScript(({ clientId }) => {
-    const user = {
-      id: 'operator', email: 'operator@example.com', displayName: 'Operator', role: 'Admin', clientId,
-      accessToken: 'test-token', refreshToken: 'test-refresh', expiresIn: 3600,
-    }
-    localStorage.setItem('backoffice_access_token', 'test-token')
-    localStorage.setItem('backoffice_refresh_token', 'test-refresh')
-    localStorage.setItem('backoffice-auth-persist', JSON.stringify({
-      state: { accessToken: 'test-token', refreshTokenValue: 'test-refresh', user }, version: 0,
-    }))
-  }, { clientId: CLIENT_ID })
+  await installCurrentSession(page, { clientId: CLIENT_ID })
 }
 
 async function json(route: Route, body: unknown, status = 200): Promise<void> {
@@ -49,7 +41,7 @@ test('archives, closes, reloads and reopens the product before reactivating with
   let selected = product({ publicationStatus: 'published', contentSchemaVersion: 1 })
   const updates: unknown[] = []
   const contentWrites: string[] = []
-  await page.route('**/api/backoffice/**', async route => {
+  await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/, async route => {
     const request = route.request()
     const path = new URL(request.url()).pathname
     if (path.endsWith('/me/timezone')) { await route.fallback(); return }
@@ -103,7 +95,7 @@ test('creates, edits, saves and publishes through exact commands without AI call
   let draftContent = structuredClone(origin)
   const requests: Array<{ method: string; path: string; body?: unknown }> = []
 
-  await page.route('**/api/backoffice/**', async (route) => {
+  await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/, async (route) => {
     if (route.request().url().endsWith('/api/backoffice/me/timezone')) { await route.fallback(); return }
     const request = route.request()
     const url = new URL(request.url())
@@ -164,7 +156,7 @@ test('creates, edits, saves and publishes through exact commands without AI call
 test('preserves a local edit through 422 and stale-revision review', async ({ page }) => {
   let saves = 0
   let currentServerTitle = origin.hero.title
-  await page.route('**/api/backoffice/**', async (route) => {
+  await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/, async (route) => {
     if (route.request().url().endsWith('/api/backoffice/me/timezone')) { await route.fallback(); return }
     const request = route.request()
     const path = new URL(request.url()).pathname
@@ -211,7 +203,7 @@ test('preserves a local edit through 422 and stale-revision review', async ({ pa
 test('passes WCAG scan and remains operable at reflow, text-spacing and alternate-media settings', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 700 })
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
-  await page.route('**/api/backoffice/**', async (route) => {
+  await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/, async (route) => {
     if (route.request().url().endsWith('/api/backoffice/me/timezone')) { await route.fallback(); return }
     const request = route.request()
     const path = new URL(request.url()).pathname
@@ -264,7 +256,7 @@ test('uploads a private hero image without saving and keeps the workflow accessi
     'base64',
   )
 
-  await page.route('**/api/backoffice/**', async (route) => {
+  await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/, async (route) => {
     if (route.request().url().endsWith('/api/backoffice/me/timezone')) { await route.fallback(); return }
     const request = route.request()
     const path = new URL(request.url()).pathname

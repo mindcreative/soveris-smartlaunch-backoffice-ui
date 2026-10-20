@@ -1,3 +1,5 @@
+import { viewerFixturePermissions } from '../../test/authorityFixtures'
+import { clientFixturePermissions } from '../../test/authorityFixtures'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -9,7 +11,7 @@ import { CLIENT, reconciliationFixture } from '../../test/reconciliationFixture'
 vi.mock('../../hooks/useAuth', () => ({ useAuth: vi.fn() }))
 vi.mock('../../api/reconciliationApi', async original => ({ ...await original<typeof import('../../api/reconciliationApi')>(), queryReconciliation: vi.fn(), findFreshReconciliationCase: vi.fn(), resolveReconciliation: vi.fn() }))
 function setup(allowed = true) {
-  vi.mocked(useAuth).mockReturnValue({ user: { id: 'actor', clientId: CLIENT, role: 'Admin' }, accessToken: 'session', isAuthenticated: true, hasPermission: () => allowed } as never)
+  vi.mocked(useAuth).mockReturnValue({ user: { id: 'actor', clientId: CLIENT, role: 'ClientAdmin', permissions: clientFixturePermissions }, accessToken: 'session', isAuthenticated: true, hasPermission: () => allowed } as never)
   const page = reconciliationFixture()
   vi.mocked(queryReconciliation).mockResolvedValue(page)
   vi.mocked(findFreshReconciliationCase).mockResolvedValue({ item: page.items[0]!, evaluatedAt: page.evaluatedAt })
@@ -42,7 +44,7 @@ describe('reconciliation workspace', () => {
     await screen.findAllByRole('button', { name: /Inspect case/ })
     await userEvent.click(screen.getAllByRole('button', { name: /Inspect case/ })[0]!)
     expect(screen.getByRole('heading', { name: 'Immutable case evidence' })).toBeInTheDocument()
-    vi.mocked(useAuth).mockReturnValue({ user: { id: 'actor', clientId: CLIENT, role: 'Viewer' }, isAuthenticated: true, hasPermission: () => false } as never)
+    vi.mocked(useAuth).mockReturnValue({ user: { id: 'actor', clientId: CLIENT, role: 'Viewer', permissions: viewerFixturePermissions,platformPermissions:[] }, isAuthenticated: true, hasPermission: () => false } as never)
     view.rerender(<MemoryRouter><BillingReconciliationPage /></MemoryRouter>)
     expect(screen.queryByRole('heading', { name: 'Immutable case evidence' })).not.toBeInTheDocument()
   })
@@ -72,7 +74,7 @@ describe('authority and navigation private-state isolation', () => {
     await user.click(screen.getByRole('button', { name: 'Release confirmed non-execution' }))
     await waitFor(() => expect(requestedSignal).toBeDefined())
     const { act } = await import('@testing-library/react')
-    vi.mocked(useAuth).mockReturnValue({ user: { id: 'new-actor', clientId: CLIENT, role: 'Admin' }, accessToken: 'another-session', isAuthenticated: true, hasPermission: () => true } as never)
+    vi.mocked(useAuth).mockReturnValue({ user: { id: 'new-actor', clientId: CLIENT, role: 'ClientAdmin', permissions: clientFixturePermissions }, accessToken: 'another-session', isAuthenticated: true, hasPermission: () => true } as never)
     view.rerenderWorkspace()
     expect(requestedSignal!.aborted).toBe(true)
     const fixture = reconciliationFixture()

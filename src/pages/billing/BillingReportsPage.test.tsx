@@ -1,3 +1,4 @@
+import { clientFixturePermissions } from '../../test/authorityFixtures'
 import { StrictMode } from 'react'
 import { render,screen,waitFor,within,act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -11,7 +12,7 @@ import {ANOMALY_ID,anomalyDetailFixture} from '../../test/billingAnomaliesFixtur
 import * as api from '../../api/billingReportsApi'
 import {creditFixture,expenseFixture,REPORT_CLIENT,REPORT_RANGE} from '../../test/billingReportsFixture'
 const B='ffffffff-1111-4222-8333-444444444444'
-function session(role:'Admin'|'Viewer'='Admin'){useAuthStore.setState({accessToken:'token',refreshTokenValue:'refresh',isLoading:false,isAuthenticated:true,isInitialized:true,user:{id:'cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa',clientId:REPORT_CLIENT,role,email:'test@example.test',displayName:'Operator',accessToken:'token',refreshToken:'refresh',expiresIn:3600}})}
+function session(role:'ClientAdmin'|'Viewer'='ClientAdmin'){useAuthStore.setState({accessToken:'token',refreshTokenValue:'refresh',isLoading:false,isAuthenticated:true,isInitialized:true,user:{id:'cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa',clientId:REPORT_CLIENT,role,permissions:role==='ClientAdmin'?clientFixturePermissions:[],platformPermissions:role==='ClientAdmin'?['platform:billing:view', 'platform:billing:reconcile']:[],email:'test@example.test',displayName:'Operator',accessToken:'token',refreshToken:'refresh',expiresIn:3600}})}
 describe('Usage & expense route',()=>{
  beforeEach(()=>{vi.restoreAllMocks();queryClient.clear();localStorage.clear();session();window.history.replaceState({},'',`/billing/clients/${REPORT_CLIENT}/reports`)})
  it('denies direct navigation before any report request',()=>{session('Viewer');const read=vi.spyOn(api,'readBillingReport');render(<App/>);expect(screen.getByText(/Current billing:view permission/)).toBeInTheDocument();expect(read).not.toHaveBeenCalled()})

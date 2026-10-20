@@ -1,3 +1,4 @@
+import { editorFixturePermissions } from '../test/authorityFixtures'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from './apiClient'
 import {
@@ -42,7 +43,7 @@ describe('AI content adapter', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     useAuthStore.setState({
-      user: { id: CLIENT_ID, clientId: CLIENT_ID, email: 'editor@example.test', displayName: 'Editor', role: 'Editor', accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600 },
+      user: { id: CLIENT_ID, clientId: CLIENT_ID, email: 'editor@example.test', displayName: 'Editor', role: 'Editor', permissions: editorFixturePermissions, accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600 },
       isAuthenticated: true,
     })
   })

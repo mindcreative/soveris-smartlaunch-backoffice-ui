@@ -1,3 +1,4 @@
+import { privateObjectUrl, releasePrivateObjectUrl } from '../../auth/authorityEpoch'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { getAiImageJob, isCanonicalUuidV7, redeemAiImageResult } from '../../api/aiImageApi'
 import { getProductImagePreview } from '../../api/productImageApi'
@@ -37,14 +38,14 @@ export function ProductGeneratedImagePanel({ clientId, productId, working, draft
   const altError = Boolean(error && /alternative text/i.test(error))
   const sourceError = Boolean(error && /canonical completed image Job ID|current permission is unavailable/i.test(error))
   useEffect(() => { if (error) errorSummary.current?.focus() }, [error])
-  const revoke = () => { if (objectUrl.current) URL.revokeObjectURL(objectUrl.current); objectUrl.current = null; setPreview(null) }
+  const revoke = () => { if (objectUrl.current) releasePrivateObjectUrl(objectUrl.current); objectUrl.current = null; setPreview(null) }
   const clear = () => {
     generation.current += 1; controller.current?.abort(); controller.current = null; reference.current = null; revoke(); commands.clear()
     setPicked(null); setScope(null); setReceipt(null); setTarget(null); setAlt(''); setJobId(''); setPointer('/hero/backgroundImage'); setBusy(false); setError(''); setQuotaRejected(false)
     setMessage('Private image selection cleared. Already accepted work may finish as a private asset.')
   }
   useLayoutEffect(() => { clear(); return () => { generation.current += 1; controller.current?.abort(); reference.current = null
-    if (objectUrl.current) URL.revokeObjectURL(objectUrl.current); commands.clear() } }, [clientId, productId, user?.id, allowed])
+    if (objectUrl.current) releasePrivateObjectUrl(objectUrl.current); commands.clear() } }, [clientId, productId, user?.id, allowed])
   useEffect(() => { const reset = () => clear(); window.addEventListener('auth:refreshed', reset); window.addEventListener('popstate', reset)
     return () => { window.removeEventListener('auth:refreshed', reset); window.removeEventListener('popstate', reset) } })
   useEffect(() => {
@@ -104,7 +105,7 @@ export function ProductGeneratedImagePanel({ clientId, productId, working, draft
         : picked?.result && reference.current ? await redeemAiImageResult(picked.jobId, reference.current, picked.result.byteSize, abort.signal) : null
       if (captured !== generation.current || abort.signal.aborted) return
       if (!blob || blob.type !== 'image/webp' || blob.size !== (receipt?.asset.byteLength ?? picked?.result?.byteSize)) throw new Error('Preview unavailable.')
-      revoke(); objectUrl.current = URL.createObjectURL(blob); setPreview(objectUrl.current); setMessage('Private preview loaded.')
+      revoke(); objectUrl.current = privateObjectUrl(blob); setPreview(objectUrl.current); setMessage('Private preview loaded.')
     } catch (value) { if (captured === generation.current && !abort.signal.aborted) {
       const status = (value as ApiError).status
       if (status === 404 && !receipt) { reference.current = null; revoke(); setError('The private preview is unavailable. Refresh the completed Job or check the retained adoption status.'); }

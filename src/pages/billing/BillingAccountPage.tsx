@@ -46,11 +46,11 @@ export function BillingIndexPage() {
   if (hasPermission('billing:view')) {
     return <Navigate to={`/billing/clients/${clientId}/account`} replace />
   }
-  if (hasPermission('billing:subscription')) {
+  if (hasPermission('platform:packages:manage')) {
     return <Navigate to={`/billing/clients/${clientId}/subscriptions`} replace />
   }
 
-  if (hasPermission('billing:reconcile')) return <Navigate to={`/billing/clients/${clientId}/reconciliation`} replace />
+  if (hasPermission('platform:billing:reconcile')) return <Navigate to={`/billing/clients/${clientId}/reconciliation`} replace />
   return <ClientContextUnavailable />
 }
 
@@ -137,7 +137,7 @@ function CanonicalBillingAccountPage({
       )}
 
       {snapshot && <AccountSnapshotView snapshot={snapshot} />}
-      {snapshot?.status === 'active' && user?.id && hasPermission('billing:adjust') && (
+      {snapshot?.status === 'active' && user?.id && hasPermission('platform:billing:adjust') && (
         <CreditAdjustmentWorkflow
           clientId={clientId}
           snapshot={snapshot}
@@ -209,8 +209,12 @@ function BillingAccountRoute({ clientId }: { clientId: string }) {
 }
 
 export function BillingAccountPage() {
+  const {user,hasPermission}=useAuth()
   const { clientId: routeClientId } = useParams()
   const clientId = canonicalizeGuid(routeClientId)
+  if(clientId && user && canonicalizeGuid(user.clientId)!==clientId && !hasPermission('platform:billing:view'))
+    return <Forbidden message="This Client is outside your current financial scope." />
+
 
   if (!clientId) return <ClientContextUnavailable />
   if (routeClientId !== clientId) {

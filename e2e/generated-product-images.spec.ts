@@ -1,3 +1,4 @@
+import { installCurrentSession } from './currentSession'
 import { expect, test, type Locator } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { readFileSync } from 'node:fs'
@@ -24,19 +25,14 @@ for (const environment of [
   await page.setViewportSize({ width: environment.width, height: environment.height })
   if (environment.name === 'forced-colours') await page.emulateMedia({ forcedColors: 'active' })
   if (environment.name === 'reduced-motion') await page.emulateMedia({ reducedMotion: 'reduce' })
-  await page.addInitScript(({ client }) => {
-    const user = { id: 'operator', email: 'operator@example.test', displayName: 'Operator', role: 'Admin', clientId: client,
-      accessToken: 'test-token', refreshToken: 'test-refresh', expiresIn: 3600 }
-    localStorage.setItem('backoffice_access_token', 'test-token'); localStorage.setItem('backoffice_refresh_token', 'test-refresh')
-    localStorage.setItem('backoffice-auth-persist', JSON.stringify({ state: { accessToken: 'test-token', refreshTokenValue: 'test-refresh', user }, version: 0 }))
-  }, { client })
+  await installCurrentSession(page, { clientId: client })
   await installTimeZoneRoute(page)
   let revision = 7; let content = structuredClone(origin); let receipt: Record<string, unknown> | null = null
   const writes: string[] = []; let sourceReads = 0; let rejectedOperation = ''
   const product = () => ({ id: productId, clientId: client, name: 'Origin', slug: 'origin', status: 'active', publicationStatus: 'draft',
     revision: 3, contentSchemaVersion: null, contentRevision: 1, draftSchemaVersion: 1, draftRevision: revision,
     completeness: { isComplete: true, missingRequirements: [] }, canonicalUrl: null, createdAt: '2026-09-12T00:00:00Z', updatedAt: '2026-09-12T00:00:00Z' })
-  await page.route('**/api/backoffice/**', async route => {
+  await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/, async route => {
     const request = route.request(); const path = new URL(request.url()).pathname; const method = request.method()
     if (path.endsWith('/me/timezone')) { await route.fallback(); return }
     const json = async (body: unknown, status = 200) => fulfillLocal(route, { status, contentType: 'application/json', body: JSON.stringify(body) })

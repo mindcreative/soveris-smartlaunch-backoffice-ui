@@ -1,3 +1,4 @@
+import { clientFixturePermissions } from '../../test/authorityFixtures'
 import { useRef, useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
@@ -38,7 +39,7 @@ beforeEach(() => {
   sessionStorage.clear()
   window.history.replaceState({}, '', '/products')
   useAuthStore.setState({
-    user: { id: '01990000-0000-7000-8000-000000000005', clientId: client, role: 'Admin', email: 'admin@example.test', displayName: 'Admin', accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600 },
+    user: { id: '01990000-0000-7000-8000-000000000005', clientId: client, role: 'ClientAdmin', permissions: clientFixturePermissions, sessionId: '01990000-0000-7000-8000-000000000077',clientRoleId:'01990000-0000-7000-8000-000000000078',securityRevision:'1', email: 'admin@example.test', displayName: 'ClientAdmin', accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600 },
     accessToken: 'token', isAuthenticated: true, isInitialized: true, isLoading: false,
   })
   vi.spyOn(productRemovalApi, 'preview').mockImplementation(async (_client, id) =>
@@ -99,7 +100,7 @@ it('reload recovery discovers all URL locators and session-only material without
   const operationB = '01990000-0000-7000-8000-000000000088'
   window.history.replaceState({}, '', `/products?productRemoval=${receipt.operationId}&removedProduct=${product}&productRemoval=${operationB}&removedProduct=${second}`)
   const command: RemovalCommand = { operationId: receipt.operationId, expectedRevision: '1', policyVersion: 'product-removal-v1', previewFingerprint: preview.previewFingerprint }
-  sessionStorage.setItem(`backoffice:product-removal:${client}:${product}:${receipt.operationId}`, JSON.stringify({ actor: useAuthStore.getState().user!.id, role: 'Admin', command }))
+  sessionStorage.setItem(`backoffice:product-removal:${client}:${product}:${receipt.operationId}`, JSON.stringify({actor:useAuthStore.getState().user!.id,role:'ClientAdmin',session:'01990000-0000-7000-8000-000000000077',clientRole:'01990000-0000-7000-8000-000000000078',revision:'1',command}))
   const remove = vi.spyOn(productRemovalApi, 'remove').mockRejectedValue({ status: 503, code: 'dependency_unavailable' })
   const status = vi.spyOn(productRemovalApi, 'status').mockRejectedValue({ status: 404, code: 'product_not_found' })
   vi.spyOn(productRemovalApi, 'list').mockResolvedValue({ items: [], page: '1', pageSize: '20', totalCount: '0', totalPages: '0' })

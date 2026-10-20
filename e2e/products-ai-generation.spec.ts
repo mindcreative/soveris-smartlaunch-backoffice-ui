@@ -1,3 +1,6 @@
+import { currentAuthorityFixture } from '../src/test/authorityFixtures'
+import { installCurrentSession } from './currentSession'
+import { clientFixturePermissions, viewerFixturePermissions } from '../src/test/authorityFixtures'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { readFileSync } from 'node:fs'
@@ -63,13 +66,8 @@ function durable(status: 'completed' | 'failed' | 'execution_unknown') {
   }
 }
 
-async function session(page: Page, clientId = CLIENT_A, role = 'Admin') {
-  await page.addInitScript(({ clientId: id, role: actorRole }) => {
-    const user = { id: 'operator', email: 'operator@example.test', displayName: 'Operator', role: actorRole, clientId: id, accessToken: 'test-token', refreshToken: 'test-refresh', expiresIn: 3600 }
-    localStorage.setItem('backoffice_access_token', 'test-token')
-    localStorage.setItem('backoffice_refresh_token', 'test-refresh')
-    localStorage.setItem('backoffice-auth-persist', JSON.stringify({ state: { accessToken: 'test-token', refreshTokenValue: 'test-refresh', user }, version: 0 }))
-  }, { clientId, role })
+async function session(page: Page, clientId = CLIENT_A, role: 'ClientAdmin' | 'Editor' | 'Viewer' = 'ClientAdmin') {
+  await installCurrentSession(page, { clientId, role, permissions: role === 'Viewer' ? viewerFixturePermissions : clientFixturePermissions })
 }
 
 async function respond(route: Route, body: unknown, status = 200, headers?: Record<string, string>) {
@@ -94,7 +92,7 @@ async function installBase(
     if (path.startsWith('/api/ai/') && onAi) return onAi(route)
     await route.abort()
   }
-  await page.route('**/api/backoffice/**', handler)
+  await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/, handler)
   await page.route('**/api/ai/**', handler)
 }
 
@@ -327,7 +325,7 @@ test('Dismiss clears only the local preview and returns focus without any server
   expect(requests).toHaveLength(before)
 })
 
-test('authentication replay preserves the exact UUIDv7 identity and serialized POST bytes', async ({ page }) => {
+test('authentication loss retires the draft without automatically replaying paid admission', async ({ page }) => {
   const bodies: string[] = []
   let admissions = 0
   await installBase(page, capabilities(), async (route) => {
@@ -344,9 +342,9 @@ test('authentication replay preserves the exact UUIDv7 identity and serialized P
   const editor = await openEditor(page)
   await bindHeroTitle(editor)
   await editor.getByRole('button', { name: 'Generate' }).click()
-  await expect(editor.getByText('Persisted durable variation')).toBeVisible()
-  expect(bodies).toHaveLength(2)
-  expect(bodies[1]).toBe(bodies[0])
+  await expect(page.getByRole('button',{name:'Sign in',exact:true})).toBeVisible()
+  expect(bodies).toHaveLength(1)
+  await expect(page.getByText('Persisted durable variation')).toHaveCount(0)
   expect(JSON.parse(bodies[0]!).idempotencyKey).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
 })
 
@@ -412,9 +410,10 @@ test('lookup delay exposes GET-only Check status and permission loss clears the 
   await editor.getByRole('button', { name: 'Generate' }).click()
   await expect(editor.getByRole('button', { name: 'Check status' })).toBeVisible()
   await editor.getByRole('button', { name: 'Check status' }).click()
-  await expect(editor.getByRole('alert')).toContainText(/permission changed/i)
+  await expect(page.getByRole('heading',{name:'Current access unavailable'})).toBeVisible()
+  await expect(editor).toHaveCount(0)
   await expect(editor.getByText(JOB_ID)).toHaveCount(0)
-  await expect(editor.getByRole('textbox', { name: 'Hero subtitle' })).toHaveValue('Authorized unsaved product edit')
+  await expect(page.getByText('Authorized unsaved product edit',{exact:true})).toHaveCount(0)
   expect(posts).toBe(1); expect(gets).toBe(2)
 })
 
@@ -448,7 +447,7 @@ test('logout and a different-Client login clear all prior Job/result frames', as
   await page.getByRole('button', { name: /User menu/ }).click()
   await page.getByRole('menuitem', { name: 'Logout' }).click()
   await expect(page).toHaveURL(/\/login/)
-  await page.route('**/api/backoffice/auth/login', (route) => respond(route, { accessToken: 'b-token', refreshToken: 'b-refresh', expiresIn: 3600, user: { id: 'operator-b', displayName: 'Operator B', role: 'Admin', clientId: CLIENT_B } }))
+  await page.route('**/api/backoffice/auth/login', (route) => respond(route, { accessToken: 'b-token', refreshToken: 'b-refresh', expiresIn: 3600, user: currentAuthorityFixture({id:'01990000-0000-7000-8000-00000000000b',displayName:'Operator B',clientId:CLIENT_B}) }))
   await page.getByLabel('Email address').fill('b@example.test')
   await page.getByLabel('Password').fill('password')
   await page.getByRole('button', { name: 'Sign in' }).click()

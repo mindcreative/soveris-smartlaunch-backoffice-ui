@@ -1,3 +1,4 @@
+import { clientFixturePermissions } from '../../test/authorityFixtures'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
@@ -8,7 +9,7 @@ const selectedClient = '0149620b-af5c-47c9-8290-95edde45ef8f'
 
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({
-    user: { clientId: '98b71ac3-7f62-4ac8-9b28-30444993a001', role: 'Admin' },
+    user: { clientId: '98b71ac3-7f62-4ac8-9b28-30444993a001', role: 'ClientAdmin', permissions: clientFixturePermissions },
     hasPermission: () => true,
   }),
 }))

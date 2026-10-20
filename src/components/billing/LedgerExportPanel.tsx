@@ -1,3 +1,5 @@
+import { useAuth } from '../../hooks/useAuth'
+import { privateObjectUrl, releasePrivateObjectUrl } from '../../auth/authorityEpoch'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ApiError, AuthRefreshLifecycleDetail } from '../../api/apiClient'
@@ -165,7 +167,7 @@ export function LedgerExportPanel({
     }
     window.addEventListener('auth:refreshed', handleRefresh)
     window.addEventListener('auth:cleared', handleClear)
-    return () => {
+  return () => {
       window.removeEventListener('auth:refreshed', handleRefresh)
       window.removeEventListener('auth:cleared', handleClear)
     }
@@ -300,14 +302,14 @@ export function LedgerExportPanel({
       }
       const blob = await billingApi.redeemLedgerExport(attempt, result.reference, controller.signal)
       if (epoch !== scopeEpoch.current || controller.signal.aborted) return
-      const url = URL.createObjectURL(blob)
+      const url = privateObjectUrl(blob)
       try {
         const anchor = document.createElement('a')
         anchor.href = url
         anchor.download = `ledger-export-${attempt.exportId}-local.csv`
         anchor.click()
       } finally {
-        URL.revokeObjectURL(url)
+        releasePrivateObjectUrl(url)
       }
       setFeedback('Private ledger CSV download started. No reusable download reference was retained.')
       setAnnouncement('Private ledger CSV download started.')
@@ -341,6 +343,9 @@ export function LedgerExportPanel({
   const requestActionAllowed = !metadata || metadata.status === 'completed' || terminal || commandState === 'ambiguous'
   const artifactEligible = metadata?.status === 'completed' && Boolean(metadata.artifactExpiresAt)
 
+  const {user,hasPermission}=useAuth()
+  const exportAllowed=user?.clientId===clientId?hasPermission('billing:export'):hasPermission('platform:billing:export')
+  if(!exportAllowed) return null
   return (
     <section aria-labelledby="ledger-export-title" className="state-indicator mb-6 min-w-0 rounded-lg border border-control bg-surface p-4 sm:p-5">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">

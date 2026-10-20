@@ -1,3 +1,4 @@
+import { clientFixturePermissions } from '../test/authorityFixtures'
 import { useAuthStore } from '../stores/authStore'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from './apiClient'
@@ -31,7 +32,7 @@ import type {
 
 beforeEach(() => useAuthStore.setState({ user: {
   id: 'actor', clientId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
-  email: 'actor@example.test', displayName: 'Actor', role: 'Admin',
+  email: 'actor@example.test', displayName: 'Actor', role: 'ClientAdmin', permissions: clientFixturePermissions,
   accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600,
 } }))
 

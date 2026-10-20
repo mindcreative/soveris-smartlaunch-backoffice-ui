@@ -5,7 +5,7 @@ const prefix = 'backoffice:product-removal:'
 const memory = new Map<string, string>()
 function identity() {
   const state = useAuthStore.getState()
-  return JSON.stringify([state.user?.id, state.user?.clientId, state.user?.role, state.accessToken])
+  return JSON.stringify([state.user?.id,state.user?.clientId,state.user?.clientRoleId,state.user?.sessionId,state.user?.securityRevision,state.user?.role,state.user?.permissions,state.accessToken])
 }
 
 export function clearRemovalMaterial() {
@@ -18,11 +18,24 @@ export function clearRemovalMaterial() {
 }
 
 let current = identity()
-useAuthStore.subscribe((state, previous) => {
-  const next = identity()
-  if (next !== current || (previous.isAuthenticated && !state.isAuthenticated)) {
-    current = next
-    clearRemovalMaterial()
+useAuthStore.subscribe((state,previous) => {
+  // A cold restore has no established identity yet. Stored commands remain unreadable
+  // until the server verifies the original session; login/revocation cannot revive them.
+  if(!state.isInitialized || state.isLoading) return
+  if(!state.isAuthenticated) {current=identity();clearRemovalMaterial();return}
+  if(previous.isAuthenticated && previous.accessToken!==state.accessToken) clearRemovalMaterial()
+  const next=identity()
+  if(next!==current) {
+    current=next
+    const keys=new Set(memory.keys())
+    try {for(const storageKey of Object.keys(sessionStorage)) keys.add(storageKey)} catch { /* Memory only. */ }
+    for(const storageKey of keys) {
+      if(!storageKey.startsWith(prefix)) continue
+      const [client,product,operation,extra]=storageKey.slice(prefix.length).split(':')
+      if(client && product && operation && extra===undefined && readRemovalMaterial(client,product,operation)) continue
+      memory.delete(storageKey)
+      try {sessionStorage.removeItem(storageKey)} catch { /* Memory removed. */ }
+    }
   }
 })
 if (typeof window !== 'undefined') {
@@ -36,9 +49,9 @@ function key(client: string, product: string, operation: string) {
 
 export function rememberRemovalMaterial(client: string, product: string, command: RemovalCommand) {
   const user = useAuthStore.getState().user
-  if (!user || user.clientId !== client) return
+  if (!useAuthStore.getState().isAuthenticated || !user || user.clientId !== client || !user.sessionId || !user.clientRoleId || !user.securityRevision || !user.permissions?.includes('products:delete')) return
   const storageKey = key(client, product, command.operationId)
-  const value = JSON.stringify({ actor: user.id, role: user.role, command })
+  const value = JSON.stringify({ actor:user.id,role:user.role,session:user.sessionId,revision:user.securityRevision,clientRole:user.clientRoleId,command })
   memory.set(storageKey, value)
   try { sessionStorage.setItem(storageKey, value) }
   catch { /* Closing the modal must not discard this tab's exact command. */ }
@@ -58,9 +71,11 @@ export function readRemovalMaterial(client: string, product: string, operation: 
   catch { /* Use the in-memory command if storage is unavailable. */ }
   try {
     const user = useAuthStore.getState().user
-    const stored = JSON.parse(value ?? 'null') as { actor?: string; role?: string; command?: RemovalCommand } | null
+    const stored = JSON.parse(value ?? 'null') as { actor?: string; role?: string; session?:string; revision?:string; clientRole?:string; command?: RemovalCommand } | null
     const command = stored?.command
-    if (!user || user.clientId !== client || stored?.actor !== user.id || stored.role !== user.role ||
+    if (!useAuthStore.getState().isAuthenticated || !user || !user.sessionId || !user.permissions?.includes('products:delete') ||
+        user.clientId !== client || stored?.actor !== user.id || stored.role !== user.role ||
+        stored.session!==user.sessionId || stored.revision!==user.securityRevision || stored.clientRole!==user.clientRoleId ||
         !command || command.operationId !== operation || command.policyVersion !== removalPolicy ||
         typeof command.expectedRevision !== 'string' || !/^[1-9]\d*$/.test(command.expectedRevision) ||
         BigInt(command.expectedRevision) > 9223372036854775807n || !/^[a-f0-9]{64}$/.test(command.previewFingerprint)) return null

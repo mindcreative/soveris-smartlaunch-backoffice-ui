@@ -38,6 +38,7 @@ function ReportSection({kind,client,filters,deny}:{kind:ReportKind;client:string
   </section>
 }
 function Workspace({client}:{client:string}) {
+  const {hasPermission}=useAuth();const providerView=hasPermission('platform:billing:view')
   const blocked=useAnomalyFilterBlock(client);const heading=useRef<HTMLHeadingElement>(null);const [denied,setDenied]=useState(false);const queries=useQueryClient()
   const [credit,setCredit]=useState<Filters>(defaultReportFilters);const [expense,setExpense]=useState<Filters>(()=>normalizeReportFilters('expense',defaultReportFilters()))
   const [creditEpoch,setCreditEpoch]=useState(0),[expenseEpoch,setExpenseEpoch]=useState(0)
@@ -56,7 +57,7 @@ function Workspace({client}:{client:string}) {
     <p>Point-in-time reports are read-only. Anomaly investigation has separately authorized operator actions. Abstract Soveris credits and provider money are separate domains. Each report has its own snapshot; their as-of times may differ.</p>
     <ReportFilters credit={credit} expense={expense} onApply={apply} blocked={blocked}/>
     <ReportSection key={`credit:${creditEpoch}`} kind="credit" client={client} filters={credit} deny={deny}/>
-    <ReportSection key={`expense:${expenseEpoch}`} kind="expense" client={client} filters={expense} deny={deny}/>
+    {providerView && <ReportSection key={`expense:${expenseEpoch}`} kind="expense" client={client} filters={expense} deny={deny}/>}
     </>}
   </div>
 }
@@ -79,7 +80,7 @@ export function BillingReportsPage() {
   if(restoring||!auth.isInitialized||auth.isLoading)return <LoadingSpinner message="Re-establishing report authority…"/>
   if(cleared||!auth.isAuthenticated||!auth.hasPermission('billing:view')||!auth.user)return <Forbidden message="Current billing:view permission is required."/>
   if(!client||client==='00000000-0000-0000-0000-000000000000')return <Forbidden message="A valid Client context is required."/>
-  if(auth.user.role!=='Admin'&&auth.user.clientId!==client)return <Forbidden message="This Client is outside your authorized report scope."/>
+  if(auth.user.clientId!==client&&!auth.hasPermission('platform:billing:view'))return <Forbidden message="This Client is outside your authorized report scope."/>
   if(routeClient!==client)return <Navigate to={`/billing/clients/${client}/reports${evaluationId?`/anomalies/${canonicalizeGuid(evaluationId)??evaluationId}`:''}`} replace/>
   return <Workspace key={`${binding.epoch}:${location.key}:${client}:${auth.user.id}:${auth.user.clientId}:${auth.user.role}`} client={client}/>
 }

@@ -1,3 +1,5 @@
+import { installCurrentSession } from './currentSession'
+import { clientFixturePermissions, viewerFixturePermissions } from '../src/test/authorityFixtures'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page, type Route } from '@playwright/test'
 
@@ -9,16 +11,8 @@ const LEDGER = '0199b9d2-a9b1-7000-8000-000000000004'
 const AT = '2026-09-24T12:00:00.123456Z'
 const accountPath = `/billing/clients/${CLIENT}/account`
 
-async function installSession(page: Page, role: 'Admin' | 'Viewer' = 'Admin'): Promise<void> {
-  await page.addInitScript(({ clientId, actorId, actorRole }) => {
-    const user = { id: actorId, email: 'operator@example.test', displayName: 'Operator',
-      role: actorRole, clientId, accessToken: 'test-token', refreshToken: 'test-refresh', expiresIn: 3600 }
-    localStorage.setItem('backoffice_access_token', 'test-token')
-    localStorage.setItem('backoffice_refresh_token', 'test-refresh')
-    localStorage.setItem('backoffice-auth-persist', JSON.stringify({
-      state: { accessToken: 'test-token', refreshTokenValue: 'test-refresh', user }, version: 0,
-    }))
-  }, { clientId: CLIENT, actorId: ACTOR, actorRole: role })
+async function installSession(page: Page, role: 'ClientAdmin' | 'Viewer' = 'ClientAdmin'): Promise<void> {
+  await installCurrentSession(page, { id:ACTOR,clientId: CLIENT, role, permissions: role === 'Viewer' ? viewerFixturePermissions : clientFixturePermissions, platformPermissions: role === 'Viewer' ? [] : ['platform:billing:view','platform:billing:adjust'] })
 }
 
 function accountBody(committed = false): string {

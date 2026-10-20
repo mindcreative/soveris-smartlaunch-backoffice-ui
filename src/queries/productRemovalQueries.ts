@@ -3,7 +3,7 @@ import { useEffect,useSyncExternalStore } from 'react'
 import { useQuery,useQueryClient } from '@tanstack/react-query'
 import { productKeys } from './productQueries'
 import { domainScopeCurrent,type DomainScope } from './domainScope'
-import { hasRolePermission } from '../auth/permissions'
+import { hasPermission } from '../auth/permissions'
 import { useAuthStore } from '../stores/authStore'
 import { productRemovalApi } from '../api/productRemovalApi'
 let blockedKey:string|null=null,revision=0
@@ -11,7 +11,7 @@ const listeners=new Set<()=>void>()
 const scopeKey=(s:DomainScope)=>JSON.stringify([s.actorId,s.clientId,s.generation])
 export function useRemovalAuthority(){useSyncExternalStore(listener=>{listeners.add(listener);return()=>{listeners.delete(listener)}},()=>revision)}
 export function blockRemovalScope(scope:DomainScope){if(!domainScopeCurrent(scope))return;clearRemovalMaterial();blockedKey=scopeKey(scope);revision++;for(const listener of listeners)listener()}
-export function removalScopeCurrent(scope:DomainScope){return blockedKey!==scopeKey(scope)&&domainScopeCurrent(scope)&&hasRolePermission(useAuthStore.getState().user?.role,'products:delete')}
+export function removalScopeCurrent(scope:DomainScope){return blockedKey!==scopeKey(scope)&&domainScopeCurrent(scope)&&hasPermission(useAuthStore.getState().user,'products:delete')}
 export const removalKeys={scope:(s:DomainScope)=>[...productKeys.client(s.clientId),'removal',s.actorId,s.generation] as const}
 export function assertRemovalScope(scope:DomainScope,signal?:AbortSignal){if(signal?.aborted||!removalScopeCurrent(scope))throw new DOMException('Private scope changed','AbortError')}
 function useCleanup(scope:DomainScope){

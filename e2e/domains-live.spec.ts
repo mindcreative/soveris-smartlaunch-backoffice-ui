@@ -16,10 +16,9 @@ test('built Domains UI drives actual DNS, edge, primary and retained release aga
   }
   const headers = { Authorization: `Bearer ${fixture.accessToken}` }
   await page.addInitScript(f => {
-    const user = { id: f.actorId, clientId: f.clientId, role: 'Admin', displayName: 'Domains live fixture', email: 'local@example.test', accessToken: f.accessToken, refreshToken: f.refreshToken, expiresIn: 3600 }
     localStorage.setItem('backoffice_access_token', f.accessToken)
     localStorage.setItem('backoffice_refresh_token', f.refreshToken)
-    localStorage.setItem('backoffice-auth-persist', JSON.stringify({ state: { user, accessToken: f.accessToken, refreshTokenValue: f.refreshToken }, version: 0 }))
+    localStorage.setItem('backoffice-auth-persist', JSON.stringify({ state: { accessToken: f.accessToken, refreshTokenValue: f.refreshToken }, version: 2 }))
   }, fixture)
   const commands: Array<{ method: string; path: string; status: number }> = []
   page.on('response', response => { const request = response.request(); if (response.url().includes('/api/backoffice/')) commands.push({ method: request.method(), path: new URL(response.url()).pathname, status: response.status() }) })

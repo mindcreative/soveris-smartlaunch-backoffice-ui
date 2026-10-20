@@ -1,3 +1,4 @@
+import { clientFixturePermissions } from '../test/authorityFixtures'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, expect, it, vi } from 'vitest'
@@ -13,7 +14,7 @@ const clientId = '0149620b-af5c-47c9-8290-95edde45ef8f'
 const actorId = '01990000-0000-7000-8000-000000000001'
 const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>
-beforeEach(() => { client.clear(); useAuthStore.setState({ isAuthenticated: true, accessToken: 'a', user: { id: actorId, clientId, role: 'Admin', email: '', displayName: '', accessToken: 'a', refreshToken: '', expiresIn: 1 } }) })
+beforeEach(() => { client.clear(); useAuthStore.setState({ isAuthenticated: true, accessToken: 'a', user: { id: actorId, clientId, role: 'ClientAdmin', permissions: clientFixturePermissions, email: '', displayName: '', accessToken: 'a', refreshToken: '', expiresIn: 1 } }) })
 it('fences late GET after Client/session change before Query can cache it', async () => {
   let resolve!: (value: never) => void
   vi.mocked(domainsApi.list).mockReturnValue(new Promise(r => { resolve = r }))

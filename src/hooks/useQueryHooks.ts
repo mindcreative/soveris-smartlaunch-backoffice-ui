@@ -14,8 +14,8 @@ import {
   getClients,
   settingsApi,
   themeApi,
-  healthApi,
   type Client,
+  type ClientWorkspaceDashboard,
   type AiGenerationRequest,
 } from '../api/endpoints'
 import type {
@@ -60,7 +60,6 @@ export const queryKeys = {
   auditLogs: () => ['backoffice', 'audit'] as const,
   themes: () => ['backoffice', 'themes'] as const,
   ai: () => ['backoffice', 'ai'] as const,
-  health: () => ['backoffice', 'health'] as const,
   settings: () => ['backoffice', 'settings'] as const,
 }
 
@@ -79,6 +78,15 @@ export function useClients(_params?: { page?: number; pageSize?: number; search?
       }
     },
     staleTime: 5 * 60 * 1000,
+  })
+}
+
+export function useClientWorkspaceDashboard(clientId?: string) {
+  return useQuery<ClientWorkspaceDashboard>({
+    queryKey: [...queryKeys.client(clientId ?? ''), 'dashboard'] as const,
+    queryFn: () => clientsApi.getClientDashboard(clientId!),
+    enabled: Boolean(clientId),
+    staleTime: 2 * 60 * 1000,
   })
 }
 
@@ -415,14 +423,3 @@ export function useDashboardActivity() {
   })
 }
 
-// ==================== HEALTH HOOKS ====================
-
-export function useHealthCheck() {
-  return useQuery({
-    queryKey: queryKeys.health(),
-    queryFn: () => healthApi.checkHealth(),
-    staleTime: 30 * 1000,
-    refetchInterval: 60 * 1000,
-    retry: 1,
-  })
-}

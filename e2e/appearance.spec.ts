@@ -1,3 +1,4 @@
+import { installCurrentSession } from './currentSession'
 import { test, expect, type Page, type Locator } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -11,18 +12,13 @@ async function scan(page: Page) {
 }
 async function dashboard(page: Page) {
   await installSession(page)
-  await page.route('**/api/backoffice/**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(route.request().url().includes('/health')
-    ? { status: 'healthy', database: 'ok', redis: 'ok' }
-    : { fromDate: null, toDate: null, totalPageViews: 7600, totalSubmissions: 1248, verifiedSubmissions: 1032, verificationRate: .827, conversionRate: .164 }) }))
+  await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/, route => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ fromDate: null, toDate: null, totalPageViews: 7600, totalSubmissions: 1248, verifiedSubmissions: 1032, verificationRate: .827, conversionRate: .164 }) }))
 }
 async function domains(page: Page) {
-  await page.addInitScript(clientId => {
-    const user = { id: '01990000-0000-7000-8000-000000000001', clientId, role: 'Admin', displayName: 'Domain operator', email: 'domain@example.test', accessToken: 'fixture-token', refreshToken: 'fixture-refresh', expiresIn: 3600 }
-    localStorage.setItem('backoffice_access_token', 'fixture-token')
-    localStorage.setItem('backoffice-auth-persist', JSON.stringify({ state: { user, accessToken: 'fixture-token', refreshTokenValue: 'fixture-refresh' }, version: 0 }))
-  }, domain.clientId)
+  await installCurrentSession(page, {clientId:domain.clientId,displayName:'Domain operator'})
+
   let reads = 0
-  await page.route('**/api/backoffice/**', route => {
+  await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/, route => {
     reads++
     const path = new URL(route.request().url()).pathname
     const response = path.endsWith('/capabilities') ? capabilities : path.endsWith(`/domains/${domain.id}`) ? domain : { items: [domain], page: 1, pageSize: 20, totalCount: 1, totalPages: 1 }
@@ -54,7 +50,7 @@ test('Products and editor actions provide hover feedback without changing drafts
     completeness: { isComplete: true, missingRequirements: [] }, canonicalUrl: null,
     createdAt: '2026-09-12T00:00:00.000000', updatedAt: '2026-09-12T00:00:00.000000' }
   const writes: string[] = []
-  await page.route('**/api/backoffice/**', route => {
+  await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/, route => {
     const request = route.request(), path = new URL(request.url()).pathname
     if (request.method() !== 'GET') writes.push(path)
     const body = path.endsWith('/product-removals') ? { items: [], nextCursor: null }
@@ -195,12 +191,9 @@ test('header tooltips survive pointer transfer and Escape dismisses them without
 })
 
 test('long identity menu keeps Logout reachable in short desktop viewports', async ({ page }) => {
-  await page.addInitScript(() => {
-    const user = { id: 'operator', clientId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', role: 'Admin',
-      displayName: 'Long account name '.repeat(5).trim(), email: 'a'.repeat(60) + '@' + 'b'.repeat(50) + '.example.test' }
-    localStorage.setItem('backoffice-auth-persist', JSON.stringify({ state: { user, accessToken: 'fixture-token', refreshTokenValue: 'fixture-refresh' }, version: 0 }))
-  })
-  await page.route('**/api/**', route => route.fulfill({ status: 503, json: {} }))
+  await installCurrentSession(page, {displayName:'Long account name '.repeat(5).trim(),email:'a'.repeat(60)+'@'+'b'.repeat(50)+'.example.test'})
+
+  await page.route(/\/api\/(?!backoffice\/auth\/(?:current|revoke)(?:[?]|$))/, route => route.fulfill({ status: 503, json: {} }))
   await page.setViewportSize({ width: 1280, height: 260 }); await page.goto('/dashboard')
   await page.getByRole('button', { name: /User menu:/ }).click()
   const menu = page.getByRole('menu', { name: 'User menu' }), logout = page.getByRole('menuitem', { name: 'Logout' })
@@ -265,13 +258,13 @@ for (const path of ['/login', '/log%69n', '/%6cogin', '/dashboard', '/forbidden'
   await page.route('**/assets/*.js', async route => { await gate; await route.continue() })
   await page.goto(path, { waitUntil: 'commit' })
   const isLogin = path !== '/dashboard' && path !== '/forbidden'
-  const expected = !isLogin && (stored === 'light' || stored === 'dark') ? stored : info.project.name
+  const expected = info.project.name
   await expect(page.locator('html')).toHaveAttribute('data-theme', expected)
   expect(await page.locator('#root').textContent()).toBe('')
   expect(await page.locator('html').evaluate(el => getComputedStyle(el).backgroundColor)).toBe(expected === 'dark' ? 'rgb(17, 29, 43)' : 'rgb(244, 247, 250)')
   await page.screenshot({ path: info.outputPath(`prepaint-${stored}.png`) })
   release(); await expect(isLogin ? page.getByRole('button', { name: 'Sign in', exact: true }) : path === '/dashboard' ? page.getByText('1,248') : page.getByRole('heading', { name: '403 — Access Denied' })).toBeVisible()
-  await expect(page.locator('html')).toHaveAttribute('data-theme', expected); await scan(page)
+  await expect(page.locator('html')).toHaveAttribute('data-theme', !isLogin && (stored === 'light' || stored === 'dark') ? stored : expected); await scan(page)
   if (isLogin) {
     const opposite = info.project.name === 'light' ? 'dark' : 'light'
     await page.emulateMedia({ colorScheme: opposite })
@@ -338,11 +331,9 @@ test('unavailable storage and media API safely initialize login and forbidden sc
 
 for (const displayName of ['', 'Long operator name '.repeat(8)]) test(`narrow user identity safely handles ${displayName ? 'long names' : 'missing names'}`, async ({ page }) => {
   const email = 'long.operator.address.for.appearance@example.test'
-  await page.addInitScript(({ displayName, email }) => {
-    const user = { id: 'operator', clientId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', role: 'Admin', displayName, email, accessToken: 'fixture-token', refreshToken: 'fixture-refresh', expiresIn: 3600 }
-    localStorage.setItem('backoffice-auth-persist', JSON.stringify({ state: { user, accessToken: 'fixture-token', refreshTokenValue: 'fixture-refresh' }, version: 0 }))
-  }, { displayName, email })
-  await page.route('**/api/**', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }))
+  await installCurrentSession(page, {displayName,email})
+
+  await page.route(/\/api\/(?!backoffice\/auth\/(?:current|revoke)(?:[?]|$))/, route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }))
   await page.setViewportSize({ width: 320, height: 780 }); await page.goto('/dashboard')
   await page.getByRole('button', { name: /User menu/ }).click()
   const menu = page.getByRole('menu', { name: 'User menu' })

@@ -1,3 +1,5 @@
+import { viewerFixturePermissions } from '../../test/authorityFixtures'
+import { clientFixturePermissions } from '../../test/authorityFixtures'
 import { useRef,useState } from 'react'
 import { QueryClient,QueryClientProvider } from '@tanstack/react-query'
 import { render,screen,waitFor } from '@testing-library/react'
@@ -16,7 +18,7 @@ function wrapper(){const queryClient=new QueryClient({defaultOptions:{queries:{r
 function Host(){const heading=useRef<HTMLHeadingElement>(null),[open,setOpen]=useState(false);return <><h1 tabIndex={-1} ref={heading}>Products</h1><button onClick={()=>setOpen(true)}>Remove Product</button>{open&&<ProductRemovalModal clientId={client} product={item} onClose={()=>setOpen(false)} returnFocusRef={heading}/>}</>}
 beforeEach(()=>{
  clearRemovalMaterial()
- window.history.replaceState({},'', '/products');vi.restoreAllMocks();useAuthStore.setState({user:{id:'01990000-0000-7000-8000-000000000005',clientId:client,role:'Admin',email:'admin@example.test',displayName:'Admin',accessToken:'token',refreshToken:'refresh',expiresIn:3600},accessToken:'token',isAuthenticated:true,isInitialized:true,isLoading:false})
+ window.history.replaceState({},'', '/products');vi.restoreAllMocks();useAuthStore.setState({user:{id:'01990000-0000-7000-8000-000000000005',clientId:client,role:'ClientAdmin', permissions: clientFixturePermissions, sessionId: '01990000-0000-7000-8000-000000000077',clientRoleId:'01990000-0000-7000-8000-000000000078',securityRevision:'1',email:'admin@example.test',displayName:'ClientAdmin',accessToken:'token',refreshToken:'refresh',expiresIn:3600},accessToken:'token',isAuthenticated:true,isInitialized:true,isLoading:false})
  vi.spyOn(productRemovalApi,'preview').mockResolvedValue(parseRemovalPreview(JSON.stringify(preview),client,product))
 })
 it('names consequences, initially focuses Cancel and returns focus to the stable list after deletion',async()=>{
@@ -64,7 +66,7 @@ it.each(['logout','client','actor','role','token','history'] as const)('fences a
  if(change==='logout')useAuthStore.setState({user:null,accessToken:null,isAuthenticated:false})
  if(change==='client')useAuthStore.setState({user:{...actor,clientId:product}})
  if(change==='actor')useAuthStore.setState({user:{...actor,id:product}})
- if(change==='role')useAuthStore.setState({user:{...actor,role:'Viewer'}})
+ if(change==='role')useAuthStore.setState({user:{...actor,role:'Viewer', permissions: viewerFixturePermissions}})
  if(change==='token')useAuthStore.setState({accessToken:'replacement-token'})
  if(change==='history')window.dispatchEvent(new PopStateEvent('popstate'))
  await waitFor(()=>expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -79,7 +81,7 @@ it.each(['logout','client','role','refresh'] as const)('discards a late removal 
  const actor=useAuthStore.getState().user!
  if(change==='logout')useAuthStore.setState({user:null,isAuthenticated:false})
  if(change==='client')useAuthStore.setState({user:{...actor,clientId:product}})
- if(change==='role')useAuthStore.setState({user:{...actor,role:'Viewer'}})
+ if(change==='role')useAuthStore.setState({user:{...actor,role:'Viewer', permissions: viewerFixturePermissions}})
  if(change==='refresh')window.dispatchEvent(new Event('auth:refreshed'))
  await waitFor(()=>expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
  fail({status:503,code:'dependency_unavailable',message:'Private old result'});await new Promise(resolve=>setTimeout(resolve,0))

@@ -1,3 +1,4 @@
+import { clientFixturePermissions } from '../test/authorityFixtures'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode, type ReactNode } from 'react'
@@ -15,7 +16,7 @@ const domain = parseDomain(wire, JSON.parse(wire).clientId)
 beforeEach(() => {
   window.dispatchEvent(new Event('auth:refreshed'))
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
-  useAuthStore.setState({ isAuthenticated: true, accessToken: 'a', user: { id: '01990000-0000-7000-8000-000000000001', clientId: domain.clientId, role: 'Admin', email: '', displayName: '', accessToken: '', refreshToken: '', expiresIn: 0 } })
+  useAuthStore.setState({ isAuthenticated: true, accessToken: 'a', user: { id: '01990000-0000-7000-8000-000000000001', clientId: domain.clientId, role: 'ClientAdmin', permissions: clientFixturePermissions, email: '', displayName: '', accessToken: '', refreshToken: '', expiresIn: 0 } })
 })
 it('deduplicates two consumers and StrictMode under one scoped polling owner', async () => {
   vi.mocked(domainsApi.detail).mockResolvedValue(domain)
@@ -54,6 +55,18 @@ it('recovers a cold retained release after ordinary detail 404 using the active 
   const result = renderHook(() => useDomainTracker(scope, domain.id), { wrapper })
   await waitFor(() => expect(result.result.current.state.value?.kind).toBe('release'))
   expect(domainsApi.releaseStatus).toHaveBeenCalledWith(scope.clientId, domain.id, expect.any(AbortSignal))
+  result.unmount()
+})
+
+it('keeps a read-only domain404 scoped without requesting a privileged release receipt', async () => {
+  useAuthStore.setState(state => ({ user: { ...state.user!, role: 'Editor', permissions: ['domains:view'] } }))
+  vi.mocked(domainsApi.detail).mockRejectedValue({ status: 404, code: 'domain_not_found' })
+  const client = new QueryClient(), scope = captureDomainScope()
+  const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  const result = renderHook(() => useDomainTracker(scope, domain.id), { wrapper })
+  await waitFor(() => expect(result.result.current.state.phase).toBe('not_found'))
+  expect(domainsApi.releaseStatus).not.toHaveBeenCalled()
+  expect(useAuthStore.getState().isAuthenticated).toBe(true)
   result.unmount()
 })
 

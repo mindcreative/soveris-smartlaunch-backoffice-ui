@@ -1,3 +1,5 @@
+import { viewerFixturePermissions } from '../../test/authorityFixtures'
+import { clientFixturePermissions } from '../../test/authorityFixtures'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,12 +12,12 @@ import type { BillingSubscriptionState } from '../../types/billing'
 
 const CLIENT_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 
-function authenticate(role: 'Admin' | 'Viewer' = 'Admin') {
+function authenticate(role: 'ClientAdmin' | 'Viewer' = 'ClientAdmin') {
   useAuthStore.setState({
     accessToken: 'token', refreshTokenValue: 'refresh', isLoading: false,
     isAuthenticated: true, isInitialized: true,
     user: {
-      id: 'operator', email: 'operator@example.com', displayName: 'Operator', role,
+      id: 'operator', email: 'operator@example.com', displayName: 'Operator', role, permissions: role==='ClientAdmin'?clientFixturePermissions:[], platformPermissions: role==='ClientAdmin'?['platform:packages:manage']:[],
       clientId: CLIENT_ID, accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600,
     },
   })
@@ -105,7 +107,7 @@ describe('Billing subscription route and page state', () => {
     await user.type(screen.getByLabelText('Reason'), 'Private role-revocation reason')
     const existingUser = useAuthStore.getState().user
     if (!existingUser) throw new Error('Expected authenticated user')
-    act(() => useAuthStore.getState().setUser({ ...existingUser, role: 'Viewer' }))
+    act(() => useAuthStore.setState({user:{ ...existingUser, role: 'Viewer', permissions: viewerFixturePermissions,platformPermissions:[] }}))
     expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.queryByText('Private role-revocation reason')).not.toBeInTheDocument()

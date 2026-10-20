@@ -1,3 +1,5 @@
+import { installCurrentSession } from './currentSession'
+import { clientFixturePermissions, viewerFixturePermissions } from '../src/test/authorityFixtures'
 import { stringify, LosslessNumber } from 'lossless-json'
 import type { Page, Route } from '@playwright/test'
 import { CREDIT_METRICS, CREDIT_METRICS as metrics } from '../src/test/billingReportsFixture'
@@ -29,7 +31,9 @@ function sumExpense(values:ReturnType<typeof expenseMetrics>[]) {
  return result
 }
 
-export async function installSession(page:Page,role='Admin') {await page.addInitScript(({client,actor,role})=>{const user={id:actor,clientId:client,role,email:'operator@example.test',displayName:'Operator',accessToken:'test-token',refreshToken:'test-refresh',expiresIn:3600};localStorage.setItem('backoffice_access_token','test-token');localStorage.setItem('backoffice_refresh_token','test-refresh');localStorage.setItem('backoffice-auth-persist',JSON.stringify({state:{accessToken:'test-token',refreshTokenValue:'test-refresh',user},version:0}))},{client:CLIENT,actor:ACTOR,role})}
+export async function installSession(page:Page,role: 'ClientAdmin' | 'Editor' | 'Viewer'='ClientAdmin') {
+ await installCurrentSession(page,{id:ACTOR,clientId:CLIENT,role,permissions:role==='Viewer'?viewerFixturePermissions:clientFixturePermissions,platformPermissions:role==='Viewer'?[]:['platform:billing:view','platform:billing:reconcile']})
+}
 function periods(from:string,to:string,grain:string){const result:{bucketStart:string;periodStart:string;periodEnd:string}[]=[];const date=new Date(from);date.setUTCHours(0,0,0,0);if(grain==='week')date.setUTCDate(date.getUTCDate()-(date.getUTCDay()+6)%7);if(grain==='month')date.setUTCDate(1);while(date.getTime()<Date.parse(to)){const start=date.toISOString();if(grain==='month')date.setUTCMonth(date.getUTCMonth()+1);else date.setUTCDate(date.getUTCDate()+(grain==='week'?7:1));result.push({bucketStart:start,periodStart:new Date(Math.max(Date.parse(start),Date.parse(from))).toISOString(),periodEnd:new Date(Math.min(date.getTime(),Date.parse(to))).toISOString()})}return result}
 export function mockReports(){
  let version=1,sequence=0;const snapshots=new Map<string,{kind:string;client:string;filters:Record<string,any>;asOf:string;version:number;position:number}>();const requests:URL[]=[]

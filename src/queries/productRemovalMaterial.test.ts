@@ -1,19 +1,32 @@
+import { viewerFixturePermissions } from '../test/authorityFixtures'
+import { clientFixturePermissions } from '../test/authorityFixtures'
 import {beforeEach,expect,it,vi} from 'vitest'
 import {useAuthStore} from '../stores/authStore'
 import {clearRemovalMaterial,readRemovalMaterial,rememberRemovalMaterial} from './productRemovalMaterial'
 import {client,product} from '../test/fixtures/productRemoval'
-const user={id:'01990000-0000-7000-8000-000000000005',clientId:client,role:'Admin' as const,email:'admin@example.test',displayName:'Admin',accessToken:'token',refreshToken:'refresh',expiresIn:3600}
+const user={id:'01990000-0000-7000-8000-000000000005',clientId:client,role:'ClientAdmin' as const, permissions: clientFixturePermissions, sessionId: '01990000-0000-7000-8000-000000000077',clientRoleId:'01990000-0000-7000-8000-000000000078',securityRevision:'1',email:'admin@example.test',displayName:'ClientAdmin',accessToken:'token',refreshToken:'refresh',expiresIn:3600}
 const command={operationId:'01990000-0000-7000-8000-000000000006',expectedRevision:'9223372036854775807',policyVersion:'product-removal-v1' as const,previewFingerprint:'a'.repeat(64)}
-beforeEach(()=>{vi.restoreAllMocks();clearRemovalMaterial();sessionStorage.clear();useAuthStore.setState({user,accessToken:'token',isAuthenticated:true})})
-it('retains exact material when persisted authentication initializes after a reload',()=>{
- useAuthStore.setState({isAuthenticated:false});rememberRemovalMaterial(client,product,command)
- useAuthStore.setState({isAuthenticated:true});expect(readRemovalMaterial(client,product,command.operationId)).toEqual(command)
+beforeEach(()=>{vi.restoreAllMocks();clearRemovalMaterial();sessionStorage.clear();useAuthStore.setState({user,accessToken:'token',isAuthenticated:true,isInitialized:true,isLoading:false})})
+it('preserves only an original-session command after server verification during reload',()=>{
+ rememberRemovalMaterial(client,product,command)
+ useAuthStore.setState({isInitialized:false,isLoading:true,user:null,isAuthenticated:false})
+ expect(readRemovalMaterial(client,product,command.operationId)).toBeNull()
+ expect(Object.keys(sessionStorage).filter(k=>k.startsWith('backoffice:product-removal:'))).toHaveLength(1)
+ useAuthStore.setState({user,isAuthenticated:true,isInitialized:true,isLoading:false})
+ expect(readRemovalMaterial(client,product,command.operationId)).toEqual(command)
+})
+it.each(['session','revision','clientRole'] as const)('a new %s never revives an old command',change=>{
+ rememberRemovalMaterial(client,product,command)
+ const changed={...user,...(change==='session'?{sessionId:command.operationId}:change==='revision'?{securityRevision:'2'}:{clientRoleId:command.operationId})}
+ useAuthStore.setState({user:changed})
+ expect(readRemovalMaterial(client,product,command.operationId)).toBeNull()
+ expect(Object.keys(sessionStorage).filter(k=>k.startsWith('backoffice:product-removal:'))).toHaveLength(0)
 })
 it.each(['client','actor','role','token','logout','refresh'] as const)('purges exact material on %s authority change',change=>{
  rememberRemovalMaterial(client,product,command);expect(readRemovalMaterial(client,product,command.operationId)).toEqual(command)
  if(change==='client')useAuthStore.setState({user:{...user,clientId:product}})
  if(change==='actor')useAuthStore.setState({user:{...user,id:product}})
- if(change==='role')useAuthStore.setState({user:{...user,role:'Viewer'}})
+ if(change==='role')useAuthStore.setState({user:{...user,role:'Viewer', permissions: viewerFixturePermissions}})
  if(change==='token')useAuthStore.setState({accessToken:'new-token'})
  if(change==='logout')useAuthStore.setState({user:null,accessToken:null,isAuthenticated:false})
  if(change==='refresh')window.dispatchEvent(new Event('auth:refreshed'))
@@ -36,7 +49,7 @@ it.each(['client','actor','role','token','logout','refresh','authentication-loss
  expect(readRemovalMaterial(client,product,command.operationId)).toEqual(command)
  if(change==='client')useAuthStore.setState({user:{...user,clientId:product}})
  if(change==='actor')useAuthStore.setState({user:{...user,id:product}})
- if(change==='role')useAuthStore.setState({user:{...user,role:'Viewer'}})
+ if(change==='role')useAuthStore.setState({user:{...user,role:'Viewer', permissions: viewerFixturePermissions}})
  if(change==='token')useAuthStore.setState({accessToken:'new-token'})
  if(change==='logout')useAuthStore.setState({user:null,accessToken:null,isAuthenticated:false})
  if(change==='refresh')window.dispatchEvent(new Event('auth:refreshed'))

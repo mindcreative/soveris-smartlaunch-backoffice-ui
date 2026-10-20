@@ -2,16 +2,27 @@ import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
 import type { AuthUser, UserRole } from '../types/auth'
 import { authApi } from '../api/endpoints'
-import { hasRolePermission } from '../auth/permissions'
+import { hasPermission } from '../auth/permissions'
+import { parseCurrentAuthority } from '../auth/currentAuthority'
+import { currentAuthorityEpoch, retireAuthority } from '../auth/authorityEpoch'
 import { clearPrivateClientScope } from '../queries/billingQueries'
 import { queryClient } from '../queryClient'
 
-async function clearPrivateSessionQueries(): Promise<void> {
-  await clearPrivateClientScope(queryClient)
-  await queryClient.cancelQueries()
+function clearPrivateState(): Promise<void> {
+  retireAuthority()
+  const retiring = clearPrivateClientScope(queryClient)
+  void queryClient.cancelQueries()
   queryClient.clear()
+  return retiring
 }
-
+function tokens(access: string | null, refresh: string | null): void {
+  try {
+    if (access) localStorage.setItem('backoffice_access_token', access)
+    else localStorage.removeItem('backoffice_access_token')
+    if (refresh) localStorage.setItem('backoffice_refresh_token', refresh)
+    else localStorage.removeItem('backoffice_refresh_token')
+  } catch { /* Storage availability never confers authority. */ }
+}
 interface AuthState {
   accessToken: string | null
   refreshTokenValue: string | null
@@ -19,259 +30,108 @@ interface AuthState {
   isLoading: boolean
   isAuthenticated: boolean
   isInitialized: boolean
+  authorityUnavailable: boolean
 }
-
 export interface AuthActions {
-  setTokens: (accessToken: string, refreshTokenValue: string) => void
+  setTokens: (access: string, refresh: string) => void
   setUser: (user: AuthUser) => void
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   doRefreshToken: () => Promise<void>
   initialize: () => Promise<void>
   clearSession: () => Promise<void>
+  suspendAuthority: () => Promise<void>
   handleSuccessfulRefresh: () => Promise<void>
-  hasRole: (requiredRole: UserRole) => boolean
+  hasRole: (role: UserRole) => boolean
   hasAnyRole: (roles: UserRole[]) => boolean
   hasPermission: (permission: string) => boolean
 }
-
 type AuthStore = AuthState & AuthActions
-
-const roleHierarchy: Record<UserRole, number> = { Viewer: 0, Editor: 1, Admin: 2 }
-
-export const useAuthStore = create<AuthStore>()(
-  devtools(
-    persist(
-      (set, get) => ({
-        accessToken: null,
-        refreshTokenValue: null,
-        user: null,
-        isLoading: true,
-        isAuthenticated: false,
-        isInitialized: false,
-
-        setTokens: (accessToken: string, refreshTokenValue: string) => {
-          set({ accessToken, refreshTokenValue, isAuthenticated: !!accessToken, isInitialized: true })
-        },
-
-        setUser: (user: AuthUser) => {
-          const previous = get().user
-          if (!previous || previous.id !== user.id || previous.clientId !== user.clientId)
-            queryClient.clear()
-          set({ user, isAuthenticated: true, isInitialized: true })
-        },
-
-        hasRole: (requiredRole: UserRole) => {
-          const state = get()
-          if (!state.user) return false
-          return roleHierarchy[state.user.role] >= roleHierarchy[requiredRole]
-        },
-
-        hasAnyRole: (roles: UserRole[]) => {
-          const state = get()
-          if (!state.user) return false
-          return roles.includes(state.user.role)
-        },
-
-        hasPermission: (permission: string) => {
-          const state = get()
-          if (!state.user) return false
-          return hasRolePermission(state.user.role, permission)
-        },
-
-        login: async (email: string, password: string) => {
-          set({ isLoading: true })
-          try {
-            const result = await authApi.login({ email, password })
-            const fullUser: AuthUser = {
-              id: result.user?.id || '',
-              email,
-              displayName: result.user?.displayName || email,
-              role: result.user?.role || 'Viewer',
-              clientId: result.user?.clientId || '',
-              accessToken: result.accessToken,
-              refreshToken: result.refreshToken,
-              expiresIn: result.expiresIn,
-            }
-
-            await clearPrivateSessionQueries()
-
-            set({
-              user: fullUser,
-              accessToken: result.accessToken,
-              refreshTokenValue: result.refreshToken,
-              isAuthenticated: true,
-              isLoading: false,
-              isInitialized: true,
-            })
-
-            // Also persist in localStorage for interceptor
-            try {
-              localStorage.setItem('backoffice_access_token', result.accessToken)
-              localStorage.setItem('backoffice_refresh_token', result.refreshToken)
-            } catch {
-              // localStorage unavailable
-            }
-          } catch (error) {
-            const message =
-              error && typeof error === 'object' && 'message' in error
-                ? (error as { message: string }).message
-                : 'Login failed'
-            set({ isLoading: false, isAuthenticated: false, isInitialized: true })
-            throw new Error(message)
-          }
-        },
-
-        logout: async () => {
-          // NOTE: API /auth/logout and /auth/revoke are not called from the UI side.
-          // Simply clear local state.
-          set({
-            user: null,
-            accessToken: null,
-            refreshTokenValue: null,
-            isAuthenticated: false,
-            isLoading: false,
-            isInitialized: true,
-          })
-
-          await clearPrivateSessionQueries()
-
-          try {
-            localStorage.removeItem('backoffice_access_token')
-            localStorage.removeItem('backoffice_refresh_token')
-          }
-          catch {
-            // noop
-          }
-        },
-
-        clearSession: async () => {
-          await get().logout()
-        },
-
-        handleSuccessfulRefresh: async () => {
-          const actor = get().user
-          const preferenceKey = ['time-zone-preference', actor?.id, actor?.clientId]
-          await clearPrivateClientScope(queryClient)
-          await queryClient.cancelQueries()
-          for (const query of queryClient.getQueryCache().getAll()) {
-            if (JSON.stringify(query.queryKey) !== JSON.stringify(preferenceKey))
-              queryClient.removeQueries({ queryKey: query.queryKey, exact: true })
-          }
-          queryClient.getMutationCache().clear()
-          if (actor) await queryClient.invalidateQueries({ queryKey: preferenceKey, exact: true })
-        },
-
-        doRefreshToken: async () => {
-          const state = get()
-          if (!state.refreshTokenValue) {
-            set({
-              isAuthenticated: false,
-              user: null,
-              accessToken: null,
-              refreshTokenValue: null,
-              isLoading: false,
-              isInitialized: true,
-            })
-            await clearPrivateSessionQueries()
-            return
-          }
-
-          set({ isLoading: true })
-          try {
-            const result = await authApi.refreshToken({ refreshToken: state.refreshTokenValue })
-
-            await clearPrivateSessionQueries()
-
-            set({
-              accessToken: result.accessToken,
-              refreshTokenValue: result.refreshToken,
-              isLoading: false,
-              isAuthenticated: true,
-              isInitialized: true,
-            })
-
-            try {
-              localStorage.setItem('backoffice_access_token', result.accessToken)
-              localStorage.setItem('backoffice_refresh_token', result.refreshToken)
-            } catch {
-              // noop
-            }
-          } catch {
-            set({
-              user: null,
-              accessToken: null,
-              refreshTokenValue: null,
-              isAuthenticated: false,
-              isLoading: false,
-              isInitialized: true,
-            })
-
-            await clearPrivateSessionQueries()
-
-            try {
-              localStorage.removeItem('backoffice_access_token')
-              localStorage.removeItem('backoffice_refresh_token')
-            } catch {
-              // noop
-            }
-          }
-        },
-
-        initialize: async () => {
-          const state = get()
-          if (state.isInitialized) return
-          if (!state.accessToken) {
-            set({ isLoading: false, isAuthenticated: false, isInitialized: true })
-            return
-          }
-
-          // NOTE: /auth/me is not implemented in the API.
-          // Trust the persisted JWT payload (user + expiration) and attempt refresh if needed.
-          set({ isLoading: false })
-          try {
-            // If we have a persisted user with accessToken, consider authenticated
-            if (state.user && state.accessToken) {
-              set({ isAuthenticated: true, isLoading: false, isInitialized: true })
-            } else if (state.refreshTokenValue) {
-              await get().doRefreshToken()
-            } else {
-              set({
-                user: null,
-                accessToken: null,
-                refreshTokenValue: null,
-                isAuthenticated: false,
-                isLoading: false,
-                isInitialized: true,
-              })
-            }
-          } catch {
-            // Token is stale — attempt refresh
-            const currentState = get()
-            if (currentState.refreshTokenValue) {
-              await get().doRefreshToken()
-            } else {
-              set({
-                user: null,
-                accessToken: null,
-                refreshTokenValue: null,
-                isAuthenticated: false,
-                isLoading: false,
-                isInitialized: true,
-              })
-            }
-          }
-        },
-      }),
-      {
-        name: 'backoffice-auth-persist',
-        partialize: (state) => ({
-          accessToken: state.accessToken,
-          refreshTokenValue: state.refreshTokenValue,
-          user: state.user,
-        }),
-      }
-    ),
-    { name: 'BackofficeAuthStore' }
-  )
-)
+const anonymous = { user: null, accessToken: null, refreshTokenValue: null, isAuthenticated: false, isLoading: false, isInitialized: true, authorityUnavailable: false }
+let initializing: Promise<void> | null = null
+let refreshingProjection: Promise<void> | null = null
+export const useAuthStore = create<AuthStore>()(devtools(persist((set, get) => {
+  function accept(user: unknown, access: string, refresh: string): void {
+    const parsed = parseCurrentAuthority(user)
+    void clearPrivateState()
+    tokens(access, refresh)
+    set({ user: { ...parsed, accessToken: access, refreshToken: refresh }, accessToken: access,
+      refreshTokenValue: refresh, isAuthenticated: true, isInitialized: true, isLoading: false, authorityUnavailable: false })
+  }
+  async function clear(): Promise<void> {
+    set(anonymous); tokens(null, null); await clearPrivateState()
+  }
+  return {
+    ...anonymous, isLoading: true, isInitialized: false,
+    setTokens: (access, refresh) => { tokens(access, refresh); set({ accessToken: access, refreshTokenValue: refresh }) },
+    setUser: user => { const s=get(); if (!s.accessToken || !s.refreshTokenValue) return; accept(user,s.accessToken,s.refreshTokenValue) },
+    hasRole: role => get().isAuthenticated && get().user?.role === role,
+    hasAnyRole: roles => get().isAuthenticated && Boolean(get().user && roles.includes(get().user!.role)),
+    hasPermission: permission => get().isAuthenticated && hasPermission(get().user,permission),
+    login: async (email,password) => {
+      await clear(); set({ isLoading: true }); const epoch=currentAuthorityEpoch()
+      try {
+        const result=await authApi.login({ email,password })
+        if (currentAuthorityEpoch()!==epoch) return
+        accept(result.user,result.accessToken,result.refreshToken)
+      } catch (error) { if(currentAuthorityEpoch()===epoch) await clear(); throw error }
+    },
+    logout: async () => {
+      const refresh=get().refreshTokenValue
+      await clear()
+      if (refresh) { try { await authApi.revoke(refresh) } catch { /* Local scope stays retired; server denial/unavailability is not success. */ } }
+    },
+    clearSession: clear,
+    suspendAuthority: async () => {
+      set({ user: null,isAuthenticated: false,isLoading: false,isInitialized: true,authorityUnavailable: true })
+      await clearPrivateState()
+    },
+    handleSuccessfulRefresh: async () => {
+      if (refreshingProjection) return refreshingProjection
+      refreshingProjection=(async () => {
+        await get().suspendAuthority()
+        let access: string | null=null, refresh: string | null=null
+        try { access=localStorage.getItem('backoffice_access_token');refresh=localStorage.getItem('backoffice_refresh_token') } catch { /* handled below */ }
+        if(!access || !refresh) { await clear();return }
+        const epoch=currentAuthorityEpoch()
+        const projection=await authApi.currentAuthority()
+        if(currentAuthorityEpoch()!==epoch) return
+        accept(projection,access,refresh)
+      })()
+      try { await refreshingProjection } finally { refreshingProjection=null }
+    },
+    doRefreshToken: async () => {
+      const refresh=get().refreshTokenValue
+      if(!refresh) { await clear();return }
+      await get().suspendAuthority();const epoch=currentAuthorityEpoch()
+      try {
+        const result=await authApi.refreshToken({ refreshToken: refresh })
+        if(currentAuthorityEpoch()!==epoch) return
+        accept(result.user,result.accessToken,result.refreshToken)
+      } catch { if(currentAuthorityEpoch()===epoch) await clear() }
+    },
+    initialize: async () => {
+      if(get().isInitialized) return
+      if(initializing) return initializing
+      initializing=(async () => {
+        const state=get();if(!state.accessToken) { await clear();return }
+        tokens(state.accessToken,state.refreshTokenValue)
+        set({ user: null,isAuthenticated: false,isLoading: true });await clearPrivateState();const epoch=currentAuthorityEpoch()
+        try {
+          const projection=await authApi.currentAuthority()
+          if(currentAuthorityEpoch()===epoch) accept(projection,state.accessToken,state.refreshTokenValue??'')
+        } catch (error) {
+          if(currentAuthorityEpoch()!==epoch) return
+          if(error && typeof error==='object' && 'status' in error && error.status===503) await get().suspendAuthority()
+          else await clear()
+        }
+      })()
+      try { await initializing } finally { initializing=null }
+    },
+  }
+}, {
+  name: 'backoffice-auth-persist',version: 2,
+  // Legacy role/session payloads must reauthenticate. Persisted user data never grants authority.
+  migrate: () => ({ accessToken: null,refreshTokenValue: null }),
+  partialize: state => ({ accessToken: state.accessToken, refreshTokenValue: state.refreshTokenValue }),
+}), { name: 'BackofficeAuthStore' }))

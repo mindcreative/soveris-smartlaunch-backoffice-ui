@@ -1,3 +1,4 @@
+import { AuthorityChangedError, currentAuthorityEpoch } from '../auth/authorityEpoch'
 import { normalizeRemovalProblem } from './productRemovalProblem'
 import { normalizeDomainProblem } from './domainProblem'
 import axios, {
@@ -138,6 +139,7 @@ export class ApiClient {
     // Request interceptor — attach access token
     this.client.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
+        const scoped=config as InternalAxiosRequestConfig & { authorityEpoch?: number }; scoped.authorityEpoch=currentAuthorityEpoch()
         const token = this.getAccessToken()
         if (token) {
           config.headers.set('Authorization', `Bearer ${token}`)
@@ -149,19 +151,40 @@ export class ApiClient {
 
     // Response interceptor — handle 401 with token refresh
     this.client.interceptors.response.use(
-      (response: AxiosResponse) => response,
+      (response: AxiosResponse) => {
+        const epoch=(response.config as InternalAxiosRequestConfig & { authorityEpoch?: number }).authorityEpoch
+        if(epoch!==undefined && epoch!==currentAuthorityEpoch()) throw new AuthorityChangedError()
+        return response
+      },
       async (error) => {
         const originalRequest = error.config as InternalAxiosRequestConfig & {
           _retry?: boolean
+          authorityEpoch?: number
           onAuthReplay?: () => void
         }
 
-        // If 401 and we haven't retried yet, attempt refresh
+        if(originalRequest?.authorityEpoch!==undefined && originalRequest.authorityEpoch!==currentAuthorityEpoch())
+          return Promise.reject(new AuthorityChangedError())
+        const status=error.response?.status
+        const authPublic=['/auth/login','/auth/refresh','/auth/revoke'].some(path=>originalRequest?.url?.endsWith(path))
+        let problemBody=error.response?.data
+        if(problemBody instanceof Blob && problemBody.size<=65536) {
+          try {problemBody=await problemBody.text()} catch { /* Keep the bounded generic failure. */ }
+          if(originalRequest?.authorityEpoch!==undefined && originalRequest.authorityEpoch!==currentAuthorityEpoch())
+            return Promise.reject(new AuthorityChangedError())
+        }
+        const problem=decodeErrorBody(problemBody)
+        const problemCode=problem && typeof problem==='object' ? String((problem as {code?:unknown;error?:unknown}).code??(problem as {error?:unknown}).error??'') : ''
+        const unavailable=status===503 && (/authorization.*unavailable|authorization.*dependency/.test(problemCode) || originalRequest?.url?.endsWith('/auth/current'))
+        if(!authPublic && (status===403 || unavailable)) window.dispatchEvent(new CustomEvent('auth:suspended'))
+        // Replays use the same original session; mutations are never automatically retried.
+
         if (
           error.response?.status === 401 &&
           !originalRequest._retry &&
           this.shouldRetryRequest(originalRequest)
         ) {
+          window.dispatchEvent(new CustomEvent('auth:suspended'))
           originalRequest._retry = true
           originalRequest.onAuthReplay?.()
 
@@ -176,13 +199,14 @@ export class ApiClient {
           }
         }
 
+        if(status===401 && !authPublic) this.clearAuthState()
         return Promise.reject(this.normalizeError(error))
       }
     )
   }
 
   private shouldRetryRequest(config: InternalAxiosRequestConfig & { _retry?: boolean; retryOnUnauthorized?: boolean }): boolean {
-    if (config.retryOnUnauthorized === false) return false
+    if (config.retryOnUnauthorized === false || config.method?.toUpperCase()!=='GET') return false
     // Don't retry login, refresh, or health endpoints
     const nonRetryPaths = ['/auth/login', '/auth/refresh', '/health']
     return !nonRetryPaths.some((path) => config.url?.includes(path))

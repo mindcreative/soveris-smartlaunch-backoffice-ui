@@ -1,3 +1,5 @@
+import { installCurrentSession } from './currentSession'
+import { clientFixturePermissions, viewerFixturePermissions } from '../src/test/authorityFixtures'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { fulfillLocal } from './localPresentationMocks'
@@ -46,13 +48,8 @@ function completedStatus(credits = 2.25) {
   }
 }
 
-async function session(page: Page, role = 'Admin') {
-  await page.addInitScript(({ clientId, actorRole }) => {
-    const user = { id: 'operator', email: 'operator@example.test', displayName: 'Operator', role: actorRole, clientId, accessToken: 'test-token', refreshToken: 'test-refresh', expiresIn: 3600 }
-    localStorage.setItem('backoffice_access_token', 'test-token')
-    localStorage.setItem('backoffice_refresh_token', 'test-refresh')
-    localStorage.setItem('backoffice-auth-persist', JSON.stringify({ state: { accessToken: 'test-token', refreshTokenValue: 'test-refresh', user }, version: 0 }))
-  }, { clientId: CLIENT_ID, actorRole: role })
+async function session(page: Page, role: 'ClientAdmin' | 'Editor' | 'Viewer' = 'ClientAdmin') {
+  await installCurrentSession(page, { clientId: CLIENT_ID, role, permissions: role === 'Viewer' ? viewerFixturePermissions : clientFixturePermissions })
 }
 
 async function respondJson(route: Route, body: unknown, status = 200) {
@@ -63,7 +60,7 @@ test.beforeEach(async ({ page }) => { await session(page) })
 
 test('local fixture: fractional quote is reviewed and submitted through closed local seams', async ({ page }) => {
   const requests: Array<{ method: string; path: string; body: string | null }> = []
-  await page.route('**/api/backoffice/**', async (route) => {
+  await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/, async (route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname
     if (path === '/api/ai/backend-preparations') { await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ state: 'ready' }) }); return }

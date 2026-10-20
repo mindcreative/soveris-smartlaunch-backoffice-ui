@@ -1,3 +1,4 @@
+import { editorFixturePermissions } from '../../test/authorityFixtures'
 import type { PropsWithChildren } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, render, screen, waitFor } from '@testing-library/react'
@@ -77,7 +78,7 @@ function renderEditor(selectedProduct: Product = product) {
 describe('ProductEditorModal', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
-    useAuthStore.setState({ user: { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', clientId: CLIENT_ID, email: 'editor@example.test', displayName: 'Editor', role: 'Editor', accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600 }, isAuthenticated: true })
+    useAuthStore.setState({ user: { id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', clientId: CLIENT_ID, email: 'editor@example.test', displayName: 'Editor', role: 'Editor', permissions: editorFixturePermissions, accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600 }, isAuthenticated: true })
     vi.spyOn(contentApi, 'getProduct').mockResolvedValue(product)
     vi.spyOn(contentApi, 'getContent').mockResolvedValue(envelope())
     aiMocks.imageOutcome = null

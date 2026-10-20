@@ -55,7 +55,7 @@ function AnomalyFilterForm({kind,filters,onApply,blocked}:{kind:ReportKind;filte
  </form>
 }
 function Results({client,filters,kind,authority,deny}:{client:string;filters:AnomalyFilters;kind:ReportKind;authority:()=>string;deny:(status:number)=>void}){
- const lane=useAnomalyInvestigation(client,filters,authority,deny);const c=lane.controller;const {evaluationId}=useParams();const auth=useAuth();const canAct=auth.hasPermission('billing:reconcile')&&lane.detail?.canTransition===true
+ const lane=useAnomalyInvestigation(client,filters,authority,deny);const c=lane.controller;const {evaluationId}=useParams();const auth=useAuth();const canAct=auth.hasPermission('platform:billing:reconcile')&&lane.detail?.canTransition===true
  const [view,setView]=useState('auto');const sectionHeading=useRef<HTMLHeadingElement>(null);const refreshEvidence=useRef<HTMLButtonElement>(null);const reasonInput=useRef<HTMLTextAreaElement>(null);const errorSummary=useRef<HTMLDivElement>(null);const reasonId=useId(),descriptionId=useId();const continuation=useRef<HTMLButtonElement>(null)
  useLayoutEffect(()=>{if(evaluationId)void c.select(evaluationId)},[c,evaluationId])
  useLayoutEffect(()=>{if(lane.commandState==='invalid')errorSummary.current?.focus()},[lane.commandState])

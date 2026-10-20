@@ -13,32 +13,6 @@ export const MAX_PAGE_SIZE = 100
 /** API response timeout in milliseconds */
 export const API_TIMEOUT = 30000
 
-/** Role names */
-export const ROLES = {
-  ADMIN: 'Admin',
-  EDITOR: 'Editor',
-  VIEWER: 'Viewer'
-} as const
-
-/** Role permissions */
-export const ROLE_PERMISSIONS = {
-  Admin: ['*'],
-  Editor: [
-    'submissions:view',
-    'submissions:delete',
-    'submissions:export',
-    'analytics:view',
-    'products:view',
-    'products:create',
-    'products:update'
-  ],
-  Viewer: [
-    'submissions:view',
-    'analytics:view',
-    'products:view'
-  ]
-} as const
-
 /** Sidebar navigation items */
 export const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', path: '/dashboard' },

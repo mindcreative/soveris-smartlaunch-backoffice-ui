@@ -208,8 +208,12 @@ function PermissionAwareLedgerPage({ clientId }: { clientId: string }) {
 }
 
 export function BillingLedgerBoundaryPage() {
+  const {user,hasPermission}=useAuth()
   const { clientId: routeClientId } = useParams()
   const clientId = canonicalizeGuid(routeClientId)
+  if(clientId && user && canonicalizeGuid(user.clientId)!==clientId && !hasPermission('platform:billing:view'))
+    return <Forbidden message="This Client is outside your current financial scope." />
+
   if (!clientId) return <EmptyState title="Client context unavailable" description="A valid Client URL is required for the Billing workspace." />
   if (routeClientId !== clientId) return <Navigate to={`/billing/clients/${clientId}/ledger`} replace />
   return <PermissionAwareLedgerPage clientId={clientId} />

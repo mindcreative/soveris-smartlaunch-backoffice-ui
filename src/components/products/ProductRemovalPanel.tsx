@@ -10,7 +10,7 @@ import type { Product } from '../../types/content'
 import { useDomainScope,type DomainScope } from '../../queries/domainScope'
 import { assertRemovalScope,blockRemovalScope,removalScopeCurrent,useRemovalAuthority,useRemovalHistory,useRemovalPreview } from '../../queries/productRemovalQueries'
 import { productKeys } from '../../queries/productQueries'
-import { hasRolePermission } from '../../auth/permissions'
+import { hasPermission } from '../../auth/permissions'
 import { useAuthStore } from '../../stores/authStore'
 import { domainKeys } from '../../queries/domainQueries'
 import { clientCapabilityKeys, clearPrivateClientScope } from '../../queries/billingQueries'
@@ -105,7 +105,7 @@ export function ProductRemovalModal({clientId,product,onClose,onArchive,returnFo
   recoveryOperation.current = result.operationId
   setReceipt(result);setUnknown(false);setError(null)
   client.removeQueries({queryKey:productKeys.detail(clientId,product.id)});client.removeQueries({queryKey:productKeys.content(clientId,product.id)})
-  await Promise.all([client.invalidateQueries({queryKey:productKeys.listRoot(clientId)}),client.invalidateQueries({queryKey:[...productKeys.client(clientId),'removal']}),client.invalidateQueries({queryKey:clientCapabilityKeys.client(clientId)}),...(hasRolePermission(useAuthStore.getState().user?.role,'domains:view')?[client.invalidateQueries({queryKey:domainKeys.scope(scope)})]:[])])
+  await Promise.all([client.invalidateQueries({queryKey:productKeys.listRoot(clientId)}),client.invalidateQueries({queryKey:[...productKeys.client(clientId),'removal']}),client.invalidateQueries({queryKey:clientCapabilityKeys.client(clientId)}),...(hasPermission(useAuthStore.getState().user,'domains:view')?[client.invalidateQueries({queryKey:domainKeys.scope(scope)})]:[])])
  }
  async function check(){
   const operation=recoveryOperation.current??command.current?.operationId

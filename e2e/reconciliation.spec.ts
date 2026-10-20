@@ -1,15 +1,12 @@
+import { installCurrentSession } from './currentSession'
+import { clientFixturePermissions, viewerFixturePermissions } from '../src/test/authorityFixtures'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import { reconciliationFixture, CLIENT, FINDING, JOB, RESERVATION } from '../src/test/reconciliationFixture'
 import type { ResolutionCommand } from '../src/api/reconciliationApi'
 import type { ReconciliationAction } from '../src/types/reconciliation'
-async function session(page: Page, role = 'Admin') {
-  await page.addInitScript(({ clientId, role }) => {
-    const user = { id: 'operator', email: 'operator@example.test', displayName: 'Operator', role, clientId, accessToken: 'test-token', refreshToken: 'test-refresh', expiresIn: 3600 }
-    localStorage.setItem('backoffice_access_token', 'test-token')
-    localStorage.setItem('backoffice_refresh_token', 'test-refresh')
-    localStorage.setItem('backoffice-auth-persist', JSON.stringify({ state: { accessToken: 'test-token', refreshTokenValue: 'test-refresh', user }, version: 0 }))
-  }, { clientId: CLIENT, role })
+async function session(page: Page, role: 'ClientAdmin' | 'Editor' | 'Viewer' = 'ClientAdmin') {
+  await installCurrentSession(page, { clientId: CLIENT, role, permissions: role === 'Viewer' ? viewerFixturePermissions : clientFixturePermissions, platformPermissions: role === 'Viewer' ? [] : ['platform:billing:view','platform:billing:reconcile'] })
 }
 async function keyboardReach(page: Page, target: ReturnType<Page['getByRole']>) {
   await expect(target).toBeVisible()
@@ -163,12 +160,11 @@ test('filters reset snapshot and cursor continuation sends no repeated filters',
 })
 
 test('authorization refresh cancels old confirmation while unknown recovery retains no private state', async ({ page }) => {
-  let reads = 0
+  let refreshed=false
   await page.route('**/api/billing/reconciliation**', async route => {
     if (route.request().method() === 'POST') { await route.abort(); return }
-    reads++
     const fixture = reconciliationFixture()
-    if (reads > 3) fixture.items = []
+    if (refreshed) fixture.items = []
     await route.fulfill({ json: fixture })
   })
   await page.goto(url)
@@ -177,6 +173,7 @@ test('authorization refresh cancels old confirmation while unknown recovery reta
   await page.getByRole('textbox', { name: 'Reason (required)' }).fill('Private retained reason')
   await page.getByRole('button', { name: 'Confirm resolution' }).click()
   await expect(page.getByRole('dialog')).toContainText('Outcome unknown')
+  refreshed=true
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('auth:refreshed')))
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Check same operation' })).toHaveCount(0)
@@ -194,8 +191,8 @@ test('denial purges evidence and permission loss makes no new reconciliation req
   await page.getByRole('button', { name: 'Release confirmed non-execution' }).click()
   await page.getByRole('textbox', { name: 'Reason (required)' }).fill('Audit reason')
   await page.getByRole('button', { name: 'Confirm resolution' }).click()
-  await expect(page.getByRole('heading', { name: 'Reconciliation access denied' })).toBeVisible()
-  await expect(page.getByRole('alert')).toBeFocused()
+  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeVisible()
+  await expect(page.getByRole('heading',{name:'Current access unavailable'})).toBeFocused()
   expect(await page.locator('body').innerText()).not.toContain(FINDING)
   expect(await page.locator('body').innerText()).not.toContain('private dependency detail')
 })
@@ -239,6 +236,6 @@ test('partial pagination failure retains verified rows and exposes stale state',
 test('GET permission denial restores focus to the cleared access state', async ({ page }) => {
   await page.route('**/api/billing/reconciliation**', route => route.fulfill({ status: 403, json: { title: 'Forbidden', code: 'reconciliation_forbidden' } }))
   await page.goto(url)
-  await expect(page.getByRole('alert')).toBeFocused()
-  await expect(page.getByRole('heading', { name: 'Reconciliation access denied' })).toBeVisible()
+  await expect(page.getByRole('heading',{name:'Current access unavailable'})).toBeFocused()
+  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeVisible()
 })

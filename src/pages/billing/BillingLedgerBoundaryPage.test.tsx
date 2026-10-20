@@ -1,3 +1,6 @@
+import { currentAuthorityFixture } from '../../test/authorityFixtures'
+import { viewerFixturePermissions } from '../../test/authorityFixtures'
+import { clientFixturePermissions } from '../../test/authorityFixtures'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -46,7 +49,7 @@ function authenticate() {
     accessToken: 'token', refreshTokenValue: 'refresh', isLoading: false,
     isAuthenticated: true, isInitialized: true,
     user: {
-      id: 'operator', email: 'operator@example.com', displayName: 'Operator', role: 'Admin',
+      id: '01990000-0000-7000-8000-000000000001', email: 'operator@example.com', displayName: 'Operator', role: 'ClientAdmin', permissions: clientFixturePermissions,platformPermissions:['platform:billing:view'],
       clientId: CLIENT_ID, accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600,
     },
   })
@@ -187,7 +190,7 @@ describe('Billing ledger experience', () => {
   })
 
   it('lets a direct route ask the server when local navigation permission is absent', async () => {
-    useAuthStore.setState((state) => ({ user: state.user ? { ...state.user, role: 'Viewer' } : null }))
+    useAuthStore.setState((state) => ({ user: state.user ? { ...state.user, role: 'Viewer', permissions: viewerFixturePermissions,platformPermissions:[] } : null }))
     const request = vi.spyOn(billingApi, 'getLedgerPage').mockRejectedValue({
       code: 'HTTP_403', message: 'Insufficient permissions', status: 403,
     })
@@ -206,7 +209,7 @@ describe('Billing ledger experience', () => {
     await user.click(screen.getByRole('button', { name: 'Request ledger CSV export' }))
     expect(screen.getByRole('dialog', { name: 'Confirm ledger CSV export' })).toBeInTheDocument()
 
-    useAuthStore.setState((state) => ({ user: state.user ? { ...state.user, role: 'Viewer' } : null }))
+    useAuthStore.setState((state) => ({ user: state.user ? { ...state.user, role: 'Viewer', permissions: viewerFixturePermissions,platformPermissions:[] } : null }))
 
     expect(await screen.findByRole('heading', { name: 'Access denied' })).toHaveFocus()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -292,8 +295,8 @@ describe('Billing ledger experience', () => {
     })
     vi.spyOn(authApi, 'login').mockResolvedValue({
       accessToken: 'new-token', refreshToken: 'new-refresh', expiresIn: 3600,
-      user: {
-        id: 'operator', email: 'operator@example.com', displayName: 'Operator', role: 'Admin',
+      user: { ...currentAuthorityFixture(),
+        id: '01990000-0000-7000-8000-000000000001', email: 'operator@example.com', displayName: 'Operator', role: 'ClientAdmin', permissions: clientFixturePermissions,platformPermissions:['platform:billing:view'],
         clientId: CLIENT_ID, accessToken: 'new-token', refreshToken: 'new-refresh', expiresIn: 3600,
       },
     })

@@ -1,3 +1,4 @@
+import { viewerFixturePermissions } from '../../test/authorityFixtures'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -11,7 +12,7 @@ import fixture from '../../api/__fixtures__/domains-http.json'
 vi.mock('../../api/domainsApi', () => ({ domainsApi: { list: vi.fn(), detail: vi.fn() } }))
 const wire = fixture.cases.find(c => c.name === 'list')!.responseBody
 const clientId = JSON.parse(wire).items[0].clientId
-const user = { id: '01990000-0000-7000-8000-000000000001', clientId, role: 'Viewer' as const, email: '', displayName: 'Viewer', accessToken: '', refreshToken: '', expiresIn: 1 }
+const user = { id: '01990000-0000-7000-8000-000000000001', clientId, role: 'Viewer' as const, permissions: viewerFixturePermissions, email: '', displayName: 'Viewer', accessToken: '', refreshToken: '', expiresIn: 1 }
 beforeEach(() => { vi.mocked(domainsApi.list).mockReset(); useAuthStore.setState({ isAuthenticated: true, isInitialized: true, isLoading: false, user }) })
 function view(path = '/domains') {
   return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter initialEntries={[path]}><Sidebar /><Routes><Route path="/domains" element={<DomainsPage />} /><Route path="/domains/:domainId" element={<DomainsPage />} /></Routes></MemoryRouter></QueryClientProvider>)

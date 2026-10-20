@@ -13,7 +13,8 @@ import { timeZoneOptions } from '@/timezone/preference'
 import { LocalInstant, parseLocalInstant } from '@/timezone/LocalInstant'
 
 const roleColors: Record<UserRole, 'info' | 'warning' | 'neutral'> = {
-  Admin: 'info',
+  ClientOwner: 'info',
+  ClientAdmin: 'info',
   Editor: 'warning',
   Viewer: 'neutral',
 }
@@ -227,7 +228,7 @@ const UsersPage: FC = () => {
             >
               <option value="Viewer">Viewer</option>
               <option value="Editor">Editor</option>
-              <option value="Admin">Admin</option>
+              <option value="ClientAdmin">Client admin</option>
             </select>
           </div>
           <div>

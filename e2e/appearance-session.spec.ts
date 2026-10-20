@@ -1,18 +1,23 @@
+import { currentAuthorityFixture } from '../src/test/authorityFixtures'
 import { test, expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 
-const key = (id: string) => `soveris-smartlaunch-appearance:user:${id}`
+const accountId = (id: string) => id === 'account-a' ? '01990000-0000-7000-8000-00000000000a' : '01990000-0000-7000-8000-00000000000b'
+const key = (id: string) => `soveris-smartlaunch-appearance:user:${accountId(id)}`
 async function mockApplication(page: Page) {
-  await page.route('**/api/backoffice/**', async route => {
+  let current=currentAuthorityFixture()
+  await page.route(/\/api\/backoffice\/(?!auth\/current(?:[?]|$)|auth\/revoke(?:[?]|$))/, async route => {
     if (route.request().url().endsWith('/auth/login')) {
       const { email } = route.request().postDataJSON()
       const id = email.startsWith('a@') ? 'account-a' : 'account-b'
+      current=currentAuthorityFixture({id: accountId(id), displayName:id, email})
       return route.fulfill({ json: { accessToken: 'fixture-token', refreshToken: 'fixture-refresh', expiresIn: 3600,
-        user: { id, role: 'Admin', displayName: id, clientId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' } } })
+        user: current } })
     }
-    return route.fulfill({ json: route.request().url().includes('/health') ? { status: 'healthy', database: 'ok', redis: 'ok' }
-      : { fromDate: null, toDate: null, totalPageViews: 7600, totalSubmissions: 1248, verifiedSubmissions: 1032, verificationRate: .827, conversionRate: .164 } })
+    return route.fulfill({ json: { fromDate: null, toDate: null, totalPageViews: 7600, totalSubmissions: 1248, verifiedSubmissions: 1032, verificationRate: .827, conversionRate: .164 } })
   })
+  await page.route('**/api/backoffice/auth/current', route => route.fulfill({ json: current }))
+  await page.route('**/api/backoffice/auth/revoke', route => route.fulfill({ status: 204 }))
 }
 async function login(page: Page, account: 'a' | 'b') {
   await page.getByLabel('Email address').fill(`${account}@example.test`)

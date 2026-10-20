@@ -1,3 +1,4 @@
+import { clientFixturePermissions } from '../test/authorityFixtures'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, expect, it, vi } from 'vitest'
@@ -10,7 +11,7 @@ import type { DomainTracker } from './domainTracker'
 vi.mock('../api/domainsApi', () => ({ domainsApi: { retry: vi.fn(), verify: vi.fn(), primary: vi.fn(), release: vi.fn() } }))
 const clientId = '0149620b-af5c-47c9-8290-95edde45ef8f', id = '01990000-0000-7000-8000-000000000001'
 const tracker = { pause: vi.fn(), start: vi.fn(), deny: vi.fn(), acceptRelease: vi.fn() } as unknown as DomainTracker
-beforeEach(() => { window.dispatchEvent(new Event('auth:refreshed')); useAuthStore.setState({ isAuthenticated: true, accessToken: 'current', user: { id, clientId, role: 'Admin', email: '', displayName: '', accessToken: '', refreshToken: '', expiresIn: 0 } }); })
+beforeEach(() => { window.dispatchEvent(new Event('auth:refreshed')); useAuthStore.setState({ isAuthenticated: true, accessToken: 'current', user: { id, clientId, role: 'ClientAdmin', permissions: clientFixturePermissions, email: '', displayName: '', accessToken: '', refreshToken: '', expiresIn: 0 } }); })
 function hook() {
   const client = new QueryClient()
   const wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>

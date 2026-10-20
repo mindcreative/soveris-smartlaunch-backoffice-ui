@@ -1,3 +1,5 @@
+import { installCurrentSession } from './currentSession'
+import { clientFixturePermissions, viewerFixturePermissions } from '../src/test/authorityFixtures'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { fulfillLocal, installTimeZoneRoute } from './localPresentationMocks'
@@ -43,19 +45,11 @@ const decimal = (value: bigint): string => {
 
 async function installSession(
   page: Page,
-  role: 'Admin' | 'Viewer' = 'Admin',
+  role: 'ClientAdmin' | 'Viewer' = 'ClientAdmin',
   actorId = ACTOR,
   clientId = CLIENT
 ): Promise<void> {
-  await page.addInitScript(({ clientId, actorId, actorRole }) => {
-    const user = { id: actorId, email: 'operator@example.test', displayName: 'Operator',
-      role: actorRole, clientId, accessToken: 'test-token', refreshToken: 'test-refresh', expiresIn: 3600 }
-    localStorage.setItem('backoffice_access_token', 'test-token')
-    localStorage.setItem('backoffice_refresh_token', 'test-refresh')
-    localStorage.setItem('backoffice-auth-persist', JSON.stringify({
-      state: { accessToken: 'test-token', refreshTokenValue: 'test-refresh', user }, version: 0,
-    }))
-  }, { clientId, actorId, actorRole: role })
+  await installCurrentSession(page, { id: actorId, clientId, role, permissions: role === 'Viewer' ? viewerFixturePermissions : clientFixturePermissions, platformPermissions: role === 'Viewer' ? [] : ['platform:billing:view','platform:billing:adjust'] })
 }
 
 async function json(route: Route, body: string, status = 200): Promise<void> {
@@ -183,6 +177,7 @@ test('opens from exact fresh reads, presents local evidence, cancels, and preser
   }).first()).toBeFocused()
 
   await page.unrouteAll({ behavior: 'wait' })
+    await installSession(page)
   await installSession(page, 'Viewer')
   await installTimeZoneRoute(page)
   await installReadRoutes(page, state)
@@ -226,6 +221,7 @@ test('covers negative-credit, equality, unsafe-debit, and overflow projections',
 
   for (const scenario of scenarios) {
     await page.unrouteAll({ behavior: 'wait' })
+    await installSession(page)
     await installTimeZoneRoute(page)
     await installReadRoutes(page, scenario.state)
     await page.goto(historyPath)
@@ -275,7 +271,7 @@ test('confirms one exact three-field operation and fresh-starts authoritative hi
   await expect(page.getByText(`Reversed by ${REVERSAL}`).first()).toBeVisible()
 })
 
-test('replays one byte-identical sealed command through a successful auth refresh', async ({ page }) => {
+test('does not replay a sealed reversal automatically after authentication loss', async ({ page }) => {
   const state: ReadState = { committed: false, operationId: '' }
   const bodies: string[] = []
   await installReadRoutes(page, state)
@@ -294,9 +290,9 @@ test('replays one byte-identical sealed command through a successful auth refres
   await openReview(page)
   await page.getByLabel('Reversal reason').fill('Undo duplicate allocation')
   await page.getByRole('button', { name: 'Confirm reversal' }).click()
-  await expect(page.getByText('Compensating reversal confirmed')).toBeVisible()
-  expect(bodies).toHaveLength(2)
-  expect(bodies[1]).toBe(bodies[0])
+  await expect(page.getByRole('button',{name:'Sign in',exact:true})).toBeVisible()
+  expect(bodies).toHaveLength(1)
+  await expect(page.getByText('Undo duplicate allocation',{exact:true})).toHaveCount(0)
 })
 
 test('retains an unknown outcome and retries byte-identically without permitting abandonment', async ({ page }) => {
@@ -403,7 +399,7 @@ test('handles an already-reversed race with linked authority and no reversal cha
   await expect(page.getByRole('button', { name: new RegExp(REVERSAL) })).toHaveCount(0)
 })
 
-test('keeps readable history while a command-time permission loss clears reversal state', async ({ page }) => {
+test('permission loss retires all private history and reversal state', async ({ page }) => {
   const state: ReadState = { committed: false, operationId: '' }
   await installReadRoutes(page, state)
   await page.route(`**/api/backoffice/clients/${CLIENT}/billing/adjustments/${ORIGINAL}/reversal`,
@@ -412,9 +408,9 @@ test('keeps readable history while a command-time permission loss clears reversa
   await page.getByLabel('Reversal reason').fill('Private denied reason')
   await page.getByRole('button', { name: 'Confirm reversal' }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
-  await expect(page.getByRole('table')).toBeVisible()
+  await expect(page.getByRole('table')).toHaveCount(0)
   await expect(page.getByText('Private denied reason')).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: 'Adjustment history', exact: true })).toBeFocused()
+  await expect(page.getByRole('heading', { name: 'Current access unavailable', exact: true })).toBeFocused()
 })
 
 test('clears private review state when the route Client changes', async ({ page }) => {
@@ -438,7 +434,7 @@ test('does not carry private review state into a different actor session', async
   await installReadRoutes(page, state)
   await openReview(page)
   await page.getByLabel('Reversal reason').fill('Private first-actor reason')
-  await installSession(page, 'Admin', ACTOR_B)
+  await installSession(page, 'ClientAdmin', ACTOR_B)
   await page.reload()
   await expect(page.getByRole('table')).toBeVisible()
   await expect(page.getByRole('dialog')).toHaveCount(0)

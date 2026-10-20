@@ -5,12 +5,14 @@ import type { UserRole } from '../types/auth'
 
 export interface UseAuthGuardOptions {
   requiredRole?: UserRole
+  requiredPermission?: string
   isAuthenticatedOnly?: boolean
 }
 
 export function useAuthGuard(options: UseAuthGuardOptions = {}) {
-  const { requiredRole, isAuthenticatedOnly } = options
+  const { requiredRole,requiredPermission, isAuthenticatedOnly } = options
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  const hasPermission = useAuthStore(s => s.hasPermission)
   const currentRole = useAuthStore((s) => s.user?.role)
   const navigate = useNavigate()
   const location = useLocation()
@@ -22,14 +24,11 @@ export function useAuthGuard(options: UseAuthGuardOptions = {}) {
     // If only auth is required, grant access
     if (isAuthenticatedOnly) return true
 
-    // If a role is required, check hierarchy
-    if (requiredRole && currentRole) {
-      const roleHierarchy: Record<UserRole, number> = { Viewer: 0, Editor: 1, Admin: 2 }
-      return roleHierarchy[currentRole] >= roleHierarchy[requiredRole]
-    }
+    if(requiredPermission) return hasPermission(requiredPermission)
+    if(requiredRole) return currentRole===requiredRole
 
     return false
-  }, [isAuthenticated, isAuthenticatedOnly, requiredRole, currentRole])
+  }, [isAuthenticated, isAuthenticatedOnly, requiredRole, currentRole, requiredPermission,hasPermission])
 
   const guardWithRedirect = useCallback(
     (fallbackPath = '/login') => {

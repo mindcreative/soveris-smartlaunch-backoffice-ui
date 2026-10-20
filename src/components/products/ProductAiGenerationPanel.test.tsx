@@ -1,3 +1,4 @@
+import { editorFixturePermissions, viewerFixturePermissions } from '../../test/authorityFixtures'
 import type { PropsWithChildren } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
@@ -47,7 +48,7 @@ function renderPanel(working: ProductContentV1 = content, options: { dirty?: boo
 describe('ProductAiGenerationPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    useAuthStore.setState({ user: { id: ACTOR_ID, clientId: CLIENT_ID, email: 'editor@example.test', displayName: 'Editor', role: 'Editor', accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600 }, isAuthenticated: true })
+    useAuthStore.setState({ user: { id: ACTOR_ID, clientId: CLIENT_ID, email: 'editor@example.test', displayName: 'Editor', role: 'Editor', permissions: editorFixturePermissions, accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600 }, isAuthenticated: true })
     mocks.capabilities.mockReturnValue({ data: capability(), isLoading: false, isFetching: false, isError: false })
     mocks.workflow.mockReturnValue({ state: idle, generate: mocks.generate, regenerate: mocks.regenerate, recover: mocks.recover, checkStatus: mocks.checkStatus, recheckCompleted: mocks.recheckCompleted, dismiss: mocks.dismiss, clear: mocks.clear })
   })
@@ -81,7 +82,7 @@ describe('ProductAiGenerationPanel', () => {
   })
 
   it('fails closed for missing permissions and gives internal funding guidance without upgrade copy', () => {
-    useAuthStore.setState((state) => ({ ...state, user: state.user ? { ...state.user, role: 'Viewer' } : null }))
+    useAuthStore.setState((state) => ({ ...state, user: state.user ? { ...state.user, role: 'Viewer', permissions: viewerFixturePermissions,platformPermissions:[] } : null }))
     const internal = capability('soveris_internal')
     internal.operations[0] = { ...internal.operations[0]!, outcome: 'denied', funding: 'wallet_missing', denialConditions: ['wallet_missing'] }
     mocks.capabilities.mockReturnValue({ data: internal, isLoading: false, isFetching: false, isError: false })

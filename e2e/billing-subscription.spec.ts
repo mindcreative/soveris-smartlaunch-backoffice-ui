@@ -1,3 +1,5 @@
+import { installCurrentSession } from './currentSession'
+import { clientFixturePermissions, viewerFixturePermissions } from '../src/test/authorityFixtures'
 import { fulfillLocal, installTimeZoneRoute } from './localPresentationMocks'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page, type Route } from '@playwright/test'
@@ -364,18 +366,8 @@ function historicalStateBody(clientId: string, continuation: boolean): string {
   })
 }
 
-async function installSession(page: Page, role: 'Admin' | 'Viewer' = 'Admin'): Promise<void> {
-  await page.addInitScript(({ clientId, sessionRole }) => {
-    const user = {
-      id: 'operator', email: 'operator@example.com', displayName: 'Operator', role: sessionRole,
-      clientId, accessToken: 'test-token', refreshToken: 'test-refresh', expiresIn: 3600,
-    }
-    localStorage.setItem('backoffice_access_token', 'test-token')
-    localStorage.setItem('backoffice_refresh_token', 'test-refresh')
-    localStorage.setItem('backoffice-auth-persist', JSON.stringify({
-      state: { accessToken: 'test-token', refreshTokenValue: 'test-refresh', user }, version: 0,
-    }))
-  }, { clientId: CLIENT_A, sessionRole: role })
+async function installSession(page: Page, role: 'ClientAdmin' | 'Viewer' = 'ClientAdmin'): Promise<void> {
+  await installCurrentSession(page, { clientId: CLIENT_A, role, permissions: role === 'Viewer' ? viewerFixturePermissions : clientFixturePermissions, platformPermissions: role === 'Viewer' ? [] : ['platform:billing:view','platform:packages:manage','platform:billing:provision'] })
 }
 
 async function installReads(page: Page): Promise<void> {
@@ -415,7 +407,7 @@ async function expectNoAxeViolations(page: Page): Promise<void> {
 }
 
 test.beforeEach(async ({ page }, testInfo) => {
-  await installSession(page, testInfo.title.includes('permission loss') ? 'Viewer' : 'Admin')
+  await installSession(page, testInfo.title.includes('permission loss') ? 'Viewer' : 'ClientAdmin')
   await installTimeZoneRoute(page)
   await installReads(page)
 })
@@ -971,7 +963,7 @@ test('purges private tier evidence on 403 authorization loss', async ({ page }) 
   await page.getByRole('dialog', { name: 'Confirm subscription tier change' })
     .getByRole('button', { name: 'Confirm tier change' }).click()
 
-  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeVisible()
   await expect(page.getByText('Private tier reason')).toHaveCount(0)
   await expect(page.getByText('private authorization detail')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Schedule for next cycle' })).toHaveCount(0)
@@ -1010,6 +1002,7 @@ test('treats tier 500 and malformed 200 responses as unknown without blind retry
   })
   for (const malformedResponse of [false, true]) {
     malformed = malformedResponse
+    if(page.url()!=='about:blank') await page.evaluate(()=>{localStorage.clear();sessionStorage.clear()}) // Independent transport scenarios.
     await page.goto(pathFor(CLIENT_A))
     await page.getByRole('button', { name: 'Schedule for next cycle' }).click()
     await page.getByRole('dialog', { name: 'Confirm subscription tier change' })
@@ -1373,7 +1366,7 @@ test('revalidates stale lifecycle confirmation without sending a command', async
   await expect(page.getByRole('button', { name: 'Reactivate subscription' })).toBeVisible()
 })
 
-test('replays the byte-identical lifecycle command through one successful auth refresh', async ({ page }) => {
+test('authentication loss never automatically replays a lifecycle mutation', async ({ page }) => {
   const bodies: string[] = []
   let postCount = 0
   let status: LifecycleStatus = 'active'
@@ -1402,10 +1395,9 @@ test('replays the byte-identical lifecycle command through one successful auth r
   await page.getByRole('button', { name: 'Pause subscription' }).click()
   await page.getByLabel('Reason').fill('Retain this exact reason through refresh')
   await page.getByRole('button', { name: 'Confirm Pause' }).click()
-  await expect(page.getByRole('heading', { name: 'Lifecycle operation completed' })).toBeVisible()
-  expect(bodies).toHaveLength(2)
-  expect(bodies[1]).toBe(bodies[0])
-  await expect(page.getByText('Retain this exact reason through refresh')).toBeVisible()
+  await expect(page.getByRole('button',{name:'Sign in',exact:true})).toBeVisible()
+  expect(bodies).toHaveLength(1)
+  await expect(page.getByText('Retain this exact reason through refresh')).toHaveCount(0)
 })
 
 test('renders lifecycle concurrency conflicts as determinate sanitized states', async ({ page }) => {
@@ -1465,7 +1457,7 @@ test('fresh lifecycle authorization loss removes all private lifecycle evidence'
   await page.getByRole('button', { name: 'Pause subscription' }).click()
   await page.getByLabel('Reason').fill('Private reason removed on denial')
   await page.getByRole('button', { name: 'Confirm Pause' }).click()
-  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeVisible()
   await expect(page.getByText('Private reason removed on denial')).toHaveCount(0)
   await expect(page.getByText('99999999999999.9999', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Pause subscription' })).toHaveCount(0)
@@ -1490,7 +1482,7 @@ test('authorization refresh removes an open lifecycle dialog before fresh denial
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page.getByText('Private reason removed by authorization refresh')).toHaveCount(0)
   await page.reload()
-  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeVisible()
   await expect(page.getByText('99999999999999.9999', { exact: true })).toHaveCount(0)
 })
 
@@ -1561,6 +1553,7 @@ test('treats lifecycle 500 and malformed 200 responses as unresolved without bli
   })
   for (const malformedResponse of [false, true]) {
     malformed = malformedResponse
+    if(page.url()!=='about:blank') await page.evaluate(()=>{localStorage.clear();sessionStorage.clear()}) // Independent transport scenarios.
     await page.goto(pathFor(CLIENT_A))
     await page.getByRole('button', { name: 'Pause subscription' }).click()
     await page.getByLabel('Reason').fill('Unresolved lifecycle result')
@@ -1756,7 +1749,7 @@ test('subscription permission loss denies direct access without exposing private
     })
   })
   await page.goto(pathFor(CLIENT_A))
-  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeVisible()
   await expect(page.getByLabel('Plan name')).toHaveCount(0)
 })
 

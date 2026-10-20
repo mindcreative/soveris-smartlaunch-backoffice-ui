@@ -5,14 +5,14 @@ export function BillingWorkspaceNav({ clientId }: { clientId: string }) {
   const location = useLocation()
   const { hasPermission } = useAuth()
   const items = [
-    ...(hasPermission('billing:reconcile') ? [{ label: 'Reconciliation', href: `/billing/clients/${clientId}/reconciliation` }] : []),
+    ...(hasPermission('platform:billing:reconcile') ? [{ label: 'Reconciliation', href: `/billing/clients/${clientId}/reconciliation` }] : []),
     ...(hasPermission('billing:view') ? [
       { label: 'Account', href: `/billing/clients/${clientId}/account` },
       { label: 'Ledger', href: `/billing/clients/${clientId}/ledger` },
       { label: 'Usage & expense', href: `/billing/clients/${clientId}/reports` },
       { label: 'Adjustments', href: `/billing/clients/${clientId}/adjustments` },
     ] : []),
-    ...(hasPermission('billing:subscription') ? [
+    ...(hasPermission('billing:view') || hasPermission('platform:billing:view') || hasPermission('platform:packages:manage') ? [
       { label: 'Subscriptions', href: `/billing/clients/${clientId}/subscriptions` },
     ] : []),
   ]

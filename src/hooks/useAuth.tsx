@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, ReactNode } from 'react'
 import { useAuthStore } from '../stores/authStore'
-import { hasAnyRolePermission, hasRolePermission } from '../auth/permissions'
+import { hasAnyPermission as projectedAny, hasPermission as projected } from '../auth/permissions'
 import type { AuthRefreshLifecycleDetail } from '../api/apiClient'
 
 // AuthContext for backward compatibility with App.tsx AuthProvider
@@ -16,7 +16,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const handleAuthRefreshed = (event: Event) => {
       const detail = (event as CustomEvent<AuthRefreshLifecycleDetail>).detail
-      detail.waitUntil(useAuthStore.getState().handleSuccessfulRefresh())
+      const pending=useAuthStore.getState().handleSuccessfulRefresh()
+      if(detail?.waitUntil) detail.waitUntil(pending)
+      else void pending.catch(() => useAuthStore.getState().suspendAuthority())
     }
     window.addEventListener('auth:refreshed', handleAuthRefreshed)
     return () => window.removeEventListener('auth:refreshed', handleAuthRefreshed)
@@ -26,8 +28,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handleAuthCleared = () => {
       void useAuthStore.getState().clearSession()
     }
+    const suspend = () => { void useAuthStore.getState().suspendAuthority() }
+    window.addEventListener('auth:suspended', suspend)
     window.addEventListener('auth:cleared', handleAuthCleared)
-    return () => window.removeEventListener('auth:cleared', handleAuthCleared)
+    return () => { window.removeEventListener('auth:cleared', handleAuthCleared);window.removeEventListener('auth:suspended', suspend) }
   }, [])
 
   return <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>
@@ -51,11 +55,11 @@ export function useAuth() {
   const refreshTokenAction = useAuthStore((s) => s.doRefreshToken)
 
   const hasPermission = (permission: string): boolean => {
-    return hasRolePermission(user?.role, permission)
+    return isAuthenticated && projected(user, permission)
   }
 
   const hasAnyPermission = (permissions: string[]): boolean => {
-    return hasAnyRolePermission(user?.role, permissions)
+    return isAuthenticated && projectedAny(user, permissions)
   }
 
   return {

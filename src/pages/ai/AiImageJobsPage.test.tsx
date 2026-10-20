@@ -1,3 +1,5 @@
+import { viewerFixturePermissions } from '../../test/authorityFixtures'
+import { clientFixturePermissions } from '../../test/authorityFixtures'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -71,8 +73,8 @@ function renderRoute(path: string) {
 describe('AI image page', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    useAuthStore.setState({ user: {
-      id: 'actor', email: 'actor@example.test', displayName: 'Operator', role: 'Admin', clientId: CLIENT_ID,
+    useAuthStore.setState({ isAuthenticated:true,isInitialized:true,isLoading:false,user: {
+      id: 'actor', email: 'actor@example.test', displayName: 'Operator', role: 'ClientAdmin', permissions: clientFixturePermissions, clientId: CLIENT_ID,
       accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600,
     } })
     mocks.capabilities.mockReturnValue({ data: capability(), isLoading: false, isFetching: false, isError: false })
@@ -162,7 +164,7 @@ describe('AI image page', () => {
     expect(screen.queryByRole('heading', { name: 'Confirm image Job' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Review and quote' }))
     expect(await screen.findByRole('heading', { name: 'Confirm image Job' })).toBeVisible()
-    useAuthStore.setState((current) => ({ ...current, user: current.user ? { ...current.user, role: 'Viewer' } : null }))
+    useAuthStore.setState((current) => ({ ...current, user: current.user ? { ...current.user, role: 'Viewer', permissions: viewerFixturePermissions,platformPermissions:[] } : null }))
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Confirm image Job' })).not.toBeInTheDocument())
     expect(prompt).toHaveValue('')
   })
@@ -173,8 +175,8 @@ describe('AI image page', () => {
     expect(mocks.tracker).not.toHaveBeenCalled()
   })
 
-  it('reconstructs a direct tracker for audit:view without requiring ai:create', () => {
-    useAuthStore.setState((current) => ({ ...current, user: current.user ? { ...current.user, role: 'Viewer' } : null }))
+  it('reconstructs a direct tracker for an explicit ai:view projection without requiring ai:create', () => {
+    useAuthStore.setState((current) => ({ ...current, user: current.user ? { ...current.user, role: 'Viewer', permissions: ['ai:view'] } : null }))
     renderRoute(`/ai/image-jobs/${JOB_ID}`)
     expect(mocks.tracker).toHaveBeenCalledWith(expect.objectContaining({
       clientId: CLIENT_ID, jobId: JOB_ID, authorized: true,

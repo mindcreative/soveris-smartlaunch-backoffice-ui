@@ -6,9 +6,9 @@ test('built UI performs real preview, blocked cancellation, removal and full-rel
  const login=await request.post((process.env.PRODUCT_REMOVAL_API_URL??'http://127.0.0.1:15067')+'/api/backoffice/auth/login',{data:{email:f.email,password:'TestUser@123'}});expect(login.status()).toBe(200)
  const auth=await login.json() as {accessToken:string;refreshToken:string}
  await page.addInitScript(({f,auth})=>{
-  const user={id:f.actorId,clientId:f.clientId,role:'Admin',email:f.email,displayName:'Removal fixture',...auth,expiresIn:3600}
+
   localStorage.setItem('backoffice_access_token',auth.accessToken);localStorage.setItem('backoffice_refresh_token',auth.refreshToken)
-  localStorage.setItem('backoffice-auth-persist',JSON.stringify({state:{user,accessToken:auth.accessToken,refreshTokenValue:auth.refreshToken},version:0}))
+  localStorage.setItem('backoffice-auth-persist',JSON.stringify({state:{accessToken:auth.accessToken,refreshTokenValue:auth.refreshToken},version:2}))
  },{f,auth})
  let deletes=0;const safeResponses:Array<{path:string;status:number;body:unknown}>=[]
  page.on('request',r=>{if(r.method()==='DELETE'&&new URL(r.url()).pathname.includes('/products/'))deletes++})

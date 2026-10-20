@@ -1,3 +1,4 @@
+import { clientFixturePermissions } from '../../test/authorityFixtures'
 import { AppearanceProvider } from '../../appearance/AppearanceProvider'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
@@ -9,7 +10,7 @@ beforeEach(() => {
   useAuthStore.setState({
     isAuthenticated: true, isInitialized: true, isLoading: false,
     user: { id: 'actor', clientId: 'client', email: 'a@example.test', displayName: 'Actor',
-      role: 'Viewer', accessToken: 'token', refreshToken: 'refresh', expiresIn: 1 },
+      role: 'ClientAdmin', permissions: clientFixturePermissions, accessToken: 'token', refreshToken: 'refresh', expiresIn: 1 },
   })
 })
 

@@ -1,3 +1,4 @@
+import { clientFixturePermissions } from '../../test/authorityFixtures'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, expect, it, vi } from 'vitest'
@@ -12,7 +13,7 @@ vi.mock('../../api/domainsApi', () => ({ domainsApi: { claim: vi.fn() } }))
 vi.mock('../../api/endpoints', () => ({ contentApi: { getProducts: vi.fn() }, authApi: {} }))
 beforeEach(() => { vi.mocked(domainsApi.claim).mockReset(); window.dispatchEvent(new Event('auth:refreshed')) })
 it('keeps Client claim available and explains Product permission separately', () => {
-  useAuthStore.setState({ isAuthenticated: true, user: { id: '01990000-0000-7000-8000-000000000001', clientId: '0149620b-af5c-47c9-8290-95edde45ef8f', role: 'Admin', email: '', displayName: '', accessToken: '', refreshToken: '', expiresIn: 0 } })
+  useAuthStore.setState({ isAuthenticated: true, user: { id: '01990000-0000-7000-8000-000000000001', clientId: '0149620b-af5c-47c9-8290-95edde45ef8f', role: 'ClientAdmin', permissions: clientFixturePermissions, email: '', displayName: '', accessToken: '', refreshToken: '', expiresIn: 0 } })
   render(<QueryClientProvider client={new QueryClient()}><DomainClaimModal scope={captureDomainScope()} open canReadProducts={false} onClose={vi.fn()} onCreated={vi.fn()} /></QueryClientProvider>)
   expect(screen.getByLabelText('Binding target')).toHaveValue('client')
   expect(screen.getByRole('option', { name: 'Product' })).toBeDisabled()
@@ -25,7 +26,7 @@ it('keeps Client claim available and explains Product permission separately', ()
 function claimView(revalidatePolicy?: () => Promise<ClientCapabilities | undefined>) {
   const capsWire = fixture.cases.find(c => c.name === 'capabilities')!.responseBody
   const clientId = JSON.parse(capsWire).clientId
-  useAuthStore.setState({ isAuthenticated: true, user: { id: '01990000-0000-7000-8000-000000000001', clientId, role: 'Admin', email: '', displayName: '', accessToken: '', refreshToken: '', expiresIn: 0 } })
+  useAuthStore.setState({ isAuthenticated: true, user: { id: '01990000-0000-7000-8000-000000000001', clientId, role: 'ClientAdmin', permissions: clientFixturePermissions, email: '', displayName: '', accessToken: '', refreshToken: '', expiresIn: 0 } })
   const capabilities = parseClientCapabilities(capsWire, clientId)
   const client = new QueryClient(), scope = captureDomainScope(), onCreated = vi.fn()
   const element = (policy: ClientCapabilities) => <QueryClientProvider client={client}><DomainClaimModal scope={scope} open canReadProducts={false} capabilities={policy} revalidatePolicy={revalidatePolicy} onClose={vi.fn()} onCreated={onCreated} /></QueryClientProvider>

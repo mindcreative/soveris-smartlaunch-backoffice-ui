@@ -1,3 +1,5 @@
+import { installCurrentSession } from './currentSession'
+import { clientFixturePermissions, viewerFixturePermissions } from '../src/test/authorityFixtures'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 
@@ -13,28 +15,7 @@ function snapshotBody(clientId: string, ownedBalance = '99999999999999.9999'): s
 }
 
 async function installAdminSession(page: Page): Promise<void> {
-  await page.addInitScript(({ clientId }) => {
-    const user = {
-      id: 'operator',
-      email: 'operator@example.com',
-      displayName: 'Operator',
-      role: 'Admin',
-      clientId,
-      accessToken: 'test-token',
-      refreshToken: 'test-refresh',
-      expiresIn: 3600,
-    }
-    localStorage.setItem('backoffice_access_token', 'test-token')
-    localStorage.setItem('backoffice_refresh_token', 'test-refresh')
-    localStorage.setItem('backoffice-auth-persist', JSON.stringify({
-      state: {
-        accessToken: 'test-token',
-        refreshTokenValue: 'test-refresh',
-        user,
-      },
-      version: 0,
-    }))
-  }, { clientId: CLIENT_A })
+  await installCurrentSession(page, { clientId: CLIENT_A, platformPermissions: ['platform:billing:view'] })
 }
 
 async function expectNoAxeViolations(page: Page): Promise<void> {
@@ -135,7 +116,7 @@ test('permission-denied and transient-error states are accessible and expose no 
   })
 
   await page.goto(accountPath(CLIENT_A))
-  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeVisible()
   await expect(page.getByText('99,999,999,999,999.9999')).toHaveCount(0)
   await expectNoAxeViolations(page)
 

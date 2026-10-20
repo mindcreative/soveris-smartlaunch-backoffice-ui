@@ -1,3 +1,5 @@
+import { installCurrentSession } from './currentSession'
+import { clientFixturePermissions, viewerFixturePermissions } from '../src/test/authorityFixtures'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { fulfillLocal, installTimeZoneRoute } from './localPresentationMocks'
@@ -45,16 +47,8 @@ function historyBody(clientId = CLIENT, nextCursor: string | null = null,
     nextCursor === null ? 'null' : JSON.stringify(nextCursor)}}`
 }
 
-async function installSession(page: Page, role: 'Admin' | 'Viewer' = 'Admin'): Promise<void> {
-  await page.addInitScript(({ clientId, actorId, actorRole }) => {
-    const user = { id: actorId, email: 'operator@example.test', displayName: 'Operator',
-      role: actorRole, clientId, accessToken: 'test-token', refreshToken: 'test-refresh', expiresIn: 3600 }
-    localStorage.setItem('backoffice_access_token', 'test-token')
-    localStorage.setItem('backoffice_refresh_token', 'test-refresh')
-    localStorage.setItem('backoffice-auth-persist', JSON.stringify({
-      state: { accessToken: 'test-token', refreshTokenValue: 'test-refresh', user }, version: 0,
-    }))
-  }, { clientId: CLIENT, actorId: ACTOR, actorRole: role })
+async function installSession(page: Page, role: 'ClientAdmin' | 'Viewer' = 'ClientAdmin'): Promise<void> {
+  await installCurrentSession(page, { clientId: CLIENT, role, permissions: role === 'Viewer' ? viewerFixturePermissions : clientFixturePermissions, platformPermissions: role === 'Viewer' ? [] : ['platform:billing:view','platform:billing:adjust'] })
 }
 
 async function json(route: Route, body: string, status = 200): Promise<void> {
@@ -85,7 +79,7 @@ test('canonical direct route presents complete reciprocal immutable evidence and
   await expect(page).toHaveURL(new RegExp(`${CLIENT}/adjustments$`))
   await expect(page.getByRole('heading', { name: 'Adjustment history', exact: true })).toBeFocused()
   const tabs = page.getByRole('navigation', { name: 'Billing workspace' }).getByRole('link')
-  await expect(tabs).toHaveText(['Reconciliation', 'Account', 'Ledger', 'Usage & expense', 'Adjustments', 'Subscriptions'])
+  await expect(tabs).toHaveText(['Account', 'Ledger', 'Usage & expense', 'Adjustments', 'Subscriptions'])
   await expect(page.getByRole('link', { name: 'Adjustments' })).toHaveAttribute('aria-current', 'page')
   const table = page.getByRole('table', { name: 'Newest-first immutable Billing adjustment history' })
   await expect(table).toBeVisible()
@@ -202,7 +196,7 @@ test('renders focused denied, saved-zone, DST, dependency, and malformed-evidenc
     return json(route, '{"items":[{"schemaVersion":1}],"asOf":"bad","nextCursor":null}')
   })
   await page.goto(historyPath)
-  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeFocused()
+  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeFocused()
   await expect(page.getByRole('table')).toHaveCount(0)
   await expectNoSeriousAxeViolations(page)
 
@@ -214,7 +208,7 @@ test('renders focused denied, saved-zone, DST, dependency, and malformed-evidenc
   await expect(page.getByRole('link', { name: /From:/ })).toHaveAttribute(
     'href', '#adjustment-history-from')
   mode = 'authorization'; await page.reload()
-  await expect(page.getByRole('heading', { name: 'Authorization unavailable' })).toBeFocused()
+  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeFocused()
   await expect(page.getByText('private detail')).toHaveCount(0)
   mode = 'history'; await page.reload()
   await expect(page.getByRole('heading', { name: 'Adjustment history unavailable' })).toBeFocused()

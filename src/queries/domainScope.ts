@@ -7,7 +7,7 @@ let authorizationBlocked = false
 const listeners = new Set<() => void>()
 function identity() {
   const s = useAuthStore.getState()
-  return JSON.stringify([s.isAuthenticated, s.user?.id, s.user?.clientId, s.user?.role, s.accessToken])
+  return JSON.stringify([s.isAuthenticated, s.user?.id, s.user?.clientId, s.user?.role,s.user?.clientRoleId,s.user?.sessionId,s.user?.securityRevision,s.user?.permissions,s.accessToken])
 }
 let currentIdentity = identity()
 function retire() { generation++; for (const listener of listeners) listener() }

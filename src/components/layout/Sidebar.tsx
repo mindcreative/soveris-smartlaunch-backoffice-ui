@@ -31,10 +31,10 @@ export function Sidebar({ mobile = false, onClose, onNavigate }: SidebarProps) {
   const defaultClientId = canonicalizeGuid(user?.clientId)
   const selectedClientId = canonicalizeGuid(
     matchPath('/billing/clients/:clientId/*', location.pathname)?.params.clientId)
-  const billingClientId = selectedClientId ?? defaultClientId
+  const billingClientId = selectedClientId && hasPermission('platform:billing:view') ? selectedClientId : defaultClientId
   const canViewBilling = hasPermission('billing:view')
-  const canManageSubscriptions = hasPermission('billing:subscription')
-  const canReconcile = hasPermission('billing:reconcile')
+  const canManageSubscriptions = hasPermission('platform:packages:manage')
+  const canReconcile = hasPermission('platform:billing:reconcile')
   const billingLanding = canViewBilling ? 'account' : canManageSubscriptions ? 'subscriptions' : 'reconciliation'
   const navigation = defaultClientId && (canViewBilling || canManageSubscriptions || canReconcile)
     ? [

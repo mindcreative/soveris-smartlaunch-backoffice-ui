@@ -1,3 +1,4 @@
+import { clientFixturePermissions } from '../../../test/authorityFixtures'
 import {act,render,screen,within,waitFor} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {beforeEach,it,expect,vi} from 'vitest'
@@ -10,7 +11,7 @@ import {REPORT_CLIENT,REPORT_RANGE} from '../../../test/billingReportsFixture'
 import {anomalyPageFixture,anomalyDetailFixture,ANOMALY_ID} from '../../../test/billingAnomaliesFixture'
 import {retireAnomalyScopes} from '../../../queries/billingAnomalyKeys'
 const authority=()=>useAuthStore.getState().accessToken??''
-beforeEach(()=>{vi.restoreAllMocks();useAuthStore.setState({accessToken:'current',isAuthenticated:true,isInitialized:true,isLoading:false,user:{id:'cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa',clientId:REPORT_CLIENT,role:'Admin',email:'test@example.test',displayName:'Operator',accessToken:'current',refreshToken:'r',expiresIn:3600}});vi.spyOn(api,'readAnomalies').mockImplementation(async(client,f)=>api.parseAnomalyPage(anomalyPageFixture(f,client),client,f));vi.spyOn(api,'readAnomalyDetail').mockImplementation(async(client,id)=>api.parseAnomalyDetail(anomalyDetailFixture(client),client,id))})
+beforeEach(()=>{vi.restoreAllMocks();useAuthStore.setState({accessToken:'current',isAuthenticated:true,isInitialized:true,isLoading:false,user:{id:'cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa',clientId:REPORT_CLIENT,role:'ClientAdmin', permissions: clientFixturePermissions, platformPermissions: ['platform:billing:reconcile'],email:'test@example.test',displayName:'Operator',accessToken:'current',refreshToken:'r',expiresIn:3600}});vi.spyOn(api,'readAnomalies').mockImplementation(async(client,f)=>api.parseAnomalyPage(anomalyPageFixture(f,client),client,f));vi.spyOn(api,'readAnomalyDetail').mockImplementation(async(client,id)=>api.parseAnomalyDetail(anomalyDetailFixture(client),client,id))})
 function mount(deny=vi.fn()){return render(<QueryClientProvider client={new QueryClient()}><MemoryRouter><AnomalyPanel client={REPORT_CLIENT} kind="expense" range={REPORT_RANGE} authority={authority} deny={deny}/></MemoryRouter></QueryClientProvider>)}
 it('keeps saved evidence visible, confirms scope and retains same-operation ambiguous recovery',async()=>{
  let operation:string|undefined;const command=vi.spyOn(api,'transitionAnomaly').mockImplementation(async(client,id,r)=>{if(!operation){operation=r.operationId;throw {status:503}}expect(r.operationId).toBe(operation);return {clientId:client,evaluationId:id,operationId:r.operationId,actorId:useAuthStore.getState().user!.id,beforeStatus:'open',status:'acknowledged',beforeRevision:'0',revision:'1',at:'2026-10-10T00:00:00Z',reason:null,configVersion:r.configVersion,configHash:r.configHash,correlationId:r.operationId,routeVersion:null}})

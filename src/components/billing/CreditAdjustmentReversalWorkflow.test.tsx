@@ -1,3 +1,4 @@
+import { clientFixturePermissions } from '../../test/authorityFixtures'
 import { createRef, StrictMode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -55,7 +56,7 @@ function renderWorkflow(onClose = vi.fn()) {
 beforeEach(() => {
   vi.restoreAllMocks()
   useAuthStore.setState({ user: {
-    id: ACTOR, email: 'operator@example.com', displayName: 'Operator', role: 'Admin',
+    id: ACTOR, email: 'operator@example.com', displayName: 'Operator', role: 'ClientAdmin', permissions: clientFixturePermissions,
     clientId: CLIENT, accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600,
   } })
   vi.spyOn(billingApi, 'getAccountSnapshot').mockResolvedValue(ACCOUNT)

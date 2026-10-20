@@ -1,3 +1,4 @@
+import { clientFixturePermissions } from '../../test/authorityFixtures'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -22,7 +23,7 @@ const SNAPSHOT: BillingAccountSnapshot = {
   walletVersion: '1',
 }
 
-function authenticate(role: 'Admin' | 'Viewer' = 'Admin') {
+function authenticate(role: 'ClientAdmin' | 'Viewer' = 'ClientAdmin') {
   useAuthStore.setState({
     accessToken: 'token',
     refreshTokenValue: 'refresh',
@@ -30,7 +31,7 @@ function authenticate(role: 'Admin' | 'Viewer' = 'Admin') {
       id: 'operator',
       email: 'operator@example.com',
       displayName: 'Operator',
-      role,
+      role, permissions: role==='ClientAdmin'?clientFixturePermissions:[], platformPermissions: role==='ClientAdmin'?['platform:billing:adjust', 'platform:packages:manage']:[],
       clientId: CLIENT_ID,
       accessToken: 'token',
       refreshToken: 'refresh',

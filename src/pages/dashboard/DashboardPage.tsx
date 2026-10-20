@@ -1,24 +1,21 @@
 import { RefreshCw } from 'lucide-react'
 import type { FC } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { useOverviewMetrics, useHealthCheck } from '@/hooks/useQueryHooks'
+import { useClientWorkspaceDashboard } from '@/hooks/useQueryHooks'
 import { StatCard } from '@/components/shared/StatCard'
 import { ErrorDisplay } from '@/components/shared/ErrorDisplay'
-import { Badge } from '@/components/shared/Badge'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { useAuth } from '@/hooks/useAuth'
 
 const DashboardPage: FC = () => {
-  const navigate = useNavigate()
   const { user } = useAuth()
   const queryClient = useQueryClient()
 
-  const { data: metrics, isLoading: metricsLoading, error: metricsError } = useOverviewMetrics()
-  const { data: health, isLoading: healthLoading, error: healthError } = useHealthCheck()
+  const { data: metrics, isLoading: metricsLoading, isFetching: metricsFetching, error: metricsError } = useClientWorkspaceDashboard(user?.clientId)
 
   const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ['backoffice'] })
+    if (metricsFetching) return
+    queryClient.invalidateQueries({ queryKey: ['backoffice', 'clients', user?.clientId, 'dashboard'] })
   }
 
   return (
@@ -33,11 +30,12 @@ const DashboardPage: FC = () => {
         </div>
         <button
           onClick={handleRefresh}
-          disabled={metricsLoading || healthLoading}
+          disabled={metricsLoading}
+          aria-disabled={metricsFetching}
           className="inline-flex items-center px-3 py-2 text-sm font-medium text-foreground bg-surface border border-control rounded-md hover:bg-subtle disabled:opacity-50"
         >
           <RefreshCw aria-hidden="true" className="w-4 h-4 mr-1.5" />
-          Refresh
+          {metricsFetching && !metricsLoading ? 'Refreshing…' : 'Refresh'}
         </button>
       </div>
 
@@ -67,65 +65,19 @@ const DashboardPage: FC = () => {
             change={{ value: 8, isPositive: true }}
           />
           <StatCard
-            title="Verification Rate"
-            value={`${(metrics.verificationRate * 100).toFixed(1)}%`}
-          />
-          <StatCard
-            title="Conversion Rate"
-            value={`${(metrics.conversionRate * 100).toFixed(1)}%`}
+            title="Products"
+            value={metrics.products}
           />
         </div>
       ) : (
         <EmptyState
           icon="chart-bar"
           title="No dashboard data yet"
-          description="Dashboard statistics will appear once you start receiving data."
-          actionLabel="View Analytics"
-          onAction={() => navigate('/analytics')}
+          description="Workspace statistics will appear once you start receiving data."
         />
       )}
 
-      {/* System Health */}
-      <div className="bg-surface rounded-lg border border-line">
-        <div className="px-4 py-3 border-b border-line">
-          <h2 className="text-sm font-semibold text-foreground">System Health</h2>
-        </div>
-        {healthLoading ? (
-          <div className="p-4 space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="animate-pulse flex items-center justify-between">
-                <div className="h-4 bg-hover rounded w-1/3"></div>
-                <div className="h-5 bg-hover rounded w-1/6"></div>
-              </div>
-            ))}
-          </div>
-        ) : healthError ? (
-          <ErrorDisplay message={healthError.message} onRetry={handleRefresh} />
-        ) : health ? (
-          <div className="divide-y divide-line">
-            <div className="px-4 py-3 flex items-center justify-between">
-              <span className="text-sm text-foreground">API</span>
-              <Badge variant={health.status === 'healthy' ? 'success' : 'error'}>
-                {health.status}
-              </Badge>
-            </div>
-            <div className="px-4 py-3 flex items-center justify-between">
-              <span className="text-sm text-foreground">Database</span>
-              <Badge variant={health.database === 'ok' ? 'success' : 'error'}>
-                {health.database}
-              </Badge>
-            </div>
-            <div className="px-4 py-3 flex items-center justify-between">
-              <span className="text-sm text-foreground">Redis</span>
-              <Badge variant={health.redis === 'ok' ? 'success' : 'error'}>
-                {health.redis}
-              </Badge>
-            </div>
-          </div>
-        ) : (
-          <div className="p-6 text-center text-sm text-muted">Health data unavailable</div>
-        )}
-      </div>
+
     </div>
   )
 }

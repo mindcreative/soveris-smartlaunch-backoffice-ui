@@ -1,3 +1,5 @@
+import { currentAuthorityFixture } from '../test/authorityFixtures'
+import { clientFixturePermissions } from '../test/authorityFixtures'
 import { render, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { authApi } from '../api/endpoints'
@@ -23,7 +25,21 @@ function resetStore() {
 }
 
 describe('auth lifecycle', () => {
-  beforeEach(resetStore)
+  beforeEach(() => { resetStore(); vi.spyOn(authApi,'revoke').mockResolvedValue() })
+
+  it('shares one current-authority verification across simultaneous refresh listeners', async () => {
+    localStorage.setItem('backoffice_access_token','new-access')
+    localStorage.setItem('backoffice_refresh_token','new-refresh')
+    let release!: (value: ReturnType<typeof currentAuthorityFixture>) => void
+    const current=vi.spyOn(authApi,'currentAuthority').mockImplementation(() => new Promise(resolve => { release=resolve }))
+    const first=useAuthStore.getState().handleSuccessfulRefresh()
+    const second=useAuthStore.getState().handleSuccessfulRefresh()
+    await waitFor(()=>expect(current).toHaveBeenCalledTimes(1))
+    release(currentAuthorityFixture())
+    await Promise.all([first,second])
+    expect(useAuthStore.getState().isAuthenticated).toBe(true)
+    expect(useAuthStore.getState().accessToken).toBe('new-access')
+  })
 
   it('finishes initialization when there is no persisted session', async () => {
     await useAuthStore.getState().initialize()
@@ -45,8 +61,8 @@ describe('auth lifecycle', () => {
       user: {
         id: 'operator',
         email: 'admin@example.com',
-        displayName: 'Admin',
-        role: 'Admin',
+        displayName: 'ClientAdmin',
+        role: 'ClientAdmin', permissions: clientFixturePermissions,
         clientId: CLIENT_ID,
         accessToken: 'token',
         refreshToken: 'refresh',
@@ -113,7 +129,7 @@ describe('auth lifecycle', () => {
     queryClient.setQueryData(productKeys.detail(CLIENT_ID, 'product-id'), { name: 'Private product' })
     useAuthStore.setState({ refreshTokenValue: 'refresh', isInitialized: true, isLoading: false })
     vi.spyOn(authApi, 'refreshToken').mockResolvedValue({
-      accessToken: 'new-token', refreshToken: 'new-refresh', expiresIn: 3600,
+      accessToken: 'new-token', refreshToken: 'new-refresh', expiresIn: 3600, user:currentAuthorityFixture(),
     })
 
     await useAuthStore.getState().doRefreshToken()

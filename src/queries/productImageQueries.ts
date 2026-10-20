@@ -1,3 +1,4 @@
+import { privateObjectUrl, releasePrivateObjectUrl } from '../auth/authorityEpoch'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { AxiosProgressEvent } from 'axios'
@@ -67,7 +68,7 @@ export function useProductImageUploads(
 
   const revoke = useCallback((pointer: string) => {
     const url = objectUrls.current.get(pointer)
-    if (url) URL.revokeObjectURL(url)
+    if (url) releasePrivateObjectUrl(url)
     objectUrls.current.delete(pointer)
   }, [])
 
@@ -99,7 +100,7 @@ export function useProductImageUploads(
   const clearAll = useCallback(() => {
     generation.current += 1
     for (const controller of controllers.current.values()) controller.abort()
-    for (const url of objectUrls.current.values()) URL.revokeObjectURL(url)
+    for (const url of objectUrls.current.values()) releasePrivateObjectUrl(url)
     controllers.current.clear()
     objectUrls.current.clear()
     retained.current.clear()
@@ -160,7 +161,7 @@ export function useProductImageUploads(
       const blob = await getProductImagePreview(productId, result.asset.id, controller.signal)
       if (expectedGeneration !== generation.current || controller.signal.aborted) return
       revoke(pointer)
-      const previewUrl = URL.createObjectURL(blob)
+      const previewUrl = privateObjectUrl(blob)
       objectUrls.current.set(pointer, previewUrl)
       queryClient.setQueryData(
         productImageKeys.preview(clientId, productId, result.asset.id), blob)

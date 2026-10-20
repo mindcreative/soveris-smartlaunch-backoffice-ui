@@ -1,3 +1,4 @@
+import { clientFixturePermissions } from '../test/authorityFixtures'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiClient, type ApiError } from './apiClient'
 import {
@@ -100,7 +101,7 @@ describe('AI image closed adapters', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     useAuthStore.setState({ user: {
-      id: 'actor', email: 'actor@example.test', displayName: 'Actor', role: 'Admin',
+      id: 'actor', email: 'actor@example.test', displayName: 'Actor', role: 'ClientAdmin', permissions: clientFixturePermissions,
       clientId: CLIENT_ID, accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600,
     } })
   })

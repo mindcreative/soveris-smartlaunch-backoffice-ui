@@ -1,0 +1,501 @@
+{
+  "schemaVersion": "2",
+  "components": [
+    {
+      "alias": "api_process",
+      "status": "healthy",
+      "state": "observed",
+      "reasonCode": "available",
+      "lifecycle": "not_applicable",
+      "ageSeconds": 0,
+      "validForSeconds": 30,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "ai_worker",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "ai_job_observer",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "billing_observer",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "capability_projection",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "dlq_consumer",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "domain_cleanup",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "domain_edge",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "domain_observer",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "domain_proof",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "ledger_exports",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "unknown",
+      "storageWrite": "unverified"
+    },
+    {
+      "alias": "main_consumer",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "managed_cleanup",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "message_observer",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "postgres",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "private_ai_results",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "unknown",
+      "storageWrite": "unverified"
+    },
+    {
+      "alias": "product_assets",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "unknown",
+      "storageWrite": "unverified"
+    },
+    {
+      "alias": "provider_config",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "provider_content",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "unknown",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": false,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "provider_image",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "unknown",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": false,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "provider_readiness",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "publisher",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "queue_observer",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "rabbit_topology",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "rabbit_transport",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "reconciliation",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "redis_auth",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "redis_content",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "redis_rate",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    },
+    {
+      "alias": "runtime_config",
+      "status": "unknown",
+      "state": "absent",
+      "reasonCode": "not_observed",
+      "lifecycle": "not_applicable",
+      "ageSeconds": null,
+      "validForSeconds": null,
+      "executionReady": null,
+      "storageRead": "not_applicable",
+      "storageWrite": "not_applicable"
+    }
+  ],
+  "readiness": [
+    {
+      "scope": "api_control_plane",
+      "status": "unhealthy",
+      "components": [
+        "postgres",
+        "redis_auth",
+        "redis_rate",
+        "rabbit_transport",
+        "rabbit_topology",
+        "queue_observer",
+        "publisher",
+        "private_ai_results",
+        "ledger_exports",
+        "product_assets",
+        "provider_config",
+        "provider_readiness",
+        "provider_content",
+        "provider_image",
+        "domain_proof",
+        "domain_edge",
+        "domain_cleanup",
+        "managed_cleanup",
+        "capability_projection",
+        "runtime_config",
+        "billing_observer",
+        "message_observer",
+        "ai_job_observer",
+        "domain_observer"
+      ],
+      "blockers": [
+        "postgres",
+        "redis_auth",
+        "redis_rate",
+        "rabbit_transport",
+        "rabbit_topology",
+        "queue_observer",
+        "publisher",
+        "private_ai_results",
+        "ledger_exports",
+        "product_assets",
+        "provider_config",
+        "provider_readiness",
+        "provider_content",
+        "provider_image",
+        "domain_proof",
+        "domain_edge",
+        "domain_cleanup",
+        "managed_cleanup",
+        "capability_projection",
+        "runtime_config",
+        "billing_observer",
+        "message_observer",
+        "ai_job_observer",
+        "domain_observer"
+      ]
+    },
+    {
+      "scope": "ai_worker",
+      "status": "unhealthy",
+      "components": [
+        "ai_worker"
+      ],
+      "blockers": [
+        "ai_worker"
+      ]
+    },
+    {
+      "scope": "ai_content_execution",
+      "status": "unhealthy",
+      "components": [
+        "postgres",
+        "provider_config",
+        "provider_content",
+        "private_ai_results"
+      ],
+      "blockers": [
+        "postgres",
+        "provider_config",
+        "provider_content",
+        "private_ai_results"
+      ]
+    },
+    {
+      "scope": "ai_image_execution",
+      "status": "unhealthy",
+      "components": [
+        "postgres",
+        "rabbit_transport",
+        "rabbit_topology",
+        "ai_worker",
+        "provider_config",
+        "provider_image",
+        "private_ai_results"
+      ],
+      "blockers": [
+        "postgres",
+        "rabbit_transport",
+        "rabbit_topology",
+        "ai_worker",
+        "provider_config",
+        "provider_image",
+        "private_ai_results"
+      ]
+    },
+    {
+      "scope": "product_asset_write",
+      "status": "unhealthy",
+      "components": [
+        "product_assets"
+      ],
+      "blockers": [
+        "product_assets"
+      ]
+    },
+    {
+      "scope": "private_ai_result_write",
+      "status": "unhealthy",
+      "components": [
+        "private_ai_results"
+      ],
+      "blockers": [
+        "private_ai_results"
+      ]
+    },
+    {
+      "scope": "ledger_export_write",
+      "status": "unhealthy",
+      "components": [
+        "ledger_exports"
+      ],
+      "blockers": [
+        "ledger_exports"
+      ]
+    }
+  ]
+}

@@ -1,3 +1,6 @@
+import { currentAuthorityFixture } from '../../test/authorityFixtures'
+import { viewerFixturePermissions } from '../../test/authorityFixtures'
+import { clientFixturePermissions } from '../../test/authorityFixtures'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -44,11 +47,11 @@ function page(nextCursor: string | null = null, adjustmentId = ADJUSTMENT_ID,
   }
 }
 
-function authenticate(role: 'Admin' | 'Viewer' = 'Admin') {
+function authenticate(role: 'ClientAdmin' | 'Viewer' = 'ClientAdmin') {
   useAuthStore.setState({
     accessToken: 'token', refreshTokenValue: 'refresh', isLoading: false,
     isAuthenticated: true, isInitialized: true,
-    user: { id: ACTOR_ID, email: 'operator@example.com', displayName: 'Operator', role,
+    user: { ...currentAuthorityFixture(), id: ACTOR_ID, email: 'operator@example.com', displayName: 'Operator', role,permissions:role==='ClientAdmin'?clientFixturePermissions:[],platformPermissions:role==='ClientAdmin'?['platform:billing:adjust','platform:packages:manage','platform:billing:reconcile','platform:billing:view']:[],
       clientId: CLIENT_ID, accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600 },
   })
 }
@@ -155,7 +158,7 @@ describe('Billing adjustment history experience', () => {
       isLoading: false, isAuthenticated: false, isInitialized: true })
     vi.spyOn(authApi, 'login').mockResolvedValue({
       accessToken: 'new-token', refreshToken: 'new-refresh', expiresIn: 3600,
-      user: { id: ACTOR_ID, email: 'operator@example.com', displayName: 'Operator', role: 'Admin',
+      user: { ...currentAuthorityFixture(), id: ACTOR_ID, email: 'operator@example.com', displayName: 'Operator', role: 'ClientAdmin', permissions: clientFixturePermissions, platformPermissions: ['platform:billing:adjust', 'platform:packages:manage'],
         clientId: CLIENT_ID, accessToken: 'new-token', refreshToken: 'new-refresh', expiresIn: 3600 },
     })
     vi.spyOn(adjustmentApi, 'getCreditAdjustmentHistoryPage').mockResolvedValue(page())
@@ -258,7 +261,7 @@ describe('Billing adjustment history experience', () => {
     window.history.replaceState({}, '', `/billing/clients/${CLIENT_ID}/adjustments`)
     render(<App />)
     await screen.findByRole('table')
-    useAuthStore.setState((state) => ({ user: state.user ? { ...state.user, role: 'Viewer' } : null }))
+    useAuthStore.setState((state) => ({ user: state.user ? { ...state.user, role: 'Viewer', permissions: viewerFixturePermissions,platformPermissions:[] } : null }))
     expect(await screen.findByRole('heading', { name: 'Access denied' })).toHaveFocus()
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
