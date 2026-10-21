@@ -25,6 +25,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
+    const revalidate = (event: Event) => {
+      const detail = (event as CustomEvent<AuthRefreshLifecycleDetail>).detail
+      const pending=useAuthStore.getState().revalidateAuthority()
+      const guarded=pending.catch(() => useAuthStore.getState().suspendAuthority())
+      if(detail?.waitUntil) detail.waitUntil(guarded)
+      else void guarded
+    }
+    window.addEventListener('auth:forbidden', revalidate)
+    return () => window.removeEventListener('auth:forbidden', revalidate)
+  }, [])
+
+  useEffect(() => {
+    const synchronize = () => { void useAuthStore.getState().synchronizeSessionFromStorage() }
+    const storage = (event: StorageEvent) => {
+      if(event.storageArea && event.storageArea!==localStorage) return
+      if(event.key===null || event.key==='backoffice_access_token' || event.key==='backoffice_refresh_token' || event.key==='backoffice-auth-persist') synchronize()
+    }
+    window.addEventListener('storage',storage)
+    window.addEventListener('auth:storage-changed',synchronize)
+    // Also reconcile after a tab was frozen or restored from browser history.
+    window.addEventListener('pageshow',synchronize)
+    window.addEventListener('focus',synchronize)
+    return () => {
+      window.removeEventListener('storage',storage)
+      window.removeEventListener('auth:storage-changed',synchronize)
+      window.removeEventListener('pageshow',synchronize)
+      window.removeEventListener('focus',synchronize)
+    }
+  }, [])
+
+  useEffect(() => {
     const handleAuthCleared = () => {
       void useAuthStore.getState().clearSession()
     }

@@ -1,4 +1,4 @@
-import { AuthorityChangedError, currentAuthorityEpoch } from '../auth/authorityEpoch'
+import { AuthorityChangedError, authorityTokenIsCurrent, currentAuthorityEpoch } from '../auth/authorityEpoch'
 import { normalizeRemovalProblem } from './productRemovalProblem'
 import { normalizeDomainProblem } from './domainProblem'
 import axios, {
@@ -97,6 +97,15 @@ export async function notifySuccessfulAuthRefresh(): Promise<void> {
   await Promise.all(pending)
 }
 
+async function notifyForbiddenAuthorityCheck(): Promise<void> {
+  if (typeof window === 'undefined') return
+  const pending: Promise<void>[] = []
+  window.dispatchEvent(new CustomEvent<AuthRefreshLifecycleDetail>('auth:forbidden', {
+    detail: { waitUntil: (promise) => pending.push(promise) },
+  }))
+  await Promise.all(pending)
+}
+
 function isApiError(error: unknown): error is ApiError {
   return Boolean(
     error &&
@@ -141,6 +150,12 @@ export class ApiClient {
       (config: InternalAxiosRequestConfig) => {
         const scoped=config as InternalAxiosRequestConfig & { authorityEpoch?: number }; scoped.authorityEpoch=currentAuthorityEpoch()
         const token = this.getAccessToken()
+        const authorityLookup=config.url?.endsWith('/auth/current')
+        const publicAuth=['/auth/login','/auth/refresh','/auth/revoke'].some(path=>config.url?.endsWith(path))
+        if(!authorityLookup && !publicAuth && !authorityTokenIsCurrent(token)) {
+          window.dispatchEvent(new CustomEvent('auth:storage-changed'))
+          throw new AuthorityChangedError()
+        }
         if (token) {
           config.headers.set('Authorization', `Bearer ${token}`)
         }
@@ -152,6 +167,13 @@ export class ApiClient {
     // Response interceptor — handle 401 with token refresh
     this.client.interceptors.response.use(
       (response: AxiosResponse) => {
+        // Storage changes are visible before their queued browser event. Reject
+        // a late response even in that window, including binary/download data.
+        const sent=response.config.headers.get('Authorization')
+        if(sent && sent!==`Bearer ${this.getAccessToken()}`) {
+          window.dispatchEvent(new CustomEvent('auth:storage-changed'))
+          throw new AuthorityChangedError()
+        }
         const epoch=(response.config as InternalAxiosRequestConfig & { authorityEpoch?: number }).authorityEpoch
         if(epoch!==undefined && epoch!==currentAuthorityEpoch()) throw new AuthorityChangedError()
         return response
@@ -165,6 +187,11 @@ export class ApiClient {
 
         if(originalRequest?.authorityEpoch!==undefined && originalRequest.authorityEpoch!==currentAuthorityEpoch())
           return Promise.reject(new AuthorityChangedError())
+        const sent=originalRequest?.headers?.get('Authorization')
+        if(sent && sent!==`Bearer ${this.getAccessToken()}`) {
+          window.dispatchEvent(new CustomEvent('auth:storage-changed'))
+          return Promise.reject(new AuthorityChangedError())
+        }
         const status=error.response?.status
         const authPublic=['/auth/login','/auth/refresh','/auth/revoke'].some(path=>originalRequest?.url?.endsWith(path))
         let problemBody=error.response?.data
@@ -175,8 +202,13 @@ export class ApiClient {
         }
         const problem=decodeErrorBody(problemBody)
         const problemCode=problem && typeof problem==='object' ? String((problem as {code?:unknown;error?:unknown}).code??(problem as {error?:unknown}).error??'') : ''
-        const unavailable=status===503 && (/authorization.*unavailable|authorization.*dependency/.test(problemCode) || originalRequest?.url?.endsWith('/auth/current'))
-        if(!authPublic && (status===403 || unavailable)) window.dispatchEvent(new CustomEvent('auth:suspended'))
+        const currentAuthority=originalRequest?.url?.endsWith('/auth/current')
+        const unavailable=status===503 && (/authorization.*unavailable|authorization.*dependency/.test(problemCode) || currentAuthority)
+        if(!authPublic && unavailable) window.dispatchEvent(new CustomEvent('auth:suspended'))
+        if(!authPublic && status===403) {
+          if(currentAuthority) window.dispatchEvent(new CustomEvent('auth:suspended'))
+          else await notifyForbiddenAuthorityCheck()
+        }
         // Replays use the same original session; mutations are never automatically retried.
 
         if (
@@ -185,6 +217,7 @@ export class ApiClient {
           this.shouldRetryRequest(originalRequest)
         ) {
           window.dispatchEvent(new CustomEvent('auth:suspended'))
+          const refreshEpoch=currentAuthorityEpoch()
           originalRequest._retry = true
           originalRequest.onAuthReplay?.()
 
@@ -194,7 +227,7 @@ export class ApiClient {
             return this.client.request(originalRequest)
           } catch (refreshError) {
             // Refresh failed — clear auth and redirect
-            this.clearAuthState()
+            if(currentAuthorityEpoch()===refreshEpoch) this.clearAuthState()
             return Promise.reject(this.normalizeError(refreshError))
           }
         }
@@ -208,7 +241,7 @@ export class ApiClient {
   private shouldRetryRequest(config: InternalAxiosRequestConfig & { _retry?: boolean; retryOnUnauthorized?: boolean }): boolean {
     if (config.retryOnUnauthorized === false || config.method?.toUpperCase()!=='GET') return false
     // Don't retry login, refresh, or health endpoints
-    const nonRetryPaths = ['/auth/login', '/auth/refresh', '/health']
+    const nonRetryPaths = ['/auth/login', '/auth/refresh', '/auth/current', '/health']
     return !nonRetryPaths.some((path) => config.url?.includes(path))
   }
 

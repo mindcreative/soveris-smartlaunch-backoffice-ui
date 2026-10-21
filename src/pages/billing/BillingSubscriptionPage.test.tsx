@@ -13,6 +13,7 @@ import type { BillingSubscriptionState } from '../../types/billing'
 const CLIENT_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 
 function authenticate(role: 'ClientAdmin' | 'Viewer' = 'ClientAdmin') {
+  useAuthStore.getState().setTokens('token','refresh')
   useAuthStore.setState({
     accessToken: 'token', refreshTokenValue: 'refresh', isLoading: false,
     isAuthenticated: true, isInitialized: true,

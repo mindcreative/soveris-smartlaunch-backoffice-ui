@@ -4,7 +4,7 @@ import type { AuthUser, UserRole } from '../types/auth'
 import { authApi } from '../api/endpoints'
 import { hasPermission } from '../auth/permissions'
 import { parseCurrentAuthority } from '../auth/currentAuthority'
-import { currentAuthorityEpoch, retireAuthority } from '../auth/authorityEpoch'
+import { bindAuthorityToken, currentAuthorityEpoch, retireAuthority } from '../auth/authorityEpoch'
 import { clearPrivateClientScope } from '../queries/billingQueries'
 import { queryClient } from '../queryClient'
 
@@ -41,7 +41,9 @@ export interface AuthActions {
   initialize: () => Promise<void>
   clearSession: () => Promise<void>
   suspendAuthority: () => Promise<void>
+  revalidateAuthority: () => Promise<void>
   handleSuccessfulRefresh: () => Promise<void>
+  synchronizeSessionFromStorage: () => Promise<void>
   hasRole: (role: UserRole) => boolean
   hasAnyRole: (roles: UserRole[]) => boolean
   hasPermission: (permission: string) => boolean
@@ -50,15 +52,24 @@ type AuthStore = AuthState & AuthActions
 const anonymous = { user: null, accessToken: null, refreshTokenValue: null, isAuthenticated: false, isLoading: false, isInitialized: true, authorityUnavailable: false }
 let initializing: Promise<void> | null = null
 let refreshingProjection: Promise<void> | null = null
+let revalidatingProjection: Promise<void> | null = null
+function sameAuthority(left: AuthUser | null, right: AuthUser): boolean {
+  return Boolean(left && left.id===right.id && left.clientId===right.clientId && left.clientRoleId===right.clientRoleId &&
+    left.sessionId===right.sessionId && left.securityRevision===right.securityRevision && left.role===right.role &&
+    JSON.stringify(left.permissions??[])===JSON.stringify(right.permissions??[]) &&
+    JSON.stringify(left.platformPermissions??[])===JSON.stringify(right.platformPermissions??[]))
+}
 export const useAuthStore = create<AuthStore>()(devtools(persist((set, get) => {
   function accept(user: unknown, access: string, refresh: string): void {
     const parsed = parseCurrentAuthority(user)
     void clearPrivateState()
     tokens(access, refresh)
+    bindAuthorityToken(access)
     set({ user: { ...parsed, accessToken: access, refreshToken: refresh }, accessToken: access,
       refreshTokenValue: refresh, isAuthenticated: true, isInitialized: true, isLoading: false, authorityUnavailable: false })
   }
   async function clear(): Promise<void> {
+    bindAuthorityToken(null)
     set(anonymous); tokens(null, null); await clearPrivateState()
   }
   return {
@@ -69,7 +80,10 @@ export const useAuthStore = create<AuthStore>()(devtools(persist((set, get) => {
     hasAnyRole: roles => get().isAuthenticated && Boolean(get().user && roles.includes(get().user!.role)),
     hasPermission: permission => get().isAuthenticated && hasPermission(get().user,permission),
     login: async (email,password) => {
-      await clear(); set({ isLoading: true }); const epoch=currentAuthorityEpoch()
+      const retiring=clear(),epoch=currentAuthorityEpoch()
+      await retiring
+      if(currentAuthorityEpoch()!==epoch) return
+      set({ isLoading: true })
       try {
         const result=await authApi.login({ email,password })
         if (currentAuthorityEpoch()!==epoch) return
@@ -83,17 +97,60 @@ export const useAuthStore = create<AuthStore>()(devtools(persist((set, get) => {
     },
     clearSession: clear,
     suspendAuthority: async () => {
+      bindAuthorityToken(null)
       set({ user: null,isAuthenticated: false,isLoading: false,isInitialized: true,authorityUnavailable: true })
       await clearPrivateState()
+    },
+    synchronizeSessionFromStorage: async () => {
+      let access: string | null = null, refresh: string | null = null
+      try { access=localStorage.getItem('backoffice_access_token');refresh=localStorage.getItem('backoffice_refresh_token') } catch { /* Retire unverifiable storage. */ }
+      if(access===get().accessToken && refresh===get().refreshTokenValue) return
+      // Retire synchronously, before the first await. Do not write shared tokens:
+      // an intermediate logout/rotation event must not erase another tab's login.
+      bindAuthorityToken(null)
+      set({ ...anonymous,accessToken:access,refreshTokenValue:refresh,isLoading:Boolean(access && refresh) })
+      const retiring=clearPrivateState(), epoch=currentAuthorityEpoch()
+      await retiring
+      if(!access || !refresh || currentAuthorityEpoch()!==epoch) return
+      try {
+        const projection=await authApi.currentAuthority()
+        if(currentAuthorityEpoch()!==epoch || localStorage.getItem('backoffice_access_token')!==access ||
+          localStorage.getItem('backoffice_refresh_token')!==refresh) return
+        accept(projection,access,refresh)
+      } catch (error) {
+        if(currentAuthorityEpoch()!==epoch) return
+        const denied=error && typeof error==='object' && 'status' in error && (error.status===401 || error.status===403)
+        set({user:null,isAuthenticated:false,isLoading:false,authorityUnavailable:!denied})
+      }
+    },
+    revalidateAuthority: async () => {
+      if(revalidatingProjection) return revalidatingProjection
+      revalidatingProjection=(async () => {
+        const state=get()
+        if(!state.isAuthenticated || !state.user || !state.accessToken || !state.refreshTokenValue) return
+        const epoch=currentAuthorityEpoch()
+        try {
+          const parsed=parseCurrentAuthority(await authApi.currentAuthority())
+          if(currentAuthorityEpoch()!==epoch || sameAuthority(get().user,parsed)) return
+          accept(parsed,state.accessToken,state.refreshTokenValue)
+        } catch(error) {
+          if(currentAuthorityEpoch()!==epoch) return
+          if(error && typeof error==='object' && 'status' in error && error.status===503) await get().suspendAuthority()
+          else if(error && typeof error==='object' && 'status' in error && (error.status===401 || error.status===403)) await clear()
+          else throw error
+        }
+      })()
+      try {await revalidatingProjection} finally {revalidatingProjection=null}
     },
     handleSuccessfulRefresh: async () => {
       if (refreshingProjection) return refreshingProjection
       refreshingProjection=(async () => {
-        await get().suspendAuthority()
+        const retiring=get().suspendAuthority(),epoch=currentAuthorityEpoch()
+        await retiring
+        if(currentAuthorityEpoch()!==epoch) return
         let access: string | null=null, refresh: string | null=null
         try { access=localStorage.getItem('backoffice_access_token');refresh=localStorage.getItem('backoffice_refresh_token') } catch { /* handled below */ }
         if(!access || !refresh) { await clear();return }
-        const epoch=currentAuthorityEpoch()
         const projection=await authApi.currentAuthority()
         if(currentAuthorityEpoch()!==epoch) return
         accept(projection,access,refresh)
@@ -103,7 +160,9 @@ export const useAuthStore = create<AuthStore>()(devtools(persist((set, get) => {
     doRefreshToken: async () => {
       const refresh=get().refreshTokenValue
       if(!refresh) { await clear();return }
-      await get().suspendAuthority();const epoch=currentAuthorityEpoch()
+      const retiring=get().suspendAuthority(),epoch=currentAuthorityEpoch()
+      await retiring
+      if(currentAuthorityEpoch()!==epoch) return
       try {
         const result=await authApi.refreshToken({ refreshToken: refresh })
         if(currentAuthorityEpoch()!==epoch) return
@@ -114,12 +173,17 @@ export const useAuthStore = create<AuthStore>()(devtools(persist((set, get) => {
       if(get().isInitialized) return
       if(initializing) return initializing
       initializing=(async () => {
-        const state=get();if(!state.accessToken) { await clear();return }
-        tokens(state.accessToken,state.refreshTokenValue)
-        set({ user: null,isAuthenticated: false,isLoading: true });await clearPrivateState();const epoch=currentAuthorityEpoch()
+        let access: string | null=null,refresh: string | null=null
+        try { access=localStorage.getItem('backoffice_access_token');refresh=localStorage.getItem('backoffice_refresh_token') } catch { /* handled below */ }
+        if(!access || !refresh) { await clear();return }
+        bindAuthorityToken(null)
+        set({ user: null,accessToken:access,refreshTokenValue:refresh,isAuthenticated: false,isLoading: true })
+        const retiring=clearPrivateState(),epoch=currentAuthorityEpoch()
+        await retiring
+        if(currentAuthorityEpoch()!==epoch) return
         try {
           const projection=await authApi.currentAuthority()
-          if(currentAuthorityEpoch()===epoch) accept(projection,state.accessToken,state.refreshTokenValue??'')
+          if(currentAuthorityEpoch()===epoch) accept(projection,access,refresh)
         } catch (error) {
           if(currentAuthorityEpoch()!==epoch) return
           if(error && typeof error==='object' && 'status' in error && error.status===503) await get().suspendAuthority()

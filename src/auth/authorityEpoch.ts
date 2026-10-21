@@ -1,5 +1,10 @@
 let epoch = 0
+let validatedAccessToken: string | null | undefined
 const privateUrls = new Set<string>()
+export function bindAuthorityToken(token: string | null): void { validatedAccessToken = token }
+export function authorityTokenIsCurrent(token: string | null): boolean {
+  return validatedAccessToken === undefined || (validatedAccessToken !== null && validatedAccessToken === token)
+}
 export function currentAuthorityEpoch(): number { return epoch }
 export function retireAuthority(): number {
   epoch++
