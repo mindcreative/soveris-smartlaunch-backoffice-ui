@@ -18,7 +18,7 @@ test('current Client administrator cannot fetch foreign billing or technical hea
   const privateRequests:string[]=[]
   await page.route('**/api/backoffice/clients/**',route => {privateRequests.push(route.request().url());return route.abort()})
   await page.goto(`/billing/clients/${foreign}/account`)
-  await expect(page.getByText(/outside your current financial scope/)).toBeVisible()
+  await expect(page.getByRole('heading',{name:'Access denied'})).toBeVisible()
   expect(privateRequests).toEqual([])
   await page.goto('/dashboard')
   await expect(page.getByRole('region',{name:'System Health'})).toHaveCount(0)

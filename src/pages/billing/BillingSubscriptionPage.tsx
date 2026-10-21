@@ -12,7 +12,7 @@ import { ResourceAccessConsequenceTimeline } from '../../components/billing/Reso
 import { SubscriptionTierControls } from '../../components/billing/SubscriptionTierControls'
 import { SubscriptionPlanChangeControls } from '../../components/billing/SubscriptionPlanChangeControls'
 import { Breadcrumbs, EmptyState, ErrorDisplay, Forbidden, LoadingSpinner } from '../../components/shared'
-import { useAuth } from '../../hooks/useAuth'
+import { useBillingAccess as useAuth, billingPath, useExperience } from '../../auth/ExperienceContext'
 import { useSubscriptionLifecycle } from '../../hooks/useSubscriptionLifecycle'
 import { canonicalizeGuid } from '../../lib/guid'
 import {
@@ -36,10 +36,11 @@ function SubscriptionFrame({ clientId, headingRef, children }: {
   headingRef?: React.RefObject<HTMLHeadingElement | null>
   children: React.ReactNode
 }) {
+  const audience = useExperience()
   return (
     <div className="mx-auto min-w-0 max-w-7xl break-words">
       <Breadcrumbs items={[
-        { label: 'Billing', href: '/billing' },
+        { label: 'Billing', href: audience === 'platform' ? '/platform' : '/billing' },
         { label: 'Subscriptions' },
         { label: `Selected Client ${clientId}` },
       ]} />
@@ -124,6 +125,15 @@ type DurableSubscriptionError = {
   error: Error | ApiError
 }
 
+function WorkspaceCapabilities({ clientId, onDurableError }: { clientId: string; onDurableError: (error: DurableSubscriptionError) => void }) {
+  const query = useClientCapabilities(clientId)
+  useEffect(() => {
+    if (query.error && (query.error instanceof ClientCapabilitiesContractError || [401,403].includes(errorStatus(query.error) ?? 0)))
+      onDurableError({source:'subscription', error:query.error})
+  }, [query.error, onDurableError])
+  return <CapabilityPolicyContext clientId={clientId} capabilities={query.data} isLoading={query.isPending} isFetching={query.isFetching} error={query.error} onRetry={() => void query.refetch()} />
+}
+
 function CanonicalSubscriptionPage({ clientId, canCreate, onDurableError }: {
   clientId: string
   canCreate: boolean
@@ -131,13 +141,12 @@ function CanonicalSubscriptionPage({ clientId, canCreate, onDurableError }: {
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null)
   const queryClient = useQueryClient()
-  const { hasPermission } = useAuth()
-  const canViewAccount = hasPermission('billing:view') || hasPermission('platform:billing:view')
+  const { hasPermission, audience } = useAuth()
+  const canViewAccount = hasPermission('billing:view')
   const canManage = hasPermission('platform:packages:manage')
   const subscriptionQuery = useBillingSubscriptions(clientId)
   const accountQuery = useBillingAccount(canViewAccount ? clientId : null)
-  const capabilityQuery = useClientCapabilities(clientId)
-  const consequenceQuery = useResourceAccessConsequences(clientId)
+  const consequenceQuery = useResourceAccessConsequences(audience === 'platform' && canViewAccount ? clientId : null)
   const lifecycle = useSubscriptionLifecycle(clientId, {
     onPermissionDenied: (error) => onDurableError({ source: 'subscription', error }),
   })
@@ -203,15 +212,6 @@ function CanonicalSubscriptionPage({ clientId, canCreate, onDurableError }: {
     }
   }, [onDurableError, queryClient, subscriptionQuery.error])
 
-  useEffect(() => {
-    if (capabilityQuery.error && (
-      capabilityQuery.error instanceof ClientCapabilitiesContractError ||
-      [401, 403].includes(errorStatus(capabilityQuery.error) ?? 0)
-    )) {
-      onDurableError({ source: 'subscription', error: capabilityQuery.error })
-      queueMicrotask(() => { void clearPrivateClientScope(queryClient) })
-    }
-  }, [capabilityQuery.error, clientId, onDurableError, queryClient])
 
   useEffect(() => {
     if (accountQuery.error && (
@@ -254,13 +254,21 @@ function CanonicalSubscriptionPage({ clientId, canCreate, onDurableError }: {
   }
 
   if (subscription?.current) {
-    return <SubscriptionFrame clientId={clientId} headingRef={headingRef}><div className="space-y-4">{localReceipt && <LocalSubscriptionCreatedNotice receipt={localReceipt} />}{!authorityPending && <CapabilityPolicyContext clientId={clientId} capabilities={capabilityQuery.data} isLoading={capabilityQuery.isPending} isFetching={capabilityQuery.isFetching} error={capabilityQuery.error} onRetry={() => void capabilityQuery.refetch()} />}{canManage && <SubscriptionPlanChangeControls clientId={clientId} state={subscription} account={account ?? null} preflight={planPreflight} onPermissionDenied={(error) => onDurableError({ source: 'subscription', error })} onAuthorityPending={setPlanAuthorityPending} />}{canManage && <SubscriptionTierControls clientId={clientId} state={subscription} preflight={tierPreflight} onPermissionDenied={(error) => onDurableError({ source: 'subscription', error })} onAuthorityPending={setTierAuthorityPending} />}{authorityPending && <p role="status" className="state-indicator rounded-md border border-info-line bg-info-soft p-3 text-sm text-info">Current subscription, account, and consequence details are hidden until authoritative reconciliation completes.</p>}{!authorityPending && canManage && <SubscriptionLifecycleControlsView clientId={clientId} state={subscription} preflight={lifecyclePreflight} lifecycle={lifecycle} />}{subscriptionError && <p role="alert" className="state-indicator rounded-md border border-warning-line bg-warning-soft p-3 text-sm text-warning">Refresh failed. This is the last validated subscription state for this Client and may be stale.</p>}{!authorityPending && <CurrentSubscription subscription={subscription.current} state={subscription} hasNextPage={subscriptionQuery.hasNextPage} isLoadingMore={subscriptionQuery.isLoadingMore} continuationError={subscriptionQuery.continuationError} onLoadMore={subscriptionQuery.loadMore} />}{!authorityPending && <ResourceAccessConsequenceTimeline consequences={consequenceQuery.data} isLoading={consequenceQuery.isPending} error={consequenceQuery.error} onRetry={() => void consequenceQuery.refetch()} />}</div></SubscriptionFrame>
+    return <SubscriptionFrame clientId={clientId} headingRef={headingRef}><div className="space-y-4">{localReceipt && <LocalSubscriptionCreatedNotice receipt={localReceipt} />}{audience === 'workspace' && !authorityPending && <WorkspaceCapabilities clientId={clientId} onDurableError={onDurableError} />}{canManage && <SubscriptionPlanChangeControls clientId={clientId} state={subscription} account={account ?? null} preflight={planPreflight} onPermissionDenied={(error) => onDurableError({ source: 'subscription', error })} onAuthorityPending={setPlanAuthorityPending} />}{canManage && <SubscriptionTierControls clientId={clientId} state={subscription} preflight={tierPreflight} onPermissionDenied={(error) => onDurableError({ source: 'subscription', error })} onAuthorityPending={setTierAuthorityPending} />}{authorityPending && <p role="status" className="state-indicator rounded-md border border-info-line bg-info-soft p-3 text-sm text-info">Current subscription, account, and consequence details are hidden until authoritative reconciliation completes.</p>}{!authorityPending && canManage && <SubscriptionLifecycleControlsView clientId={clientId} state={subscription} preflight={lifecyclePreflight} lifecycle={lifecycle} />}{subscriptionError && <p role="alert" className="state-indicator rounded-md border border-warning-line bg-warning-soft p-3 text-sm text-warning">Refresh failed. This is the last validated subscription state for this Client and may be stale.</p>}{!authorityPending && <CurrentSubscription subscription={subscription.current} state={subscription} hasNextPage={subscriptionQuery.hasNextPage} isLoadingMore={subscriptionQuery.isLoadingMore} continuationError={subscriptionQuery.continuationError} onLoadMore={subscriptionQuery.loadMore} />}{audience === 'platform' && canViewAccount && !authorityPending && <ResourceAccessConsequenceTimeline consequences={consequenceQuery.data} isLoading={consequenceQuery.isPending} error={consequenceQuery.error} onRetry={() => void consequenceQuery.refetch()} />}</div></SubscriptionFrame>
   }
   if (lifecycle.receipt && subscription) {
-    return <SubscriptionFrame clientId={clientId} headingRef={headingRef}><div className="space-y-4"><CapabilityPolicyContext clientId={clientId} capabilities={capabilityQuery.data} isLoading={capabilityQuery.isPending} isFetching={capabilityQuery.isFetching} error={capabilityQuery.error} onRetry={() => void capabilityQuery.refetch()} />{canManage && <SubscriptionLifecycleControlsView clientId={clientId} state={subscription} preflight={lifecyclePreflight} lifecycle={lifecycle} />}<TerminalHistory state={subscription} hasNextPage={subscriptionQuery.hasNextPage} isLoadingMore={subscriptionQuery.isLoadingMore} continuationError={subscriptionQuery.continuationError} onLoadMore={subscriptionQuery.loadMore} /></div></SubscriptionFrame>
+    return <SubscriptionFrame clientId={clientId} headingRef={headingRef}><div className="space-y-4">{audience === 'workspace' && <WorkspaceCapabilities clientId={clientId} onDurableError={onDurableError} />}{canManage && <SubscriptionLifecycleControlsView clientId={clientId} state={subscription} preflight={lifecyclePreflight} lifecycle={lifecycle} />}<TerminalHistory state={subscription} hasNextPage={subscriptionQuery.hasNextPage} isLoadingMore={subscriptionQuery.isLoadingMore} continuationError={subscriptionQuery.continuationError} onLoadMore={subscriptionQuery.loadMore} /></div></SubscriptionFrame>
   }
   if (subscriptionError) {
     return <SubscriptionFrame clientId={clientId} headingRef={headingRef}><ErrorDisplay message="Fresh subscription state unavailable" detail="Creation remains disabled until a fresh subscription precheck succeeds." onRetry={() => void subscriptionQuery.refetch()} /></SubscriptionFrame>
+  }
+
+  if (!canCreate) {
+    return <SubscriptionFrame clientId={clientId} headingRef={headingRef}>
+      {audience === 'workspace' && <WorkspaceCapabilities clientId={clientId} onDurableError={onDurableError} />}
+      <EmptyState title="No current subscription" description="No current subscription is configured for this Client. Stored history does not establish current package eligibility." />
+      {subscription && <TerminalHistory state={subscription} hasNextPage={subscriptionQuery.hasNextPage} isLoadingMore={subscriptionQuery.isLoadingMore} continuationError={subscriptionQuery.continuationError} onLoadMore={subscriptionQuery.loadMore} />}
+    </SubscriptionFrame>
   }
 
   if (canViewAccount && accountQuery.isPending && !account && !accountError) {
@@ -280,14 +288,11 @@ function CanonicalSubscriptionPage({ clientId, canCreate, onDurableError }: {
       </SubscriptionFrame>
     )
   }
-  if (!canCreate) {
-    return <SubscriptionFrame clientId={clientId} headingRef={headingRef}><Forbidden message="Subscription creation controls are unavailable for the current mapped role." /></SubscriptionFrame>
-  }
 
   return (
     <SubscriptionFrame clientId={clientId} headingRef={headingRef}>
       <div className="space-y-4">
-        <CapabilityPolicyContext clientId={clientId} capabilities={capabilityQuery.data} isLoading={capabilityQuery.isPending} isFetching={capabilityQuery.isFetching} error={capabilityQuery.error} onRetry={() => void capabilityQuery.refetch()} />
+        {audience === 'workspace' && <WorkspaceCapabilities clientId={clientId} onDurableError={onDurableError} />}
         {subscription && canManage && <SubscriptionLifecycleControlsView clientId={clientId} state={subscription} preflight={lifecyclePreflight} lifecycle={lifecycle} />}
         {!canViewAccount && (
           <p role="status" className="state-indicator rounded-md border border-warning-line bg-warning-soft p-3 text-sm text-warning">
@@ -306,8 +311,8 @@ function CanonicalSubscriptionPage({ clientId, canCreate, onDurableError }: {
 }
 
 function PermissionAwareSubscriptionPage({ clientId }: { clientId: string }) {
-  const { hasPermission } = useAuth()
-  const allowed = hasPermission('billing:view') || hasPermission('platform:billing:view') || hasPermission('platform:packages:manage')
+  const { hasPermission, audience } = useAuth()
+  const allowed = hasPermission('billing:view')
   const previouslyAllowed = useRef(allowed)
   const [durableState, setDurableState] = useState<{
     clientId: string
@@ -345,7 +350,7 @@ function PermissionAwareSubscriptionPage({ clientId }: { clientId: string }) {
     } else if (durable.source === 'subscription') {
       content = <ErrorDisplay message="Subscription state unavailable" detail="The server response did not match the Billing subscription contract. No subscription values have been displayed." />
     } else if (status === 404) {
-      content = <><EmptyState title="Credit account not configured" description="Open Account to configure this Client before creating a subscription. No account or zero balance has been inferred." /><Link to={`/billing/clients/${clientId}/account`} className="mx-auto flex min-h-11 w-fit items-center font-semibold text-primary underline">Open Account</Link></>
+      content = <><EmptyState title="Credit account not configured" description="Open Account to configure this Client before creating a subscription. No account or zero balance has been inferred." /><Link to={billingPath(audience, clientId, 'account')} className="mx-auto flex min-h-11 w-fit items-center font-semibold text-primary underline">Open Account</Link></>
     } else if (status === 403) {
       content = <Forbidden message="The server denied access to the CreditAccount readiness check." />
     } else if (status === 401) {
@@ -358,13 +363,13 @@ function PermissionAwareSubscriptionPage({ clientId }: { clientId: string }) {
   return <CanonicalSubscriptionPage
     key={clientId}
     clientId={clientId}
-    canCreate={allowed}
+    canCreate={allowed && hasPermission('platform:packages:manage')}
     onDurableError={handleDurableError}
   />
 }
 
 export function BillingSubscriptionPage() {
-  const {user,hasPermission}=useAuth()
+  const {user,hasPermission,audience}=useAuth()
   const { clientId: routeClientId } = useParams()
   const clientId = canonicalizeGuid(routeClientId)
   if(clientId && user && canonicalizeGuid(user.clientId)!==clientId && !hasPermission('platform:billing:view'))
@@ -372,7 +377,7 @@ export function BillingSubscriptionPage() {
 
   if (!clientId) return <EmptyState title="Client context unavailable" description="A valid Client URL is required for the Billing workspace." />
   if (routeClientId !== clientId) {
-    return <Navigate to={`/billing/clients/${clientId}/subscriptions`} replace />
+    return <Navigate to={billingPath(audience, clientId, 'subscriptions')} replace />
   }
   return <PermissionAwareSubscriptionPage clientId={clientId} />
 }

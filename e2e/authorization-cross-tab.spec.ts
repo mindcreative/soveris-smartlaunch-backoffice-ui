@@ -32,18 +32,19 @@ async function prepare(context: BrowserContext, first: Page) {
   return second
 }
 
-async function startLateResponse(page: Page) {
+async function startLateResponse(page: Page, binary = false) {
   let release!: ()=>Promise<void>,entered!: ()=>void
   const started=new Promise<void>(resolve=>{entered=resolve})
-  await page.route('**/api/backoffice/cross-tab-private',async route=>{
+  await page.route(`**/api/backoffice/cross-tab-private${binary?'-binary':''}`,async route=>{
     await new Promise<void>(resolve=>{release=async()=>{await route.fulfill({json:{privateValue:'late private value'}});resolve()};entered()})
   })
-  await page.evaluate(async()=>{
+  await page.evaluate(async(binary)=>{
     const path='/src/api/apiClient.ts'
     const {apiClient}=await import(path)
-    const state=window as Window & {crossTabResult?:string}
-    void apiClient.get('/cross-tab-private').then(()=>{state.crossTabResult='accepted'},(error:{code:string})=>{state.crossTabResult=error.code})
-  })
+    const state=window as Window & {crossTabResult?:string;crossTabBinaryResult?:string}
+    const result=(value:string)=>{if(binary)state.crossTabBinaryResult=value;else state.crossTabResult=value}
+    void apiClient.get(`/cross-tab-private${binary?'-binary':''}`,{responseType:binary?'blob':'json'}).then(()=>result('accepted'),(error:{code:string})=>result(error.code))
+  },binary)
   await started
   return release
 }
@@ -51,10 +52,13 @@ async function startLateResponse(page: Page) {
 test('another real tab logs out: retire private view and reject a late response',async({context,page})=>{
   const second=await prepare(context,page)
   const release=await startLateResponse(page)
+  const releaseBinary=await startLateResponse(page,true)
   await second.evaluate(async()=>{const path='/src/stores/authStore.ts';const {useAuthStore}=await import(path);await useAuthStore.getState().logout()})
   await expect(page.getByRole('button',{name:'Sign in',exact:true})).toBeVisible()
   await expect(page.getByText('42.2500')).toHaveCount(0)
   await release()
+  await releaseBinary()
+  await expect.poll(()=>page.evaluate(()=>(window as Window & {crossTabBinaryResult?:string}).crossTabBinaryResult)).toBe('AUTHORITY_CHANGED')
   await expect.poll(()=>page.evaluate(()=>(window as Window & {crossTabResult?:string}).crossTabResult)).toBe('AUTHORITY_CHANGED')
   await page.goBack()
   await expect(page.getByText('42.2500')).toHaveCount(0)
@@ -63,6 +67,15 @@ test('another real tab logs out: retire private view and reject a late response'
 test('another real tab switches accounts: replacement authority gates requests and late responses',async({context,page})=>{
   const second=await prepare(context,page)
   const releaseLate=await startLateResponse(page)
+  let releaseRefresh!:()=>void,refreshEntered!:()=>void
+  const refreshStarted=new Promise<void>(resolve=>{refreshEntered=resolve}),refreshGate=new Promise<void>(resolve=>{releaseRefresh=resolve})
+  await page.route('**/api/backoffice/refresh-trigger',route=>route.fulfill({status:401,json:{code:'authentication_required'}}))
+  await page.route('**/api/backoffice/auth/refresh',async route=>{refreshEntered();await refreshGate;await route.fulfill({json:{accessToken:'obsolete-refresh-access',refreshToken:'obsolete-refresh-token',expiresIn:3600}})})
+  await page.evaluate(async()=>{
+    const path='/src/api/apiClient.ts';const {apiClient}=await import(path)
+    void apiClient.get('/refresh-trigger').then(()=>{(window as Window & {refreshResult?:string}).refreshResult='accepted'},(error:{code:string})=>{(window as Window & {refreshResult?:string}).refreshResult=error.code})
+  })
+  await refreshStarted
   let releaseAuthority!:()=>void,entered!:()=>void
   const started=new Promise<void>(resolve=>{entered=resolve})
   const validation=new Promise<void>(resolve=>{releaseAuthority=resolve})
@@ -84,6 +97,9 @@ test('another real tab switches accounts: replacement authority gates requests a
   expect(blocked).toBe('AUTHORITY_CHANGED');expect(protectedCalls).toBe(0)
   await releaseLate()
   await expect.poll(()=>page.evaluate(()=>(window as Window & {crossTabResult?:string}).crossTabResult)).toBe('AUTHORITY_CHANGED')
+  releaseRefresh()
+  await expect.poll(()=>page.evaluate(()=>(window as Window & {refreshResult?:string}).refreshResult)).toBe('AUTHORITY_CHANGED')
+  expect(await page.evaluate(()=>localStorage.getItem('backoffice_access_token'))).toBe('replacement-access')
   releaseAuthority()
   await expect.poll(()=>page.evaluate(async()=>{
     const path='/src/stores/authStore.ts';const {useAuthStore}=await import(path)

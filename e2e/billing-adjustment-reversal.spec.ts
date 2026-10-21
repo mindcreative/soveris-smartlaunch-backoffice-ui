@@ -1,5 +1,5 @@
 import { installCurrentSession } from './currentSession'
-import { clientFixturePermissions, viewerFixturePermissions } from '../src/test/authorityFixtures'
+import { currentAuthorityFixture, clientFixturePermissions, viewerFixturePermissions } from '../src/test/authorityFixtures'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { fulfillLocal, installTimeZoneRoute } from './localPresentationMocks'
@@ -14,7 +14,7 @@ const ORIGINAL_OPERATION = '0199d000-0000-7000-8000-000000000010'
 const ORIGINAL_LEDGER = '0199d000-0000-7000-8000-000000000020'
 const REVERSAL = '0199d000-0000-7000-8000-000000000002'
 const REVERSAL_LEDGER = '0199d000-0000-7000-8000-000000000021'
-const historyPath = `/billing/clients/${CLIENT}/adjustments`
+const historyPath = `/platform/clients/${CLIENT}/adjustments`
 
 interface ReadState {
   committed: boolean
@@ -49,7 +49,7 @@ async function installSession(
   actorId = ACTOR,
   clientId = CLIENT
 ): Promise<void> {
-  await installCurrentSession(page, { id: actorId, clientId, role, permissions: role === 'Viewer' ? viewerFixturePermissions : clientFixturePermissions, platformPermissions: role === 'Viewer' ? [] : ['platform:billing:view','platform:billing:adjust'] })
+  await installCurrentSession(page, { id: actorId, clientId, role, permissions: role === 'Viewer' ? viewerFixturePermissions : clientFixturePermissions, platformPermissions: role === 'Viewer' ? ['platform:billing:view'] : ['platform:billing:view','platform:billing:adjust'] })
 }
 
 async function json(route: Route, body: string, status = 200): Promise<void> {
@@ -132,7 +132,7 @@ async function installReadRoutes(page: Page, state: ReadState, clientId = CLIENT
 }
 
 async function openReview(page: Page, clientId = CLIENT): Promise<void> {
-  await page.goto(`/billing/clients/${clientId}/adjustments`)
+  await page.goto(`/platform/clients/${clientId}/adjustments`)
   await page.getByRole('button', {
     name: `Review reversal for original adjustment ${ORIGINAL}`,
   }).first().click()
@@ -405,12 +405,14 @@ test('permission loss retires all private history and reversal state', async ({ 
   await page.route(`**/api/backoffice/clients/${CLIENT}/billing/adjustments/${ORIGINAL}/reversal`,
     (route) => json(route, '{"title":"Forbidden","status":403,"code":"HTTP_403"}', 403))
   await openReview(page)
+  // The command denial is followed by an authoritative projection with the read grant revoked.
+  await page.route('**/api/backoffice/auth/current', route => route.fulfill({ json: currentAuthorityFixture({ id: ACTOR, clientId: CLIENT, platformPermissions: [] }) }))
   await page.getByLabel('Reversal reason').fill('Private denied reason')
   await page.getByRole('button', { name: 'Confirm reversal' }).click()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page.getByRole('table')).toHaveCount(0)
   await expect(page.getByText('Private denied reason')).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: 'Current access unavailable', exact: true })).toBeFocused()
+  await expect(page.getByRole('heading', { name: 'Access denied', exact: true })).toBeFocused()
 })
 
 test('clears private review state when the route Client changes', async ({ page }) => {
@@ -420,7 +422,7 @@ test('clears private review state when the route Client changes', async ({ page 
   await installReadRoutes(page, stateB, CLIENT_B)
   await openReview(page)
   await page.getByLabel('Reversal reason').fill('Private Client A reason')
-  await page.goto(`/billing/clients/${CLIENT_B}/adjustments`)
+  await page.goto(`/platform/clients/${CLIENT_B}/adjustments`)
   await expect(page.getByText(`Selected Client: ${CLIENT_B}`)).toBeVisible()
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page.getByText('Private Client A reason')).toHaveCount(0)

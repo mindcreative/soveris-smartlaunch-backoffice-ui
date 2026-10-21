@@ -212,11 +212,11 @@ for (const action of ['claim', 'verify', 'retry', 'primary', 'release'] as const
     await page.getByRole('button', { name: action === 'primary' ? 'Make primary' : 'Release domain', exact: true }).click()
     await page.getByRole('dialog').getByRole('button', { name: action === 'primary' ? 'Confirm primary' : 'Confirm release', exact: true }).click()
   } else await page.getByRole('button', { name: action === 'verify' ? 'Verify now' : 'Retry verification', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible()
   await expect(page.getByRole('dialog')).toHaveCount(0); await expect(page.getByText(initial.host, { exact: true })).toHaveCount(0)
   await expect(page.getByLabel('Ownership record text')).toHaveCount(0)
   await page.evaluate(id => { history.pushState({}, '', `/domains/${id}`); dispatchEvent(new PopStateEvent('popstate')) }, ID)
-  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeVisible(); expect(commands).toBe(1)
+  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible(); expect(commands).toBe(1)
 })
 
 

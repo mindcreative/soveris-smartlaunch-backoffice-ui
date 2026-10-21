@@ -1,10 +1,10 @@
 import { installCurrentSession } from './currentSession'
-import { clientFixturePermissions, viewerFixturePermissions } from '../src/test/authorityFixtures'
+import { clientFixturePermissions, editorFixturePermissions, viewerFixturePermissions } from '../src/test/authorityFixtures'
 import { stringify, LosslessNumber } from 'lossless-json'
 import type { Page, Route } from '@playwright/test'
 import { CREDIT_METRICS, CREDIT_METRICS as metrics } from '../src/test/billingReportsFixture'
 export const CLIENT='aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',CLIENT_B='ffffffff-1111-4222-8333-444444444444',ACTOR='cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa'
-export const reportsPath=(client=CLIENT)=>`/billing/clients/${client}/reports`
+export const reportsPath=(client=CLIENT)=>`/platform/clients/${client}/reports`
 const zero=JSON.parse(metrics.replace(/:(?:10\.0000|4\.0000|6\.0000|10|6|0\.40000000)/g,':0').replace('"consumptionToGrantRatio":0','"consumptionToGrantRatio":null').replace('"defined"','"zero_grants"'))
 // This fixture keeps raw numeric tokens independent of the production adapter.
 export function raw(value:unknown):string {return stringify(value,(_key,v)=>v instanceof Exact?new LosslessNumber(v.value):v)!}
@@ -32,7 +32,7 @@ function sumExpense(values:ReturnType<typeof expenseMetrics>[]) {
 }
 
 export async function installSession(page:Page,role: 'ClientAdmin' | 'Editor' | 'Viewer'='ClientAdmin') {
- await installCurrentSession(page,{id:ACTOR,clientId:CLIENT,role,permissions:role==='Viewer'?viewerFixturePermissions:clientFixturePermissions,platformPermissions:role==='Viewer'?[]:['platform:billing:view','platform:billing:reconcile']})
+ await installCurrentSession(page,{id:ACTOR,clientId:CLIENT,role,permissions:role==='Viewer'?viewerFixturePermissions:role==='Editor'?editorFixturePermissions:clientFixturePermissions,platformPermissions:role==='Viewer'?[]:['platform:billing:view','platform:billing:reconcile']})
 }
 function periods(from:string,to:string,grain:string){const result:{bucketStart:string;periodStart:string;periodEnd:string}[]=[];const date=new Date(from);date.setUTCHours(0,0,0,0);if(grain==='week')date.setUTCDate(date.getUTCDate()-(date.getUTCDay()+6)%7);if(grain==='month')date.setUTCDate(1);while(date.getTime()<Date.parse(to)){const start=date.toISOString();if(grain==='month')date.setUTCMonth(date.getUTCMonth()+1);else date.setUTCDate(date.getUTCDate()+(grain==='week'?7:1));result.push({bucketStart:start,periodStart:new Date(Math.max(Date.parse(start),Date.parse(from))).toISOString(),periodEnd:new Date(Math.min(date.getTime(),Date.parse(to))).toISOString()})}return result}
 export function mockReports(){

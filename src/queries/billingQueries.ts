@@ -1,3 +1,4 @@
+import { privateExperienceKey, withExperienceKey } from '../auth/experienceKey'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   useInfiniteQuery,
@@ -79,14 +80,14 @@ const privateRoot = ['backoffice', 'private'] as const
 export const billingAccountKeys = {
   allPrivate: privateRoot,
   billing: [...privateRoot, 'billing'] as const,
-  account: (clientId: string) => [...privateRoot, 'billing', 'account', clientId] as const,
+  account: (clientId: string) => [...privateRoot, 'billing', 'account', clientId, ...privateExperienceKey()] as const,
 }
 
 export const billingLedgerKeys = {
   all: [...privateRoot, 'billing', 'ledger'] as const,
   client: (clientId: string) => [...privateRoot, 'billing', 'ledger', clientId] as const,
   traversal: (clientId: string, filters: BillingLedgerFilters, traversalId: number) =>
-    [...privateRoot, 'billing', 'ledger', clientId, filters, traversalId] as const,
+    [...privateRoot, 'billing', 'ledger', clientId, filters, traversalId, ...privateExperienceKey()] as const,
 }
 
 export const billingAdjustmentKeys = {
@@ -100,7 +101,7 @@ export const billingAdjustmentKeys = {
     [...privateRoot, 'billing', 'adjustments', clientId, 'history'] as const,
   list: (clientId: string, filters: CreditAdjustmentHistoryFilters, traversalId: number) =>
     [...privateRoot, 'billing', 'adjustments', clientId, 'history',
-      'list', filters, traversalId] as const,
+      'list', filters, traversalId, ...privateExperienceKey()] as const,
   operation: (clientId: string, operationId: string) =>
     [...privateRoot, 'billing', 'adjustments', clientId, 'history', operationId] as const,
   reversal: (clientId: string) =>
@@ -122,7 +123,7 @@ export const billingAdjustmentKeys = {
 export const billingSubscriptionKeys = {
   all: [...privateRoot, 'billing', 'subscriptions'] as const,
   client: (clientId: string) => [...privateRoot, 'billing', 'subscriptions', clientId] as const,
-  state: (clientId: string) => [...privateRoot, 'billing', 'subscriptions', clientId, 'state'] as const,
+  state: (clientId: string) => [...privateRoot, 'billing', 'subscriptions', clientId, 'state', ...privateExperienceKey()] as const,
   create: (clientId: string) => [...privateRoot, 'billing', 'subscriptions', clientId, 'create'] as const,
   lifecycle: (clientId: string, subscriptionId: string) =>
     [...privateRoot, 'billing', 'subscriptions', clientId, subscriptionId, 'lifecycle'] as const,
@@ -143,7 +144,7 @@ export const resourceAccessKeys = {
   all: [...privateRoot, 'billing', 'resource-access'] as const,
   client: (clientId: string) => [...privateRoot, 'billing', 'resource-access', clientId] as const,
   consequences: (clientId: string) =>
-    [...privateRoot, 'billing', 'resource-access', clientId, 'consequences'] as const,
+    [...privateRoot, 'billing', 'resource-access', clientId, 'consequences', ...privateExperienceKey()] as const,
   preview: (clientId: string, subscriptionId: string) =>
     [...privateRoot, 'billing', 'resource-access', clientId, subscriptionId, 'preview'] as const,
 }
@@ -156,7 +157,7 @@ export const billingExportKeys = {
   all: [...privateRoot, 'billing', 'exports'] as const,
   client: (clientId: string) => [...privateRoot, 'billing', 'exports', clientId] as const,
   detail: (clientId: string, exportId: string) =>
-    [...privateRoot, 'billing', 'exports', clientId, exportId] as const,
+    [...privateRoot, 'billing', 'exports', clientId, exportId, ...privateExperienceKey()] as const,
   request: (clientId: string) =>
     [...privateRoot, 'billing', 'exports', clientId, 'request'] as const,
 }
@@ -838,7 +839,7 @@ export function useResourceAccessPreviewMutation(
     Error | ApiError,
     { request: ResourceAccessPreviewRequest; signal?: AbortSignal }
   >({
-    mutationKey: resourceAccessKeys.preview(clientId, subscriptionId),
+    mutationKey: withExperienceKey(resourceAccessKeys.preview(clientId, subscriptionId)),
     mutationFn: ({ request, signal }) =>
       billingApi.getResourceAccessPreview(clientId, subscriptionId, request, signal),
     retry: false,
@@ -860,7 +861,7 @@ export function useBillingSubscriptionTierChangeMutation(
       onAuthReplay?: () => void
     }
   >({
-    mutationKey: billingSubscriptionKeys.tierChange(clientId, subscriptionId, action),
+    mutationKey: withExperienceKey(billingSubscriptionKeys.tierChange(clientId, subscriptionId, action)),
     mutationFn: ({ request, serializedBody, signal, onAuthReplay }) =>
       billingApi.postSubscriptionTierChange(
         clientId, subscriptionId, action, request, signal, serializedBody, onAuthReplay
@@ -878,7 +879,7 @@ export function useBillingPlanChangePreviewMutation(
     Error | ApiError,
     { request: BillingSubscriptionPlanChangePreviewRequest; signal?: AbortSignal }
   >({
-    mutationKey: billingSubscriptionKeys.planChangePreview(clientId, subscriptionId),
+    mutationKey: withExperienceKey(billingSubscriptionKeys.planChangePreview(clientId, subscriptionId)),
     mutationFn: ({ request, signal }) =>
       previewBillingPlanChange(clientId, subscriptionId, request, signal),
     retry: false,
@@ -899,7 +900,7 @@ export function useBillingPlanChangeMutation(
       onAuthReplay?: () => void
     }
   >({
-    mutationKey: billingSubscriptionKeys.planChange(clientId, subscriptionId),
+    mutationKey: withExperienceKey(billingSubscriptionKeys.planChange(clientId, subscriptionId)),
     mutationFn: ({ request, serializedBody, signal, onAuthReplay }) =>
       postBillingPlanChange(clientId, subscriptionId, request, signal, serializedBody, onAuthReplay),
     retry: false,
@@ -912,7 +913,7 @@ export function useCreditAdjustmentPreviewMutation(clientId: string, creditAccou
     Error | ApiError,
     { request: CreditAdjustmentMaterial; signal?: AbortSignal; onAuthReplay?: () => void }
   >({
-    mutationKey: billingAdjustmentKeys.preview(clientId),
+    mutationKey: withExperienceKey(billingAdjustmentKeys.preview(clientId)),
     mutationFn: ({ request, signal, onAuthReplay }) =>
       previewCreditAdjustment(clientId, creditAccountId, request, signal, onAuthReplay),
     retry: false,
@@ -930,7 +931,7 @@ export function useCreditAdjustmentCommandMutation(clientId: string, creditAccou
       onAuthReplay?: () => void
     }
   >({
-    mutationKey: billingAdjustmentKeys.command(clientId),
+    mutationKey: withExperienceKey(billingAdjustmentKeys.command(clientId)),
     mutationFn: ({ request, serializedBody, signal, onAuthReplay }) =>
       postCreditAdjustment(clientId, creditAccountId, request, signal, serializedBody, onAuthReplay),
     retry: false,
@@ -953,7 +954,7 @@ export function useCreditAdjustmentReversalMutation(
       onAuthReplay?: () => void
     }
   >({
-    mutationKey: billingAdjustmentKeys.reversalCommand(clientId, originalAdjustmentId),
+    mutationKey: withExperienceKey(billingAdjustmentKeys.reversalCommand(clientId, originalAdjustmentId)),
     mutationFn: ({ account, original, request, serializedBody, signal, onAuthReplay }) =>
       postCreditAdjustmentReversal(
         clientId, originalAdjustmentId, account, original, request,
@@ -968,7 +969,7 @@ export function useCreateBillingSubscription(clientId: string) {
     Error | ApiError,
     { request: CreateBillingSubscriptionRequest; serializedBody: string; signal?: AbortSignal }
   >({
-    mutationKey: billingSubscriptionKeys.create(clientId),
+    mutationKey: withExperienceKey(billingSubscriptionKeys.create(clientId)),
     mutationFn: ({ request, serializedBody, signal }) =>
       legacyBillingApi.createSubscription(clientId, request, signal, serializedBody),
     retry: false,
@@ -990,7 +991,7 @@ export function useBillingSubscriptionLifecycleMutation(
       onAuthReplay?: () => void
     }
   >({
-    mutationKey: [...billingSubscriptionKeys.client(clientId), 'lifecycle'] as const,
+    mutationKey: withExperienceKey([...billingSubscriptionKeys.client(clientId), 'lifecycle'] as const),
     mutationFn: ({ request, subscriptionId, serializedBody, validTo, signal, onAuthReplay }) =>
       billingApi.postSubscriptionLifecycle(
         clientId, subscriptionId, request, signal, serializedBody, validTo, onAuthReplay

@@ -10,7 +10,7 @@ const ACCOUNT = '0199c000-0000-7000-8000-000000000099'
 const ACTOR = 'cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa'
 const ORIGINAL = '0199c000-0000-7000-8000-000000000001'
 const REVERSAL = '0199c000-0000-7000-8000-000000000002'
-const historyPath = `/billing/clients/${CLIENT}/adjustments`
+const historyPath = `/platform/clients/${CLIENT}/adjustments`
 
 function item(clientId: string, adjustmentId: string, reversal: boolean): string {
   const operationId = reversal
@@ -78,7 +78,7 @@ test('canonical direct route presents complete reciprocal immutable evidence and
 
   await expect(page).toHaveURL(new RegExp(`${CLIENT}/adjustments$`))
   await expect(page.getByRole('heading', { name: 'Adjustment history', exact: true })).toBeFocused()
-  const tabs = page.getByRole('navigation', { name: 'Billing workspace' }).getByRole('link')
+  const tabs = page.getByRole('navigation', { name: 'Platform financial views' }).getByRole('link')
   await expect(tabs).toHaveText(['Account', 'Ledger', 'Usage & expense', 'Adjustments', 'Subscriptions'])
   await expect(page.getByRole('link', { name: 'Adjustments' })).toHaveAttribute('aria-current', 'page')
   const table = page.getByRole('table', { name: 'Newest-first immutable Billing adjustment history' })
@@ -101,7 +101,7 @@ test('canonical direct route presents complete reciprocal immutable evidence and
   })).toBeHidden()
   expect(requests[0]?.search).toBe('')
   await expectNoSeriousAxeViolations(page)
-  await page.goto(`/billing/clients/${CLIENT.toUpperCase()}/adjustments`)
+  await page.goto(`/platform/clients/${CLIENT.toUpperCase()}/adjustments`)
   await expect(page).toHaveURL(new RegExp(`${CLIENT}/adjustments$`))
   await expect(page.getByRole('heading', { name: 'Adjustment history', exact: true })).toBeVisible()
 })
@@ -196,7 +196,7 @@ test('renders focused denied, saved-zone, DST, dependency, and malformed-evidenc
     return json(route, '{"items":[{"schemaVersion":1}],"asOf":"bad","nextCursor":null}')
   })
   await page.goto(historyPath)
-  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeFocused()
+  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeFocused()
   await expect(page.getByRole('table')).toHaveCount(0)
   await expectNoSeriousAxeViolations(page)
 

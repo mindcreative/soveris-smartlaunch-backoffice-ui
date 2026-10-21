@@ -1,3 +1,4 @@
+import { privateExperienceKey } from '../auth/experienceKey'
 import type { PropsWithChildren } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
@@ -134,16 +135,16 @@ describe('private Billing queries', () => {
       'private',
       'billing',
       'account',
-      CLIENT_A,
+      CLIENT_A, ...privateExperienceKey(),
     ])
     expect(billingExportKeys.detail(CLIENT_A, 'export-id')).toEqual([
-      'backoffice', 'private', 'billing', 'exports', CLIENT_A, 'export-id',
+      'backoffice', 'private', 'billing', 'exports', CLIENT_A, 'export-id', ...privateExperienceKey(),
     ])
     expect(billingExportKeys.request(CLIENT_A)).toEqual([
       'backoffice', 'private', 'billing', 'exports', CLIENT_A, 'request',
     ])
     expect(billingSubscriptionKeys.state(CLIENT_A)).toEqual([
-      'backoffice', 'private', 'billing', 'subscriptions', CLIENT_A, 'state',
+      'backoffice', 'private', 'billing', 'subscriptions', CLIENT_A, 'state', ...privateExperienceKey(),
     ])
     expect(billingSubscriptionKeys.create(CLIENT_A)).toEqual([
       'backoffice', 'private', 'billing', 'subscriptions', CLIENT_A, 'create',
@@ -156,7 +157,7 @@ describe('private Billing queries', () => {
       'backoffice', 'private', 'capabilities', CLIENT_A,
     ])
     expect(resourceAccessKeys.consequences(CLIENT_A)).toEqual([
-      'backoffice', 'private', 'billing', 'resource-access', CLIENT_A, 'consequences',
+      'backoffice', 'private', 'billing', 'resource-access', CLIENT_A, 'consequences', ...privateExperienceKey(),
     ])
     expect(domainClientPrefix(CLIENT_A)).toEqual([
       'backoffice', 'private', 'domains', CLIENT_A,
@@ -692,7 +693,7 @@ describe('private Billing ledger traversal', () => {
   it('uses a private Client/filter/fresh-traversal key', () => {
     expect(billingLedgerKeys.traversal(CLIENT_A, { transactionType: 'promotion' }, 7)).toEqual([
       'backoffice', 'private', 'billing', 'ledger', CLIENT_A,
-      { transactionType: 'promotion' }, 7,
+      { transactionType: 'promotion' }, 7, ...privateExperienceKey(),
     ])
   })
 
@@ -980,7 +981,7 @@ describe('private adjustment-history traversal', () => {
   it('uses the history prefix with a distinct list/filter/traversal identity', () => {
     expect(billingAdjustmentKeys.list(CLIENT_A, FILTERS, 7)).toEqual([
       'backoffice', 'private', 'billing', 'adjustments', CLIENT_A, 'history',
-      'list', FILTERS, 7,
+      'list', FILTERS, 7, ...privateExperienceKey(),
     ])
     expect(billingAdjustmentKeys.operation(CLIENT_A, 'operation-id')).not.toEqual(
       billingAdjustmentKeys.list(CLIENT_A, FILTERS, 7))

@@ -1,3 +1,4 @@
+import { withExperienceKey } from '../auth/experienceKey'
 import type { PropsWithChildren } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
@@ -143,7 +144,7 @@ describe('useCreditAdjustmentReversal', () => {
     })
     await waitFor(() => expect(
       queryClient.getMutationCache().getAll().map((mutation) => mutation.options.mutationKey))
-      .toContainEqual(billingAdjustmentKeys.reversalCommand(CLIENT, ORIGINAL_ID)))
+      .toContainEqual(withExperienceKey(billingAdjustmentKeys.reversalCommand(CLIENT, ORIGINAL_ID))))
     await act(async () => {
       resolvePost(RECEIPT)
       await confirmations

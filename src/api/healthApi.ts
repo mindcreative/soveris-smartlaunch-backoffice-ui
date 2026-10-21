@@ -1,5 +1,5 @@
-// Application component contract v2. No customer fetch API is exported.
-// 16.1/16.2/16.7 must supply real platform authority before adding a transport/hook.
+// Application component contract v2. The guarded platform consumer is separate
+// from workspace data. Shipping assurance and final health readiness stay closed.
 export const componentAliases = ['api_process', 'ai_worker', 'ai_job_observer', 'billing_observer', 'capability_projection',
   'dlq_consumer', 'domain_cleanup', 'domain_edge', 'domain_observer', 'domain_proof', 'ledger_exports', 'main_consumer',
   'managed_cleanup', 'message_observer', 'postgres', 'private_ai_results', 'product_assets', 'provider_config',

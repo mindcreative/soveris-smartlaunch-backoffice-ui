@@ -1,8 +1,9 @@
+import { privateExperienceKey } from '../auth/experienceKey'
 import type { ReportFilters, ReportKind } from '../types/billingReports'
 export const billingReportKeys = {
   all: ['backoffice','private','billing','reports'] as const,
   client:(client:string)=>['backoffice','private','billing','reports',client] as const,
-  page:(client:string,kind:ReportKind,filters:ReportFilters,authorityGeneration:number,traversal:number,request:number)=>[...billingReportKeys.client(client),kind,filters,authorityGeneration,traversal,request] as const,
+  page:(client:string,kind:ReportKind,filters:ReportFilters,authorityGeneration:number,traversal:number,request:number)=>[...billingReportKeys.client(client),kind,filters,authorityGeneration,traversal,request,...privateExperienceKey()] as const,
 }
 // Cleanup fences local projections synchronously, before awaiting query cancellation.
 const scopes=new Set<{client:string;kind:ReportKind;retire:()=>void}>()

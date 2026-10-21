@@ -51,7 +51,7 @@ function authenticate(role: 'ClientAdmin' | 'Viewer' = 'ClientAdmin') {
   useAuthStore.setState({
     accessToken: 'token', refreshTokenValue: 'refresh', isLoading: false,
     isAuthenticated: true, isInitialized: true,
-    user: { ...currentAuthorityFixture(), id: ACTOR_ID, email: 'operator@example.com', displayName: 'Operator', role,permissions:role==='ClientAdmin'?clientFixturePermissions:[],platformPermissions:role==='ClientAdmin'?['platform:billing:adjust','platform:packages:manage','platform:billing:reconcile','platform:billing:view']:[],
+    user: { ...currentAuthorityFixture(), id: ACTOR_ID, email: 'operator@example.com', displayName: 'Operator', role,permissions:role==='ClientAdmin'?clientFixturePermissions:[],platformPermissions:role==='ClientAdmin'?['platform:billing:view', 'platform:billing:adjust','platform:packages:manage','platform:billing:reconcile','platform:billing:view']:[],
       clientId: CLIENT_ID, accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600 },
   })
 }
@@ -75,7 +75,7 @@ describe('Billing adjustment history experience', () => {
     expect(request).toHaveBeenCalledWith(CLIENT_ID, { filters: {} }, expect.any(AbortSignal))
     expect(within(screen.getByRole('navigation', { name: 'Billing workspace' }))
       .getAllByRole('link').map((link) => link.textContent))
-      .toEqual(['Reconciliation', 'Account', 'Ledger', 'Usage & expense', 'Adjustments', 'Subscriptions'])
+      .toEqual(['Account', 'Ledger', 'Credit usage', 'Adjustments', 'Subscriptions'])
     expect(screen.getByRole('link', { name: 'Adjustments' })).toHaveAttribute('aria-current', 'page')
     const breadcrumbs = screen.getByRole('navigation', { name: 'Breadcrumb' })
     expect(within(breadcrumbs).getAllByRole('listitem').map(item => item.textContent)).toEqual(['Billing', 'Adjustment history', `Selected Client ${CLIENT_ID}`])
@@ -103,6 +103,7 @@ describe('Billing adjustment history experience', () => {
       original, reversal: null, asOf: '2026-09-24T10:00:01.000001',
     })
     const user = userEvent.setup()
+    window.history.replaceState({}, '', `/platform/clients/${CLIENT_ID}/adjustments`)
     const admin = render(<App />)
     const actions = await screen.findAllByRole('button', {
       name: `Review reversal for original adjustment ${ADJUSTMENT_ID}`,
@@ -117,6 +118,7 @@ describe('Billing adjustment history experience', () => {
     admin.unmount()
     queryClient.clear()
     authenticate('Viewer')
+    useAuthStore.setState(state=>({user:state.user?{...state.user,permissions:['billing:view']}:null}))
     window.history.replaceState({}, '', `/billing/clients/${CLIENT_ID}/adjustments`)
     render(<App />)
     await screen.findByRole('table')
@@ -137,7 +139,7 @@ describe('Billing adjustment history experience', () => {
     request.mockClear()
     window.history.replaceState({}, '', '/billing/clients/not-a-guid/adjustments')
     render(<App />)
-    expect(await screen.findByRole('heading', { name: 'Client context unavailable' }))
+    expect(await screen.findByRole('heading', { name: 'Access denied' }))
       .toBeInTheDocument()
     expect(request).not.toHaveBeenCalled()
   })
@@ -158,7 +160,7 @@ describe('Billing adjustment history experience', () => {
       isLoading: false, isAuthenticated: false, isInitialized: true })
     vi.spyOn(authApi, 'login').mockResolvedValue({
       accessToken: 'new-token', refreshToken: 'new-refresh', expiresIn: 3600,
-      user: { ...currentAuthorityFixture(), id: ACTOR_ID, email: 'operator@example.com', displayName: 'Operator', role: 'ClientAdmin', permissions: clientFixturePermissions, platformPermissions: ['platform:billing:adjust', 'platform:packages:manage'],
+      user: { ...currentAuthorityFixture(), id: ACTOR_ID, email: 'operator@example.com', displayName: 'Operator', role: 'ClientAdmin', permissions: clientFixturePermissions, platformPermissions: ['platform:billing:view', 'platform:billing:adjust', 'platform:packages:manage'],
         clientId: CLIENT_ID, accessToken: 'new-token', refreshToken: 'new-refresh', expiresIn: 3600 },
     })
     vi.spyOn(adjustmentApi, 'getCreditAdjustmentHistoryPage').mockResolvedValue(page())
@@ -179,7 +181,7 @@ describe('Billing adjustment history experience', () => {
     render(<App />)
     expect(await screen.findByRole('heading', { name: 'Access denied' })).toHaveFocus()
     expect(screen.queryByRole('link', { name: 'Adjustments' })).not.toBeInTheDocument()
-    expect(request).toHaveBeenCalledTimes(1)
+    expect(request).not.toHaveBeenCalled()
     await waitFor(() => expect(queryClient.getQueryCache().findAll({
       queryKey: ['backoffice', 'private', 'billing'],
     })).toHaveLength(0))

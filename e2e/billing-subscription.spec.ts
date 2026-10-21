@@ -7,7 +7,7 @@ import { expect, test, type Page, type Route } from '@playwright/test'
 const CLIENT_A = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 const CLIENT_B = 'ffffffff-1111-2222-3333-444444444444'
 const TIER_SUBSCRIPTION = '22222222-2222-3333-8444-555555555555'
-const pathFor = (clientId: string) => `/billing/clients/${clientId}/subscriptions`
+const pathFor = (clientId: string) => `/platform/clients/${clientId}/subscriptions`
 const CAPABILITY_KEYS = [
   'manual_content_editing', 'ordinary_image_upload', 'ai_content_generation',
   'ai_image_generation', 'ai_source_ingestion', 'client_domain_binding',
@@ -609,8 +609,10 @@ test('creation review acknowledges locally within 100ms p95 and labels held subm
 
 test('previews and schedules a tier downgrade while capability evidence is unavailable', async ({ page }) => {
   let pendingOperationId: string | undefined
+  let capabilityReads = 0
   const commands: string[] = []
   await page.route('**/api/backoffice/clients/*/capabilities', async (route) => {
+    capabilityReads++
     await fulfillLocal(route, { status: 503, contentType: 'application/problem+json', body: '{}' })
   })
   await page.route('**/api/backoffice/clients/*/billing/subscriptions/**/resource-access-preview', async (route) => {
@@ -675,7 +677,8 @@ test('previews and schedules a tier downgrade while capability evidence is unava
   })
 
   await page.goto(pathFor(CLIENT_A))
-  await expect(page.getByText('Policy evidence could not be validated.')).toBeVisible()
+  await expect(page.getByText('Policy evidence could not be validated.')).toHaveCount(0)
+  expect(capabilityReads).toBe(0)
   await page.getByRole('button', { name: 'Schedule for next cycle' }).click()
   const dialog = page.getByRole('dialog', { name: 'Confirm subscription tier change' })
   await expect(dialog).toContainText('At 2026-10-01T00:00:00.000000, new paid work will stop.')
@@ -683,6 +686,7 @@ test('previews and schedules a tier downgrade while capability evidence is unava
   await dialog.getByRole('button', { name: 'Confirm tier change' }).click()
   await expect(page.getByText('Authoritative state reconciled.')).toBeVisible()
   expect(commands).toHaveLength(1)
+  expect(capabilityReads).toBe(0)
   const request = JSON.parse(commands[0]!) as { operationId: string }
   expect(request.operationId).toMatch(/^\w{8}-\w{4}-7\w{3}-[89ab]\w{3}-\w{12}$/i)
   expect(commands[0]).toBe(`{"operationId":"${request.operationId}","expectedTierRevision":7,"subscriptionTier":"basic","effectivePolicy":"next_billing_cycle","reason":"Administrative tier change","commandAuthorityHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`)
@@ -963,7 +967,7 @@ test('purges private tier evidence on 403 authorization loss', async ({ page }) 
   await page.getByRole('dialog', { name: 'Confirm subscription tier change' })
     .getByRole('button', { name: 'Confirm tier change' }).click()
 
-  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible()
   await expect(page.getByText('Private tier reason')).toHaveCount(0)
   await expect(page.getByText('private authorization detail')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Schedule for next cycle' })).toHaveCount(0)
@@ -1457,7 +1461,7 @@ test('fresh lifecycle authorization loss removes all private lifecycle evidence'
   await page.getByRole('button', { name: 'Pause subscription' }).click()
   await page.getByLabel('Reason').fill('Private reason removed on denial')
   await page.getByRole('button', { name: 'Confirm Pause' }).click()
-  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible()
   await expect(page.getByText('Private reason removed on denial')).toHaveCount(0)
   await expect(page.getByText('99999999999999.9999', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Pause subscription' })).toHaveCount(0)
@@ -1482,7 +1486,7 @@ test('authorization refresh removes an open lifecycle dialog before fresh denial
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page.getByText('Private reason removed by authorization refresh')).toHaveCount(0)
   await page.reload()
-  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible()
   await expect(page.getByText('99999999999999.9999', { exact: true })).toHaveCount(0)
 })
 
@@ -1749,7 +1753,7 @@ test('subscription permission loss denies direct access without exposing private
     })
   })
   await page.goto(pathFor(CLIENT_A))
-  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible()
   await expect(page.getByLabel('Plan name')).toHaveCount(0)
 })
 

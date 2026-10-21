@@ -7,7 +7,8 @@ const titles: Record<string, string> = {
 const billingTitles: Record<string, string> = { account: 'Account', ledger: 'Ledger', adjustments: 'Adjustment history', subscriptions: 'Subscriptions', reports: 'Reports', reconciliation: 'Reconciliation' }
 export function PageContext() {
   const { pathname } = useLocation(), segments = pathname.split('/').filter(Boolean)
-  const title = titles[segments[0]] ?? 'Dashboard'
+  if (segments[0] === 'platform') return <div className="min-w-0 break-words text-sm font-semibold">Platform operations{segments[1] === 'health' ? ' / System Health' : segments[1] === 'clients' ? ' / Selected Client' : ''}</div>
+  const title = titles[segments[0]] ?? 'My workspace'
   const detail = segments[0] === 'billing' ? billingTitles[segments[3]] : segments[0] === 'domains' && segments.length > 1 ? 'Domain details' : undefined
   // Object identities are supplied by authorized page content, never URL segments.
   // Existing page Breadcrumbs and h1 focus remain owned by their routed pages.

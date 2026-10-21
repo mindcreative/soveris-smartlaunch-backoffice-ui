@@ -58,7 +58,7 @@ test('renders exact configured values and preserves Client context through histo
   await expect(page.getByText(`Selected Client: ${CLIENT_A}`)).toBeVisible()
 })
 
-test('Billing sidebar keeps a selected Client distinct from the signed-in Client', async ({ page }) => {
+test('platform financial navigation keeps the target distinct from the signed-in Client', async ({ page }) => {
   const requestedClients: string[] = []
   await page.route('**/api/backoffice/clients/*/billing/account', async (route) => {
     const clientId = route.request().url().match(/clients\/([^/]+)\/billing\/account/)?.[1] ?? ''
@@ -73,10 +73,10 @@ test('Billing sidebar keeps a selected Client distinct from the signed-in Client
 
   await page.goto(accountPath(CLIENT_B))
   await expect(page.getByText(`Selected Client: ${CLIENT_B}`)).toBeVisible()
-  await page.getByRole('navigation', { name: 'SmartLaunch', exact: true })
-    .getByRole('link', { name: 'Billing', exact: true }).click()
+  await page.getByRole('navigation', { name: 'Platform financial views', exact: true })
+    .getByRole('link', { name: 'Account', exact: true }).click()
 
-  await expect(page).toHaveURL(accountPath(CLIENT_B))
+  await expect(page).toHaveURL(`/platform/clients/${CLIENT_B}/account`)
   await expect(page.getByText(`Selected Client: ${CLIENT_B}`)).toBeVisible()
   expect(requestedClients.length).toBeGreaterThan(0)
   expect(requestedClients.every((clientId) => clientId === CLIENT_B)).toBe(true)
@@ -116,7 +116,7 @@ test('permission-denied and transient-error states are accessible and expose no 
   })
 
   await page.goto(accountPath(CLIENT_A))
-  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible()
   await expect(page.getByText('99,999,999,999,999.9999')).toHaveCount(0)
   await expectNoAxeViolations(page)
 

@@ -78,7 +78,7 @@ describe('Billing ledger experience', () => {
     expect(screen.getAllByText('Reservation committed / hold released').filter((element) => element.tagName !== 'OPTION')).toHaveLength(2)
     expect(screen.getAllByText('No actor recorded')).toHaveLength(2)
     expect(screen.getAllByText(ACCOUNT_ID)).toHaveLength(2)
-    expect(screen.queryByRole('link', { name: /Job|reservation|operation/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Job|reservation|^operation/i })).not.toBeInTheDocument()
   })
 
   it('renders every persisted type label and every present immutable field without future links', async () => {
@@ -197,7 +197,7 @@ describe('Billing ledger experience', () => {
     render(<App />)
 
     expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
-    expect(request).toHaveBeenCalledWith(CLIENT_ID, { filters: {} }, expect.any(AbortSignal))
+    expect(request).not.toHaveBeenCalled()
   })
 
   it('removes visible private rows immediately when Billing permission is lost', async () => {
@@ -224,7 +224,7 @@ describe('Billing ledger experience', () => {
     window.history.replaceState({}, '', '/billing/clients/not-a-guid/ledger')
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'Client context unavailable' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
     expect(request).not.toHaveBeenCalled()
     expect(queryClient.getQueryCache().findAll()).toHaveLength(0)
   })

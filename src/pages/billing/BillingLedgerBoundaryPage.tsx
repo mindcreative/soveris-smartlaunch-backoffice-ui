@@ -8,7 +8,7 @@ import { LedgerResults } from '../../components/billing/LedgerResults'
 import { LedgerExportPanel } from '../../components/billing/LedgerExportPanel'
 import { BillingWorkspaceNav } from '../../components/billing/BillingWorkspaceNav'
 import { Breadcrumbs, EmptyState, ErrorDisplay, Forbidden, LoadingSpinner } from '../../components/shared'
-import { useAuth } from '../../hooks/useAuth'
+import { useBillingAccess as useAuth, billingPath, useExperience } from '../../auth/ExperienceContext'
 import { canonicalizeGuid } from '../../lib/guid'
 import {
   billingLedgerKeys,
@@ -23,9 +23,10 @@ function errorStatus(error: unknown): number | undefined {
   return error && typeof error === 'object' && 'status' in error ? (error as ApiError).status : undefined
 }
 
-function ledgerBreadcrumbs(clientId: string) {
+function useLedgerBreadcrumbs(clientId: string) {
+  const audience = useExperience()
   return [
-    { label: 'Billing', href: `/billing/clients/${clientId}/account` },
+    { label: 'Billing', href: billingPath(audience,clientId) },
     { label: 'Ledger history' },
     { label: `Selected Client ${clientId}` },
   ]
@@ -38,7 +39,7 @@ function LedgerPageFrame({ clientId, children, headingRef }: {
 }) {
   return (
     <div className="mx-auto min-w-0 max-w-7xl break-words">
-      <Breadcrumbs items={ledgerBreadcrumbs(clientId)} />
+      <Breadcrumbs items={useLedgerBreadcrumbs(clientId)} />
       <BillingWorkspaceNav clientId={clientId} />
       <div className="mb-6 min-w-0">
         <h1 ref={headingRef} tabIndex={headingRef ? -1 : undefined} className="text-2xl font-bold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-focus">Ledger history</h1>
@@ -208,13 +209,13 @@ function PermissionAwareLedgerPage({ clientId }: { clientId: string }) {
 }
 
 export function BillingLedgerBoundaryPage() {
-  const {user,hasPermission}=useAuth()
+  const {user,hasPermission,audience}=useAuth()
   const { clientId: routeClientId } = useParams()
   const clientId = canonicalizeGuid(routeClientId)
   if(clientId && user && canonicalizeGuid(user.clientId)!==clientId && !hasPermission('platform:billing:view'))
     return <Forbidden message="This Client is outside your current financial scope." />
 
   if (!clientId) return <EmptyState title="Client context unavailable" description="A valid Client URL is required for the Billing workspace." />
-  if (routeClientId !== clientId) return <Navigate to={`/billing/clients/${clientId}/ledger`} replace />
+  if (routeClientId !== clientId) return <Navigate to={billingPath(audience, clientId, 'ledger')} replace />
   return <PermissionAwareLedgerPage clientId={clientId} />
 }

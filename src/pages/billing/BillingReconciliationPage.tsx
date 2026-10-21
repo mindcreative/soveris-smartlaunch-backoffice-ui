@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { useLocation, useParams } from 'react-router-dom'
-import { useAuth } from '../../hooks/useAuth'
+import { useBillingAccess as useAuth } from '../../auth/ExperienceContext'
 import { FINDING_TYPES, isReconciliationClient, normalizeReconciliationReason, type ReconciliationFilters } from '../../api/reconciliationApi'
 import { ACTION_LABELS, useReconciliationWorkspace } from '../../queries/reconciliationQueries'
 import type { ReconciliationAction, ReconciliationCase } from '../../types/reconciliation'

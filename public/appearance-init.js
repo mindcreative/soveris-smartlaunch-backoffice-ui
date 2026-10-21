@@ -11,9 +11,20 @@
     try { pathname = pathname.split('/').map(function (segment) { return decodeURIComponent(segment).replace(/\//g, '%2F'); }).join('/'); } catch (_) {}
     if (pathname.replace(/\/+$/, '').toLowerCase() !== '/login') {
       var session = JSON.parse(localStorage.getItem('backoffice-auth-persist') || 'null');
-      var state = session && session.version === 0 && session.state;
-      var userId = state && state.user && state.user.id;
-      if (typeof userId === 'string' && userId && typeof state.accessToken === 'string' && state.accessToken) {
+      var state = session && session.version === 2 && session.state;
+      var token = state && state.accessToken;
+      var userId = null;
+      // Bounded JWT subject is a preference lookup hint, never authentication.
+      if (typeof token === 'string' && token.length <= 8192 && typeof state.refreshTokenValue === 'string' && state.refreshTokenValue &&
+          localStorage.getItem('backoffice_access_token') === token && localStorage.getItem('backoffice_refresh_token') === state.refreshTokenValue) {
+        var segments = token.split('.');
+        if (segments.length === 3 && segments.every(function (p) { return p && /^[A-Za-z0-9_-]+$/.test(p); }) && segments[1].length <= 4096) {
+          var payload = JSON.parse(atob(segments[1].replace(/-/g, '+').replace(/_/g, '/')));
+          if (payload && typeof payload.sub === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(payload.sub) &&
+              typeof payload.exp === 'number' && Number.isSafeInteger(payload.exp) && payload.exp > Date.now()/1000) userId = payload.sub.toLowerCase();
+        }
+      }
+      if (userId) {
         var stored = localStorage.getItem('soveris-smartlaunch-appearance:user:' + encodeURIComponent(userId));
         if (stored === 'light' || stored === 'dark') preference = stored;
       }

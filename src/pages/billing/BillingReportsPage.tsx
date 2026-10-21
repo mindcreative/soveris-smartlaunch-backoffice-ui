@@ -1,7 +1,8 @@
+import { privateExperienceKey } from '../../auth/experienceKey'
 import { startTransition, useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { Navigate, useLocation, useParams } from 'react-router-dom'
-import { useAuth } from '../../hooks/useAuth'
+import { useBillingAccess as useAuth, billingPath, useExperience } from '../../auth/ExperienceContext'
 import { useAuthStore } from '../../stores/authStore'
 import { canonicalizeGuid } from '../../lib/guid'
 import { BillingWorkspaceNav } from '../../components/billing/BillingWorkspaceNav'
@@ -22,9 +23,10 @@ import '../../components/billing/reports/reports.css'
 import {AnomalyPanel} from '../../components/billing/anomalies/AnomalyPanel'
 import {retireAnomalyScopes,hasAnomalyFilterBlock,useAnomalyFilterBlock} from '../../queries/billingAnomalyKeys'
 export function reportAuthority():string {
-  const s=useAuthStore.getState();return JSON.stringify([s.isInitialized,s.isLoading,s.isAuthenticated,s.user?.id,s.user?.clientId,s.user?.role,s.accessToken])
+  const s=useAuthStore.getState();return JSON.stringify([s.isInitialized,s.isLoading,s.isAuthenticated,s.user?.id,s.user?.clientId,s.user?.role,s.user?.sessionId,s.user?.securityRevision,s.accessToken,privateExperienceKey()])
 }
 function ReportSection({kind,client,filters,deny}:{kind:ReportKind;client:string;filters:Filters;deny:(status:number)=>void}) {
+  const audience=useExperience()
   const report=useFrozenReport(kind,client,filters,reportAuthority,deny)
   const refreshButton=useRef<HTMLButtonElement>(null)
   const title=kind==='credit'?'Abstract-credit activity':'Provider expense by currency'
@@ -34,7 +36,7 @@ function ReportSection({kind,client,filters,deny}:{kind:ReportKind;client:string
 
     {report.page&&<><ReportProvenance page={report.page} pageSize={filters.pageSize}/>{report.page.unit==='abstract_credits'?<CreditActivityResults page={report.page}/>:<ProviderExpenseResults page={report.page}/>}</>}
     <ReportState kind={kind} report={report} refreshButtonRef={refreshButton}/>
-    <AnomalyPanel kind={kind} client={client} range={filters} authority={reportAuthority} deny={deny}/>
+    {audience==='platform' && <AnomalyPanel kind={kind} client={client} range={filters} authority={reportAuthority} deny={deny}/>}
   </section>
 }
 function Workspace({client}:{client:string}) {
@@ -52,10 +54,10 @@ function Workspace({client}:{client:string}) {
     if(JSON.stringify(c)!==JSON.stringify(credit)){retireReportScopes(client,'credit');setCredit(c);setCreditEpoch(x=>x+1)}
     if(JSON.stringify(e)!==JSON.stringify(expense)){retireReportScopes(client,'expense');setExpense(e);setExpenseEpoch(x=>x+1)}
   }
-  return <div className="billing-reports space-y-6"><nav aria-label="Breadcrumb"><span>Billing / Usage &amp; expense</span></nav><h1 ref={heading} tabIndex={-1} className="text-2xl font-semibold">Usage &amp; expense</h1><p className="break-all">Selected Client: {client}</p><BillingWorkspaceNav clientId={client}/>
+  return <div className="billing-reports space-y-6"><nav aria-label="Breadcrumb"><span>Billing / {providerView?'Usage & expense':'Credit usage'}</span></nav><h1 ref={heading} tabIndex={-1} className="text-2xl font-semibold">{providerView?'Usage & expense':'Credit usage'}</h1><p className="break-all">Selected Client: {client}</p><BillingWorkspaceNav clientId={client}/>
     {denied?<Forbidden message="Current report access is unavailable. Private report state was removed."/>:<>
-    <p>Point-in-time reports are read-only. Anomaly investigation has separately authorized operator actions. Abstract Soveris credits and provider money are separate domains. Each report has its own snapshot; their as-of times may differ.</p>
-    <ReportFilters credit={credit} expense={expense} onApply={apply} blocked={blocked}/>
+    <p>{providerView?'Point-in-time reports are read-only. Anomaly investigation has separately authorized operator actions. Abstract Soveris credits and provider money are separate domains. Each report has its own snapshot; their as-of times may differ.':'Point-in-time credit usage is read-only and is measured in abstract Soveris credits.'}</p>
+    <ReportFilters credit={credit} expense={expense} onApply={apply} blocked={blocked} providerView={providerView}/>
     <ReportSection key={`credit:${creditEpoch}`} kind="credit" client={client} filters={credit} deny={deny}/>
     {providerView && <ReportSection key={`expense:${expenseEpoch}`} kind="expense" client={client} filters={expense} deny={deny}/>}
     </>}
@@ -81,6 +83,6 @@ export function BillingReportsPage() {
   if(cleared||!auth.isAuthenticated||!auth.hasPermission('billing:view')||!auth.user)return <Forbidden message="Current billing:view permission is required."/>
   if(!client||client==='00000000-0000-0000-0000-000000000000')return <Forbidden message="A valid Client context is required."/>
   if(auth.user.clientId!==client&&!auth.hasPermission('platform:billing:view'))return <Forbidden message="This Client is outside your authorized report scope."/>
-  if(routeClient!==client)return <Navigate to={`/billing/clients/${client}/reports${evaluationId?`/anomalies/${canonicalizeGuid(evaluationId)??evaluationId}`:''}`} replace/>
+  if(routeClient!==client)return <Navigate to={billingPath(auth.audience, client, `reports${evaluationId?`/anomalies/${canonicalizeGuid(evaluationId)??evaluationId}`:''}`)} replace/>
   return <Workspace key={`${binding.epoch}:${location.key}:${client}:${auth.user.id}:${auth.user.clientId}:${auth.user.role}`} client={client}/>
 }

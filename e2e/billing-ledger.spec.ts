@@ -191,7 +191,7 @@ test('loading, empty, denied, and initial error states pass accessibility scans'
 
   mode = 'denied'
   await page.reload()
-  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible()
   await expectNoSeriousAxeViolations(page)
   mode = 'error'
   await page.reload()
@@ -394,7 +394,7 @@ test('terminal, ambiguous, revoked, and denied-redemption states expose no parti
   mode = 'revoked'
   await page.reload()
   await requestExport()
-  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeFocused()
+  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeFocused()
   await expect(page.getByText(EXPORT_ID)).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Download ledger CSV' })).toHaveCount(0)
 
@@ -411,6 +411,6 @@ test('terminal, ambiguous, revoked, and denied-redemption states expose no parti
   await requestExport()
   await expect(page.getByRole('heading', { name: 'Export status: completed' })).toBeVisible()
   await page.getByRole('button', { name: 'Download ledger CSV' }).click()
-  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeFocused()
+  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeFocused()
   expect(downloads).toBe(0)
 })

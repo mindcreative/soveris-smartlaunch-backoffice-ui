@@ -1,3 +1,4 @@
+import { ExperienceContext } from '../../auth/ExperienceContext'
 import { viewerFixturePermissions } from '../../test/authorityFixtures'
 import { clientFixturePermissions } from '../../test/authorityFixtures'
 import { render, screen, waitFor } from '@testing-library/react'
@@ -15,7 +16,7 @@ function setup(allowed = true) {
   const page = reconciliationFixture()
   vi.mocked(queryReconciliation).mockResolvedValue(page)
   vi.mocked(findFreshReconciliationCase).mockResolvedValue({ item: page.items[0]!, evaluatedAt: page.evaluatedAt })
-  const content = () => <MemoryRouter initialEntries={[`/billing/clients/${CLIENT}/reconciliation`]}><Routes><Route path="/billing/clients/:clientId/reconciliation" element={<BillingReconciliationPage />} /></Routes></MemoryRouter>
+  const content = () => <MemoryRouter initialEntries={[`/platform/clients/${CLIENT}/reconciliation`]}><Routes><Route path="/platform/clients/:clientId/reconciliation" element={<ExperienceContext.Provider value="platform"><BillingReconciliationPage /></ExperienceContext.Provider>} /></Routes></MemoryRouter>
   const view = render(content())
   return { ...view, rerenderWorkspace: () => view.rerender(content()) }
 }
@@ -45,7 +46,7 @@ describe('reconciliation workspace', () => {
     await userEvent.click(screen.getAllByRole('button', { name: /Inspect case/ })[0]!)
     expect(screen.getByRole('heading', { name: 'Immutable case evidence' })).toBeInTheDocument()
     vi.mocked(useAuth).mockReturnValue({ user: { id: 'actor', clientId: CLIENT, role: 'Viewer', permissions: viewerFixturePermissions,platformPermissions:[] }, isAuthenticated: true, hasPermission: () => false } as never)
-    view.rerender(<MemoryRouter><BillingReconciliationPage /></MemoryRouter>)
+    view.rerender(<MemoryRouter><ExperienceContext.Provider value="platform"><BillingReconciliationPage /></ExperienceContext.Provider></MemoryRouter>)
     expect(screen.queryByRole('heading', { name: 'Immutable case evidence' })).not.toBeInTheDocument()
   })
 })

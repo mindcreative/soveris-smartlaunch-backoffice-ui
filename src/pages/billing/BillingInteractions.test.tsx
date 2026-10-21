@@ -66,7 +66,7 @@ describe('Billing interactions and private transitions', () => {
     render(<App />)
 
     expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
-    expect(request).toHaveBeenCalledWith(CLIENT_A, expect.any(AbortSignal))
+    expect(request).not.toHaveBeenCalled()
     expect(
       within(screen.getByRole('complementary', { name: 'Primary navigation' })).queryByRole(
         'link',
@@ -77,7 +77,7 @@ describe('Billing interactions and private transitions', () => {
 
   it('clears an open adjustment form immediately when mapped permission is lost', async () => {
     vi.spyOn(billingApi, 'getAccountSnapshot').mockResolvedValue(snapshot(CLIENT_A, '10.0000'))
-    window.history.replaceState({}, '', `/billing/clients/${CLIENT_A}/account`)
+    window.history.replaceState({}, '', `/platform/clients/${CLIENT_A}/account`)
     const user = userEvent.setup()
     render(<App />)
     await user.click(await screen.findByRole('button', { name: 'Adjust credits' }))

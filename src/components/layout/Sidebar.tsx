@@ -1,7 +1,9 @@
 import { LayoutDashboard, Inbox, ChartNoAxesCombined, Package, Globe, Sparkles, Users, ClipboardClock, ReceiptText, X, type LucideIcon } from 'lucide-react'
-import { Link, matchPath, useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { canonicalizeGuid } from '../../lib/guid'
+import { permittedLanding, platformAvailable, platformViews, workspaceDestinations } from '../../auth/experience'
+import { useExperience } from '../../auth/ExperienceContext'
 
 const baseNavigation = [
   { name: 'Dashboard', href: '/dashboard', icon: 'home' },
@@ -29,41 +31,22 @@ export function Sidebar({ mobile = false, onClose, onNavigate }: SidebarProps) {
   const location = useLocation()
   const { hasPermission, user } = useAuth()
   const defaultClientId = canonicalizeGuid(user?.clientId)
-  const selectedClientId = canonicalizeGuid(
-    matchPath('/billing/clients/:clientId/*', location.pathname)?.params.clientId)
-  const billingClientId = selectedClientId && hasPermission('platform:billing:view') ? selectedClientId : defaultClientId
-  const canViewBilling = hasPermission('billing:view')
-  const canManageSubscriptions = hasPermission('platform:packages:manage')
-  const canReconcile = hasPermission('platform:billing:reconcile')
-  const billingLanding = canViewBilling ? 'account' : canManageSubscriptions ? 'subscriptions' : 'reconciliation'
-  const navigation = defaultClientId && (canViewBilling || canManageSubscriptions || canReconcile)
+  const audience = useExperience()
+  const navigation = audience === 'platform'
     ? [
-        ...baseNavigation.slice(0, 1),
-        {
-          name: 'Billing',
-          href: `/billing/clients/${billingClientId}/${billingLanding}`,
-          icon: 'billing',
-        },
-        ...baseNavigation.slice(1),
-      ]
-    : baseNavigation
-
-  const filteredNav = navigation.filter((item) => {
-    switch (item.name) {
-      case 'Users':
-        return hasPermission('users:view')
-      case 'Audit Logs':
-        return hasPermission('audit:view')
-      case 'AI Tools':
-        return hasPermission('ai:view')
-      case 'Domains':
-        return hasPermission('domains:view')
-      case 'Products':
-        return hasPermission('products:view')
-      default:
-        return true
-    }
-  })
+      ...(platformAvailable(user) ? [{ name: 'Platform operations', href: '/platform', icon: 'shield' }] : []),
+      ...(hasPermission(platformViews.health) ? [{ name: 'System Health', href: '/platform/health', icon: 'home' }] : []),
+      { name: 'My workspace', href: permittedLanding({ ...user!, platformPermissions: [] }), icon: 'home' },
+    ]
+    : [
+      ...baseNavigation.filter(item => {
+        const destination = workspaceDestinations.find(([path]) => item.href === `/${path}`)
+        return !!destination && hasPermission(destination[2])
+      }),
+      ...(defaultClientId && hasPermission('billing:view') ? [{name:'Billing', href:`/billing/clients/${defaultClientId}/account`, icon:'billing'}] : []),
+      ...(platformAvailable(user) ? [{name:'Platform operations', href:'/platform', icon:'shield'}] : []),
+    ]
+  const filteredNav = navigation
 
   return (
     <aside
@@ -74,7 +57,7 @@ export function Sidebar({ mobile = false, onClose, onNavigate }: SidebarProps) {
     >
       <div className="flex flex-grow flex-col border-r border-line bg-surface">
         <div className="flex h-16 items-center justify-between border-b border-line px-4 sm:px-6">
-          <Link to="/dashboard" onClick={onNavigate} aria-label="Soveris SmartLaunch Dashboard" className="flex min-h-11 min-w-0 items-center rounded focus-visible:ring-2 focus-visible:ring-focus">
+          <Link to={audience === 'platform' && platformAvailable(user) ? '/platform' : permittedLanding(user)} onClick={onNavigate} aria-label={audience === 'platform' ? 'Soveris SmartLaunch platform operations' : permittedLanding(user) === '/dashboard' ? 'Soveris SmartLaunch Dashboard' : 'Soveris SmartLaunch workspace'} className="flex min-h-11 min-w-0 items-center rounded focus-visible:ring-2 focus-visible:ring-focus">
             <img src="/soveris-light.svg" alt="" className="brand-light h-auto w-28 shrink-0" />
             <img src="/soveris-dark.svg" alt="" className="brand-dark h-auto w-28 shrink-0" />
             <span className="ml-2 text-xs font-medium text-muted">
@@ -99,7 +82,7 @@ export function Sidebar({ mobile = false, onClose, onNavigate }: SidebarProps) {
           {filteredNav.map((item) => {
             const Icon = iconMap[item.icon]
             const activePrefix = item.name === 'Billing' ? '/billing' : item.href
-            const isActive = location.pathname.startsWith(activePrefix)
+            const isActive = item.href === '/platform' ? location.pathname === item.href : location.pathname.startsWith(activePrefix)
             return (
               <Link
                 key={item.name}

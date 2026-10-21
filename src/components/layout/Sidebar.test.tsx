@@ -28,8 +28,8 @@ describe('Billing sidebar Client context', () => {
       fireEvent.click(screen.getByRole('link', { name: 'Billing' }))
 
       expect(screen.getByTestId('current-route')).toHaveTextContent(
-        `/billing/clients/${selectedClient}/account`)
-      expect(screen.getByTestId('current-route')).not.toHaveTextContent(actorClient)
+        `/billing/clients/${actorClient}/account`)
+      expect(screen.getByTestId('current-route')).not.toHaveTextContent(selectedClient)
     })
 
   it.each(['/dashboard', '/billing', '/billing/clients/invalid/account'])(

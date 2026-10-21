@@ -409,6 +409,7 @@ test('lookup delay exposes GET-only Check status and permission loss clears the 
   await editor.getByRole('textbox', { name: 'Hero subtitle' }).fill('Authorized unsaved product edit')
   await editor.getByRole('button', { name: 'Generate' }).click()
   await expect(editor.getByRole('button', { name: 'Check status' })).toBeVisible()
+  await page.route('**/api/backoffice/auth/current', route => route.fulfill({ status:403, json:{error:'Insufficient permissions'} }))
   await editor.getByRole('button', { name: 'Check status' }).click()
   await expect(page.getByRole('heading',{name:'Current access unavailable'})).toBeVisible()
   await expect(editor).toHaveCount(0)

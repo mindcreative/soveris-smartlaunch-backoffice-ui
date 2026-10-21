@@ -1,3 +1,4 @@
+import { billingSubscriptionKeys } from '../../queries/billingQueries'
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -51,7 +52,7 @@ const RECEIPT: BillingSubscriptionLifecycleReceipt = {
 
 function ActiveSubscriptionObserver() {
   useQuery({
-    queryKey: ['backoffice', 'private', 'billing', 'subscriptions', CLIENT_ID, 'state'],
+    queryKey: billingSubscriptionKeys.state(CLIENT_ID),
     queryFn: ({ signal }) => billingApi.getSubscriptionState(CLIENT_ID, { pageSize: 20 }, signal),
     initialData: state(),
     staleTime: Infinity,
@@ -205,7 +206,7 @@ describe('SubscriptionLifecycleControls', () => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     })
-    queryClient.setQueryData(['backoffice', 'private', 'billing', 'subscriptions', CLIENT_ID, 'state'], state())
+    queryClient.setQueryData(billingSubscriptionKeys.state(CLIENT_ID), state())
     render(
       <QueryClientProvider client={queryClient}>
         <ActiveSubscriptionObserver />

@@ -20,7 +20,7 @@ function receipt(command: ResolutionCommand, replayed = false) {
   return { schemaVersion: 1, operationId: command.operationId, findingId: command.findingId, action: command.action, applied: !replayed, replayed, resolvedAt: '2026-10-05T08:10:00Z', caseVersion: 'opaque-resolved',
     afterState: { schemaVersion: 1, evidenceFingerprint: 'c'.repeat(64), jobStatus: command.action === 'commit_confirmed_execution' ? 'completed' : command.action === 'authorize_safe_reexecution' ? 'reserved' : 'failed', attemptOutcomeStatus: command.action === 'commit_confirmed_execution' ? 'succeeded' : command.action === 'authorize_safe_reexecution' ? 'execution_unknown' : 'failed', attemptExecutionPhase: command.action === 'authorize_safe_reexecution' ? 'dispatched' : 'resolved', attemptCount: 1, currentAttemptId: command.action === 'authorize_safe_reexecution' ? null : FINDING, leaseState: 'none', reservationState: command.action === 'commit_confirmed_execution' ? 'committed' : command.action === 'authorize_safe_reexecution' ? 'active' : 'released', estimatedCredits: '2.2500', actualCredits: command.action === 'commit_confirmed_execution' ? '1.2345' : null, resultIds: [], usageIds: [], providerCostIds: [], ledgerOperationIds: [], outcomeEventIds: [], outboxEventIds: [] } }
 }
-const url = `/billing/clients/${CLIENT}/reconciliation`
+const url = `/platform/clients/${CLIENT}/reconciliation`
 test.beforeEach(async ({ page }) => { await session(page) })
 test('keyboard confirmation, reason semantics, cancellation focus and responsive accessibility', async ({ page }) => {
   let posts = 0
@@ -100,7 +100,7 @@ test('fresh state refusal prevents POST and Client switch hides all prior privat
   await expect(page.getByText(/Case state changed or the action was refused/)).toBeVisible()
   await expect(page.getByRole('status').filter({ hasText: 'Case state changed' })).toBeFocused()
   expect(posts).toBe(0)
-  await page.goto(`/billing/clients/${otherClient}/reconciliation`)
+  await page.goto(`/platform/clients/${otherClient}/reconciliation`)
   await expect(page.getByText(/No reconciliation cases/)).toBeVisible()
   await expect(page.getByText(FINDING, { exact: true })).toHaveCount(0)
   await expect(page.getByRole('dialog')).toHaveCount(0)
@@ -191,8 +191,8 @@ test('denial purges evidence and permission loss makes no new reconciliation req
   await page.getByRole('button', { name: 'Release confirmed non-execution' }).click()
   await page.getByRole('textbox', { name: 'Reason (required)' }).fill('Audit reason')
   await page.getByRole('button', { name: 'Confirm resolution' }).click()
-  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeVisible()
-  await expect(page.getByRole('heading',{name:'Current access unavailable'})).toBeFocused()
+  await expect(page.getByRole('heading', { name: 'Reconciliation access denied' })).toBeVisible()
+  await expect(page.getByRole('alert')).toBeFocused()
   expect(await page.locator('body').innerText()).not.toContain(FINDING)
   expect(await page.locator('body').innerText()).not.toContain('private dependency detail')
 })
@@ -236,6 +236,6 @@ test('partial pagination failure retains verified rows and exposes stale state',
 test('GET permission denial restores focus to the cleared access state', async ({ page }) => {
   await page.route('**/api/billing/reconciliation**', route => route.fulfill({ status: 403, json: { title: 'Forbidden', code: 'reconciliation_forbidden' } }))
   await page.goto(url)
-  await expect(page.getByRole('heading',{name:'Current access unavailable'})).toBeFocused()
-  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeVisible()
+  await expect(page.getByRole('alert')).toBeFocused()
+  await expect(page.getByRole('heading', { name: 'Reconciliation access denied' })).toBeVisible()
 })

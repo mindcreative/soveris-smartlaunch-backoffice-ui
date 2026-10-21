@@ -8,7 +8,7 @@ import { AdjustmentHistoryResults } from '../../components/billing/AdjustmentHis
 import { CreditAdjustmentReversalWorkflow } from '../../components/billing/CreditAdjustmentReversalWorkflow'
 import { BillingWorkspaceNav } from '../../components/billing/BillingWorkspaceNav'
 import { Breadcrumbs, EmptyState, ErrorDisplay, Forbidden, LoadingSpinner } from '../../components/shared'
-import { useAuth } from '../../hooks/useAuth'
+import { useBillingAccess as useAuth, billingPath, useExperience } from '../../auth/ExperienceContext'
 import { canonicalizeGuid } from '../../lib/guid'
 import {
   billingAdjustmentKeys,
@@ -52,9 +52,10 @@ function serverDateError(error: unknown): { field: 'from' | 'to'; message: strin
   }
 }
 
-function historyBreadcrumbs(clientId: string) {
+function useHistoryBreadcrumbs(clientId: string) {
+  const audience = useExperience()
   return [
-    { label: 'Billing', href: `/billing/clients/${clientId}/account` },
+    { label: 'Billing', href: billingPath(audience,clientId) },
     { label: 'Adjustment history' },
     { label: `Selected Client ${clientId}` },
   ]
@@ -67,7 +68,7 @@ function HistoryPageFrame({ clientId, children, headingRef }: {
 }) {
   return (
     <div className="mx-auto min-w-0 max-w-7xl break-words">
-      <Breadcrumbs items={historyBreadcrumbs(clientId)} />
+      <Breadcrumbs items={useHistoryBreadcrumbs(clientId)} />
       <BillingWorkspaceNav clientId={clientId} />
       <div className="mb-6 min-w-0">
         <h1 ref={headingRef} tabIndex={headingRef ? -1 : undefined}
@@ -332,7 +333,7 @@ function PermissionAwareAdjustmentHistoryPage({ clientId }: { clientId: string }
 }
 
 export function BillingAdjustmentHistoryPage() {
-  const {user,hasPermission}=useAuth()
+  const {user,hasPermission,audience}=useAuth()
   const { clientId: routeClientId } = useParams()
   const clientId = canonicalizeGuid(routeClientId)
   if(clientId && user && canonicalizeGuid(user.clientId)!==clientId && !hasPermission('platform:billing:view'))
@@ -342,6 +343,6 @@ export function BillingAdjustmentHistoryPage() {
     return <EmptyState title="Client context unavailable"
       description="A valid Client URL is required for the Billing workspace." />
   if (routeClientId !== clientId)
-    return <Navigate to={`/billing/clients/${clientId}/adjustments`} replace />
+    return <Navigate to={billingPath(audience, clientId, 'adjustments')} replace />
   return <PermissionAwareAdjustmentHistoryPage key={clientId} clientId={clientId} />
 }

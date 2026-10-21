@@ -1,3 +1,4 @@
+import { privateExperienceKey } from '../auth/experienceKey'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { QueryClient } from '@tanstack/react-query'
 import { findFreshReconciliationCase, normalizeReconciliationReason, queryReconciliation, reconciliationOutcome, ReconciliationContractError, resolutionProof, resolveReconciliation, validateResolutionCommand, type ReconciliationFilters, type ReconciliationOutcome, type ResolutionCommand } from '../api/reconciliationApi'
@@ -28,6 +29,7 @@ export function reviewedCaseState(item: ReconciliationCase): string {
 interface Confirmation { item: ReconciliationCase; action: ReconciliationAction; proofId: string | null; effect: string }
 export function useReconciliationWorkspace(clientId: string) {
   // Private QueryClient belongs to this mounted authority scope; no evidence survives navigation.
+  const [scopeKey] = useState(privateExperienceKey)
   const [queries] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0, staleTime: 0 } } }))
   const [items, setItems] = useState<ReconciliationCase[]>([])
   const [page, setPage] = useState<ReconciliationPage | null>(null)
@@ -61,7 +63,7 @@ export function useReconciliationWorkspace(clientId: string) {
   }
   const finish = (controller: AbortController) => { if (current.current !== controller) return; lock.current = false; if (alive.current) setBusy(false) }
   const read = (query: ReconciliationFilters | { cursor: string }, signal: AbortSignal) => queries.fetchQuery({
-    queryKey: ['reconciliation', clientId, ++sequence.current], queryFn: ({ signal: querySignal }) => {
+    queryKey: ['backoffice','private','platform','reconciliation',clientId,scopeKey,query,++sequence.current], queryFn: ({ signal: querySignal }) => {
       // Both owner cancellation and TanStack cancellation reach the transport.
       signal.addEventListener('abort', () => void queries.cancelQueries(), { once: true })
       return queryReconciliation(clientId, query, querySignal)

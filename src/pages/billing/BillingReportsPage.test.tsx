@@ -14,8 +14,8 @@ import {creditFixture,expenseFixture,REPORT_CLIENT,REPORT_RANGE} from '../../tes
 const B='ffffffff-1111-4222-8333-444444444444'
 function session(role:'ClientAdmin'|'Viewer'='ClientAdmin'){useAuthStore.setState({accessToken:'token',refreshTokenValue:'refresh',isLoading:false,isAuthenticated:true,isInitialized:true,user:{id:'cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa',clientId:REPORT_CLIENT,role,permissions:role==='ClientAdmin'?clientFixturePermissions:[],platformPermissions:role==='ClientAdmin'?['platform:billing:view', 'platform:billing:reconcile']:[],email:'test@example.test',displayName:'Operator',accessToken:'token',refreshToken:'refresh',expiresIn:3600}})}
 describe('Usage & expense route',()=>{
- beforeEach(()=>{vi.restoreAllMocks();queryClient.clear();localStorage.clear();session();window.history.replaceState({},'',`/billing/clients/${REPORT_CLIENT}/reports`)})
- it('denies direct navigation before any report request',()=>{session('Viewer');const read=vi.spyOn(api,'readBillingReport');render(<App/>);expect(screen.getByText(/Current billing:view permission/)).toBeInTheDocument();expect(read).not.toHaveBeenCalled()})
+ beforeEach(()=>{vi.restoreAllMocks();queryClient.clear();localStorage.clear();session();window.history.replaceState({},'',`/platform/clients/${REPORT_CLIENT}/reports`)})
+ it('denies direct navigation before any report request',()=>{session('Viewer');const read=vi.spyOn(api,'readBillingReport');render(<App/>);expect(screen.getByRole('heading',{name:'Access denied'})).toBeInTheDocument();expect(read).not.toHaveBeenCalled()})
  it('loads both sections under StrictMode, focuses route heading and preserves drafts',async()=>{
   const read=vi.spyOn(api,'readBillingReport').mockImplementation(async(kind,client,filters)=>{
    if(kind==='credit') {const page=api.parseCreditActivity(creditFixture(client),client,REPORT_RANGE);return {...page,from:api.utcInstant(filters.from),to:api.utcInstant(filters.to),items:page.items.map(i=>({...i,periodStart:api.utcInstant(filters.from)}))}}
@@ -30,7 +30,7 @@ describe('Usage & expense route',()=>{
   render(<App/>);await waitFor(()=>expect(reject).toBeDefined());await act(async()=>reject({status:403}));expect(screen.getByRole('heading',{name:'Access denied'})).toBeInTheDocument();await act(async()=>resolve(api.parseCreditActivity(creditFixture(),REPORT_CLIENT,REPORT_RANGE)));expect(screen.queryByText('Full-window credit totals')).not.toBeInTheDocument()
  })
  it('token/role changes gate existing protected content synchronously',async()=>{
-  vi.spyOn(api,'readBillingReport').mockImplementation(async kind=>kind==='credit'?api.parseCreditActivity(creditFixture(),REPORT_CLIENT,REPORT_RANGE):api.parseProviderExpense(expenseFixture(),REPORT_CLIENT,REPORT_RANGE));render(<App/>);await waitFor(()=>expect(screen.getByText('Full-window credit totals')).toBeInTheDocument());act(()=>session('Viewer'));expect(screen.queryByText('Full-window credit totals')).not.toBeInTheDocument();expect(screen.getByText(/Current billing:view permission/)).toBeInTheDocument()
+  vi.spyOn(api,'readBillingReport').mockImplementation(async kind=>kind==='credit'?api.parseCreditActivity(creditFixture(),REPORT_CLIENT,REPORT_RANGE):api.parseProviderExpense(expenseFixture(),REPORT_CLIENT,REPORT_RANGE));render(<App/>);await waitFor(()=>expect(screen.getByText('Full-window credit totals')).toBeInTheDocument());act(()=>session('Viewer'));expect(screen.queryByText('Full-window credit totals')).not.toBeInTheDocument();expect(screen.getByRole('heading',{name:'Access denied'})).toBeInTheDocument()
  })
  it.each([
   {strict:false,returnToA:false}, {strict:false,returnToA:true},
@@ -49,7 +49,7 @@ describe('Usage & expense route',()=>{
   render(strict?<StrictMode><App/></StrictMode>:<App/>)
   const active=(client:string)=>pending.filter(r=>r.client===client&&!r.signal.aborted)
   const waitForPair=async(client:string)=>{await waitFor(()=>expect(active(client).map(r=>r.kind).sort()).toEqual(['credit','expense']))}
-  const navigate=async(client:string)=>{act(()=>{window.history.pushState({},'',`/billing/clients/${client}/reports`);window.dispatchEvent(new PopStateEvent('popstate'))});await waitForPair(client)}
+  const navigate=async(client:string)=>{act(()=>{window.history.pushState({},'',`/platform/clients/${client}/reports`);window.dispatchEvent(new PopStateEvent('popstate'))});await waitForPair(client)}
   await waitForPair(REPORT_CLIENT)
   const oldA=[...active(REPORT_CLIENT)]
   await navigate(B)
@@ -68,7 +68,7 @@ describe('Usage & expense route',()=>{
   expect(screen.queryByText('Full-window expense totals')).not.toBeInTheDocument()
   expect(useAuthStore.getState().isAuthenticated).toBe(true)
   expect(useAuthStore.getState().accessToken).toBe('token')
-  expect(window.location.pathname).toBe(`/billing/clients/${returnToA?REPORT_CLIENT:B}/reports`)
+  expect(window.location.pathname).toBe(`/platform/clients/${returnToA?REPORT_CLIENT:B}/reports`)
   await act(async()=>{for(const r of active(returnToA?REPORT_CLIENT:B))r.resolve(r.page)})
   await waitFor(()=>expect(screen.getByText('Full-window credit totals')).toBeInTheDocument())
   expect(screen.getByText('Full-window expense totals')).toBeInTheDocument()
@@ -78,5 +78,5 @@ describe('Usage & expense route',()=>{
 
 it('canonicalizes uppercase Client deep links without losing the evaluation',async()=>{
  session();queryClient.clear();const detail=vi.spyOn(anomalies,'readAnomalyDetail').mockImplementation(async(client,id)=>anomalies.parseAnomalyDetail(anomalyDetailFixture(client),client,id));vi.spyOn(anomalies,'readAnomalies').mockRejectedValue({status:503});vi.spyOn(api,'readBillingReport').mockRejectedValue({status:503})
- window.history.replaceState({},'',`/billing/clients/${REPORT_CLIENT.toUpperCase()}/reports/anomalies/${ANOMALY_ID}`);render(<App/>);await waitFor(()=>expect(window.location.pathname).toBe(`/billing/clients/${REPORT_CLIENT}/reports/anomalies/${ANOMALY_ID}`));await waitFor(()=>expect(detail).toHaveBeenCalled());expect(detail.mock.calls[0].slice(0,2)).toEqual([REPORT_CLIENT,ANOMALY_ID])
+ window.history.replaceState({},'',`/platform/clients/${REPORT_CLIENT.toUpperCase()}/reports/anomalies/${ANOMALY_ID}`);render(<App/>);await waitFor(()=>expect(window.location.pathname).toBe(`/platform/clients/${REPORT_CLIENT}/reports/anomalies/${ANOMALY_ID}`));await waitFor(()=>expect(detail).toHaveBeenCalled());expect(detail.mock.calls[0].slice(0,2)).toEqual([REPORT_CLIENT,ANOMALY_ID])
 })

@@ -31,7 +31,7 @@ function authenticate(role: 'ClientAdmin' | 'Viewer' = 'ClientAdmin') {
       id: 'operator',
       email: 'operator@example.com',
       displayName: 'Operator',
-      role, permissions: role==='ClientAdmin'?clientFixturePermissions:[], platformPermissions: role==='ClientAdmin'?['platform:billing:adjust', 'platform:packages:manage']:[],
+      role, permissions: role==='ClientAdmin'?clientFixturePermissions:['billing:view'], platformPermissions: role==='ClientAdmin'?['platform:billing:view', 'platform:billing:adjust', 'platform:packages:manage']:[],
       clientId: CLIENT_ID,
       accessToken: 'token',
       refreshToken: 'refresh',
@@ -52,7 +52,7 @@ describe('Billing account routes and states', () => {
 
   it('renders the server snapshot on a canonical direct route', async () => {
     vi.spyOn(billingApi, 'getAccountSnapshot').mockResolvedValue(SNAPSHOT)
-    window.history.replaceState({}, '', `/billing/clients/${CLIENT_ID}/account`)
+    window.history.replaceState({}, '', `/platform/clients/${CLIENT_ID}/account`)
 
     render(<App />)
 
@@ -65,7 +65,7 @@ describe('Billing account routes and states', () => {
     expect(document.querySelector('time')?.getAttribute('datetime')).toBe(SNAPSHOT.asOf)
     expect(screen.getByRole('link', { name: /Ledger/ })).toHaveAttribute(
       'href',
-      `/billing/clients/${CLIENT_ID}/ledger`
+      `/platform/clients/${CLIENT_ID}/ledger`
     )
     expect(screen.getByRole('button', { name: 'Adjust credits' })).toBeInTheDocument()
   })
@@ -87,7 +87,7 @@ describe('Billing account routes and states', () => {
     vi.spyOn(adjustmentApi, 'previewCreditAdjustment').mockRejectedValue({
       code: 'HTTP_403', status: 403, message: 'Denied',
     })
-    window.history.replaceState({}, '', `/billing/clients/${CLIENT_ID}/account`)
+    window.history.replaceState({}, '', `/platform/clients/${CLIENT_ID}/account`)
     const user = userEvent.setup()
     render(<App />)
 
@@ -133,7 +133,7 @@ describe('Billing account routes and states', () => {
 
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'Client context unavailable' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Access denied' })).toBeInTheDocument()
     expect(request).not.toHaveBeenCalled()
     expect(queryClient.getQueryCache().findAll()).toHaveLength(0)
   })

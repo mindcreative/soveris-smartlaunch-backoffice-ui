@@ -6,10 +6,13 @@ import {
   type LocalSubscriptionMaterial,
   type ResolvedLocalSubscriptionPreview, type LocalSubscriptionReceipt,
 } from '../../api/localSubscriptionApi'
-import { useAuth } from '../../hooks/useAuth'
-import { useAuthStore } from '../../stores/authStore'
 import { createUuidV7 } from '../../lib/uuidV7'
 import { billingAccountKeys, billingSubscriptionKeys } from '../../queries/billingQueries'
+import {
+  discardLocalSubscriptionAttempt, localSubscriptionAttemptScope,
+  localSubscriptionAttemptScopeIsCurrent, retainLocalSubscriptionAttempt,
+  retainedLocalSubscriptionAttempt, type RetainedLocalSubscriptionAttempt,
+} from '../../queries/localSubscriptionAttemptScope'
 import { normalizeLocalWallInput, LocalInstant } from '../../timezone/LocalInstant'
 import { Modal } from '../shared/Modal'
 
@@ -25,11 +28,6 @@ const EMPTY: Draft = {
   concurrentAiOperations: '', contentGeneration: false, imageGeneration: false,
   validFrom: '', endChoice: '', endCycleIndex: '',
 }
-interface RetainedAttempt { body: string; operationId: string }
-const uncertainAttempts = new Map<string, RetainedAttempt>()
-if (typeof window !== 'undefined') window.addEventListener('auth:cleared', () => uncertainAttempts.clear())
-let retainedActorId: string | null = null
-
 function errorStatus(error: unknown): number | undefined {
   return error && typeof error === 'object' && 'status' in error
     ? (error as ApiError).status : undefined
@@ -78,19 +76,14 @@ export function LocalSubscriptionCreationWorkspace({ clientId, onPreconfirm, onC
   onPreconfirm: () => Promise<boolean>
   onCreated: (receipt: LocalSubscriptionReceipt) => void
 }) {
-  const { user } = useAuth()
   const queryClient = useQueryClient()
-  const attemptKey = `${user?.id ?? ''}:${clientId}`
-  if (retainedActorId !== (user?.id ?? null)) {
-    uncertainAttempts.clear()
-    retainedActorId = user?.id ?? null
-  }
+  const attemptKey = localSubscriptionAttemptScope(clientId)
   const [draft, setDraft] = useState<Draft>(EMPTY)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [preview, setPreview] = useState<ResolvedLocalSubscriptionPreview | null>(null)
   const [material, setMaterial] = useState<LocalSubscriptionMaterial | null>(null)
   const [busy, setBusy] = useState(false)
-  const [uncertain, setUncertain] = useState(() => uncertainAttempts.has(attemptKey))
+  const [uncertain, setUncertain] = useState(() => !!retainedLocalSubscriptionAttempt(attemptKey))
   const [feedback, setFeedback] = useState('')
   const summaryRef = useRef<HTMLDivElement>(null)
   const reviewButtonRef = useRef<HTMLButtonElement>(null)
@@ -102,7 +95,7 @@ export function LocalSubscriptionCreationWorkspace({ clientId, onPreconfirm, onC
   }, [errors])
 
   useEffect(() => {
-    setUncertain(uncertainAttempts.has(attemptKey))
+    setUncertain(!!retainedLocalSubscriptionAttempt(attemptKey))
     setPreview(null)
     setMaterial(null)
     setFeedback('')
@@ -149,13 +142,11 @@ export function LocalSubscriptionCreationWorkspace({ clientId, onPreconfirm, onC
     } finally { if (epoch === requestEpoch.current) setBusy(false) }
   }
 
-  const send = async (retained: RetainedAttempt) => {
+  const send = async (retained: RetainedLocalSubscriptionAttempt) => {
     if (busy) return
-    const actorId = user?.id
     const scopeKey = attemptKey
     const epoch = requestEpoch.current
-    const currentScope = () => actorId === useAuthStore.getState().user?.id &&
-      scopeKey === `${useAuthStore.getState().user?.id ?? ''}:${clientId}` &&
+    const currentScope = () => localSubscriptionAttemptScopeIsCurrent(scopeKey, clientId) &&
       epoch === requestEpoch.current
     setBusy(true)
     setFeedback('Creating or replaying the retained subscription operation…')
@@ -163,7 +154,7 @@ export function LocalSubscriptionCreationWorkspace({ clientId, onPreconfirm, onC
       const receipt = await createLocalSubscription(clientId, retained.body,
         retained.operationId)
       if (!currentScope()) return
-      uncertainAttempts.delete(attemptKey)
+      discardLocalSubscriptionAttempt(scopeKey)
       setUncertain(false)
       setFeedback('')
       onCreated(receipt)
@@ -175,7 +166,7 @@ export function LocalSubscriptionCreationWorkspace({ clientId, onPreconfirm, onC
       if (!currentScope()) return
       const status = errorStatus(error)
       if (status === 400 || status === 404 || status === 409 || status === 422) {
-        uncertainAttempts.delete(attemptKey)
+        discardLocalSubscriptionAttempt(scopeKey)
         setUncertain(false)
         setFeedback('The server rejected this operation. Review the saved values and request a new preview.')
       } else {
@@ -192,7 +183,7 @@ export function LocalSubscriptionCreationWorkspace({ clientId, onPreconfirm, onC
     const operationId = createUuidV7()
     const body = serializeLocalSubscriptionRequest(material, preview, operationId)
     const retained = Object.freeze({ body, operationId })
-    uncertainAttempts.set(attemptKey, retained)
+    retainLocalSubscriptionAttempt(attemptKey, retained)
     setPreview(null)
     setMaterial(null)
     void send(retained)
@@ -207,8 +198,8 @@ export function LocalSubscriptionCreationWorkspace({ clientId, onPreconfirm, onC
     </div>}
     {feedback && <p role="status" className="mt-3 rounded border border-primary-line p-3">{feedback}</p>}
     {uncertain && <div className="mt-3 rounded border border-warning-line p-3" role="alert"><p>The exact operation ID and request bytes are retained for this Client.</p>
-      <button type="button" disabled={busy} onClick={() => { const retained = uncertainAttempts.get(attemptKey); if (retained) void send(retained) }} className="mt-2 min-h-11 rounded bg-primary-hover px-4 py-2 text-on-accent disabled:opacity-50">Replay exact request</button>
-      <button type="button" disabled={busy} onClick={() => { uncertainAttempts.delete(attemptKey); setUncertain(false); setFeedback('A new operation can now be reviewed.') }} className="ml-2 min-h-11 rounded border px-4 py-2 disabled:opacity-50">Abandon unresolved attempt</button>
+      <button type="button" disabled={busy} onClick={() => { const retained = retainedLocalSubscriptionAttempt(attemptKey); if (retained) void send(retained) }} className="mt-2 min-h-11 rounded bg-primary-hover px-4 py-2 text-on-accent disabled:opacity-50">Replay exact request</button>
+      <button type="button" disabled={busy} onClick={() => { discardLocalSubscriptionAttempt(attemptKey); setUncertain(false); setFeedback('A new operation can now be reviewed.') }} className="ml-2 min-h-11 rounded border px-4 py-2 disabled:opacity-50">Abandon unresolved attempt</button>
     </div>}
     <form onSubmit={(event) => { void review(event) }} className="mt-4 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2" noValidate>
       {([

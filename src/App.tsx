@@ -1,3 +1,4 @@
+import { pendingAppearanceSubject } from './appearance/sessionHint'
 import { NotificationIcon, NotificationClose } from './appearance/NotificationIcon'
 import { AppearanceProvider, useAppearance } from './appearance/AppearanceProvider'
 import { BrowserRouter, Routes, Route, Navigate, useMatch } from 'react-router-dom'
@@ -23,6 +24,11 @@ import { BillingAdjustmentHistoryPage } from './pages/billing/BillingAdjustmentH
 import { BillingSubscriptionPage } from './pages/billing/BillingSubscriptionPage'
 import { AiImageJobsPage } from './pages/ai/AiImageJobsPage'
 import { BillingReportsPage } from './pages/billing/BillingReportsPage'
+import { PlatformHealthPage } from './pages/platform/PlatformHealthPage'
+import { PlatformClientPage } from './pages/platform/PlatformClientPage'
+import { PlatformIndexPage, WorkspaceAccessPage, ExperienceDeniedPage } from './pages/platform/PlatformIndexPage'
+import { LoadingSpinner } from './components/shared/LoadingSpinner'
+import { permittedLanding } from './auth/experience'
 import { BillingReconciliationPage } from './pages/billing/BillingReconciliationPage'
 // Protected route wrapper with role-based access
 function ProtectedRoute({
@@ -39,6 +45,12 @@ function ProtectedRoute({
   return <>{children}</>
 }
 
+function Landing() {
+  const { user, isInitialized, isLoading, isAuthenticated } = useAuth()
+  if (!isInitialized || isLoading) return <LoadingSpinner message="Restoring access…" />
+  return <Navigate to={isAuthenticated ? permittedLanding(user) : '/login'} replace />
+}
+
 function Application() {
   const { mode } = useAppearance()
   return (
@@ -51,6 +63,18 @@ function Application() {
 
             {/* Protected routes under AdminShell */}
             <Route element={<AdminShell />}>
+              <Route path="/platform" element={<PlatformIndexPage />} />
+              <Route path="/platform/*" element={<ExperienceDeniedPage />} />
+              <Route path="/platform/clients/:clientId" element={<PlatformClientPage />} />
+              <Route path="/platform/health" element={<PlatformHealthPage />} />
+              <Route path="/workspace-access" element={<WorkspaceAccessPage />} />
+              <Route path="/platform/clients/:clientId/account" element={<BillingAccountPage />} />
+              <Route path="/platform/clients/:clientId/ledger" element={<BillingLedgerBoundaryPage />} />
+              <Route path="/platform/clients/:clientId/adjustments" element={<BillingAdjustmentHistoryPage />} />
+              <Route path="/platform/clients/:clientId/subscriptions" element={<BillingSubscriptionPage />} />
+              <Route path="/platform/clients/:clientId/reports" element={<BillingReportsPage />} />
+              <Route path="/platform/clients/:clientId/reports/anomalies/:evaluationId" element={<BillingReportsPage />} />
+              <Route path="/platform/clients/:clientId/reconciliation" element={<BillingReconciliationPage />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/submissions" element={<Submissions />} />
               <Route path="/analytics" element={<Analytics />} />
@@ -80,11 +104,11 @@ function Application() {
               />
 
               {/* Default redirect to dashboard */}
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/" element={<Landing />} />
             </Route>
 
             {/* Catch-all */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Landing />} />
           </Routes>
 
           <ToastContainer
@@ -109,11 +133,11 @@ function Application() {
 
 function SessionAppearance() {
   const isLogin = !!useMatch('/login')
-  const { user, isAuthenticated, isInitialized, accessToken } = useAuth()
+  const { user, isAuthenticated, isInitialized, accessToken, refreshTokenValue } = useAuth()
   // Match the existing auth restoration policy without making appearance an
   // authority for access. Login always stays on System, including submit/restore.
   const restoringUser = !isInitialized && !!accessToken
-  const userId = !isLogin && (isAuthenticated || restoringUser) ? user?.id || null : null
+  const userId = isLogin ? null : isAuthenticated ? user?.id ?? null : restoringUser ? pendingAppearanceSubject(accessToken,refreshTokenValue) : null
   return <AppearanceProvider userId={userId}><Application /></AppearanceProvider>
 }
 

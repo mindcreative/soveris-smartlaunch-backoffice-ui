@@ -9,10 +9,10 @@ const ACTOR = '22222222-3333-4444-8555-666666666666'
 const ADJUSTMENT = '0199b9d2-a9b1-7000-8000-000000000003'
 const LEDGER = '0199b9d2-a9b1-7000-8000-000000000004'
 const AT = '2026-09-24T12:00:00.123456Z'
-const accountPath = `/billing/clients/${CLIENT}/account`
+const accountPath = `/platform/clients/${CLIENT}/account`
 
 async function installSession(page: Page, role: 'ClientAdmin' | 'Viewer' = 'ClientAdmin'): Promise<void> {
-  await installCurrentSession(page, { id:ACTOR,clientId: CLIENT, role, permissions: role === 'Viewer' ? viewerFixturePermissions : clientFixturePermissions, platformPermissions: role === 'Viewer' ? [] : ['platform:billing:view','platform:billing:adjust'] })
+  await installCurrentSession(page, { id:ACTOR,clientId: CLIENT, role, permissions: role === 'Viewer' ? viewerFixturePermissions : clientFixturePermissions, platformPermissions: role === 'Viewer' ? ['platform:billing:view'] : ['platform:billing:view','platform:billing:adjust'] })
 }
 
 function accountBody(committed = false): string {
@@ -184,7 +184,7 @@ test('preserves direct routes and adjustment accessibility at reflow and user pr
     json(route, previewBody()))
   await page.setViewportSize({ width: 320, height: 700 })
   await page.emulateMedia({ reducedMotion: 'reduce', forcedColors: 'active' })
-  await page.goto(`/billing/clients/${CLIENT.toUpperCase()}/account`)
+  await page.goto(`/platform/clients/${CLIENT.toUpperCase()}/account`)
   await expect(page).toHaveURL(new RegExp(`${CLIENT}/account$`))
   await page.getByRole('button', { name: 'Adjust credits' }).click()
   expect(await page.getByLabel('Adjustment amount').getAttribute('inputmode')).toBe('decimal')
@@ -224,8 +224,8 @@ test('preserves direct routes and adjustment accessibility at reflow and user pr
   await page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()
 
-  await page.goto('/billing/clients/not-a-guid/account')
-  await expect(page.getByRole('heading', { name: 'Client context unavailable' })).toBeVisible()
+  await page.goto('/platform/clients/not-a-guid/account')
+  await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Adjust credits' })).toHaveCount(0)
 })
 

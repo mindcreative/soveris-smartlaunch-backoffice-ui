@@ -1,4 +1,5 @@
-import { useAuth } from '../../hooks/useAuth'
+import { withExperienceKey } from '../../auth/experienceKey'
+import { useBillingAccess as useAuth } from '../../auth/ExperienceContext'
 import { privateObjectUrl, releasePrivateObjectUrl } from '../../auth/authorityEpoch'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -61,7 +62,7 @@ function acceptedMetadata(accepted: BillingLedgerExportAccepted): BillingLedgerE
   }
 }
 
-export function LedgerExportPanel({
+function AuthorizedLedgerExportPanel({
   clientId,
   filters,
   onPermissionDenied,
@@ -113,7 +114,7 @@ export function LedgerExportPanel({
   }, [clientId, queryClient])
 
   const mutation = useMutation({
-    mutationKey: billingExportKeys.request(clientId),
+    mutationKey: withExperienceKey(billingExportKeys.request(clientId)),
     mutationFn: ({ source, signal }: { source: BillingLedgerFilters; signal: AbortSignal }) =>
       billingApi.requestLedgerExport(clientId, source, signal),
     retry: false,
@@ -343,9 +344,6 @@ export function LedgerExportPanel({
   const requestActionAllowed = !metadata || metadata.status === 'completed' || terminal || commandState === 'ambiguous'
   const artifactEligible = metadata?.status === 'completed' && Boolean(metadata.artifactExpiresAt)
 
-  const {user,hasPermission}=useAuth()
-  const exportAllowed=user?.clientId===clientId?hasPermission('billing:export'):hasPermission('platform:billing:export')
-  if(!exportAllowed) return null
   return (
     <section aria-labelledby="ledger-export-title" className="state-indicator mb-6 min-w-0 rounded-lg border border-control bg-surface p-4 sm:p-5">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
@@ -420,4 +418,9 @@ export function LedgerExportPanel({
       </Modal>
     </section>
   )
+}
+
+export function LedgerExportPanel(props: {clientId:string; filters:BillingLedgerFilters; onPermissionDenied:()=>void}) {
+  const {hasPermission} = useAuth()
+  return hasPermission('billing:export') ? <AuthorizedLedgerExportPanel {...props}/> : null
 }

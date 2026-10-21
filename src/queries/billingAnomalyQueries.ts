@@ -1,3 +1,4 @@
+import { privateExperienceKey } from '../auth/experienceKey'
 import {useLayoutEffect,useState,useSyncExternalStore} from 'react'
 import {QueryClient,useQueryClient} from '@tanstack/react-query'
 import {allowed,appendAnomalyPage,readAnomalies,readAnomalyDetail,serializeAnomalyCommand,trimAnomalyReason,transitionAnomaly,validateHistory} from '../api/billingAnomaliesApi'
@@ -17,13 +18,14 @@ export class AnomalyInvestigation {
  private listeners=new Set<()=>void>();private alive=true;private auth:string;private generation=++generation;private request=0
  private listAbort:AbortController|null=null;private detailAbort:AbortController|null=null;private commandAbort:AbortController|null=null
  private unregister:()=>void=()=>{};private expiry:ReturnType<typeof setTimeout>|undefined;private historyExpiry:ReturnType<typeof setTimeout>|undefined;private cooldown:ReturnType<typeof setTimeout>|undefined
+ private scopeKey=privateExperienceKey()
  private traversal=0;private detailEpoch=0;private selected:string|null=null;private cursors=new Set<string>();private historyCursors=new Set<string>()
  constructor(private queries:QueryClient,readonly client:string,readonly filters:AnomalyFilters,private authority:()=>string,private denied:(status:number)=>void,private transport:Transport={list:readAnomalies,detail:readAnomalyDetail,command:transitionAnomaly}){this.auth=authority()}
  snapshot=()=>this.state
  subscribe=(f:()=>void)=>{this.listeners.add(f);return ()=>{this.listeners.delete(f)}}
  private emit(value:Partial<InvestigationState>){this.state={...this.state,...value};for(const f of this.listeners)f();notifyAnomalyScopes()}
- private get prefix(){return [...billingAnomalyKeys.client(this.client),this.filters,this.generation]}
- activate(){this.alive=true;this.auth=this.authority();this.generation=++generation;this.unregister();this.unregister=registerAnomalyScope(this.client,()=>this.retire(),this.filters.signal,()=>Boolean(this.state.command)||this.state.commandBusy||this.state.retryAt>Date.now(),this.setCooldown);this.emit({retired:false})}
+ private get prefix(){return [...billingAnomalyKeys.client(this.client),this.scopeKey,this.filters,this.generation]}
+ activate(){this.alive=true;this.auth=this.authority();this.scopeKey=privateExperienceKey();this.generation=++generation;this.unregister();this.unregister=registerAnomalyScope(this.client,()=>this.retire(),this.filters.signal,()=>Boolean(this.state.command)||this.state.commandBusy||this.state.retryAt>Date.now(),this.setCooldown);this.emit({retired:false})}
  retire(){if(!this.alive)return;this.alive=false;this.traversal++;this.detailEpoch++;this.listAbort?.abort();this.detailAbort?.abort();this.commandAbort?.abort();clearTimeout(this.expiry);clearTimeout(this.historyExpiry);clearTimeout(this.cooldown);this.cursors.clear();this.historyCursors.clear();this.selected=null;void this.queries.cancelQueries({queryKey:this.prefix});this.queries.removeQueries({queryKey:this.prefix});this.unregister();this.emit({page:null,detail:null,listBusy:false,detailBusy:false,commandBusy:false,stale:false,historyStale:false,retired:true,error:null,detailError:null,message:'',action:null,reason:'',command:null,receipt:null,commandState:'idle'})}
  private valid(abort:AbortController){return this.alive&&!abort.signal.aborted&&this.auth===this.authority()}
  private expiryTime(page:AnomalyPage){return Number(instantMicros(page.asOf)/1000n)+15*60000}

@@ -6,7 +6,7 @@ import { AccountSnapshotView } from '../../components/billing/AccountSnapshotVie
 import { BillingWorkspaceNav } from '../../components/billing/BillingWorkspaceNav'
 import { CreditAdjustmentWorkflow } from '../../components/billing/CreditAdjustmentWorkflow'
 import { Breadcrumbs, EmptyState, ErrorDisplay, Forbidden, LoadingSpinner } from '../../components/shared'
-import { useAuth } from '../../hooks/useAuth'
+import { useBillingAccess as useAuth, billingPath, useExperience } from '../../auth/ExperienceContext'
 import { canonicalizeGuid } from '../../lib/guid'
 import { useBillingAccount } from '../../queries/billingQueries'
 
@@ -21,9 +21,10 @@ function isDurableAccountError(error: unknown): error is Error | ApiError {
   return error instanceof BillingContractError || status === 401 || status === 403 || status === 404
 }
 
-function accountBreadcrumbs(clientId: string) {
+function useAccountBreadcrumbs(clientId: string) {
+  const audience = useExperience()
   return [
-    { label: 'Billing', href: `/billing/clients/${clientId}/account` },
+    { label: 'Billing', href: billingPath(audience,clientId) },
     { label: 'Account overview' },
     { label: `Selected Client ${clientId}` },
   ]
@@ -39,18 +40,13 @@ function ClientContextUnavailable() {
 }
 
 export function BillingIndexPage() {
-  const { hasPermission, user } = useAuth()
+  const { hasPermission, user, audience } = useAuth()
   const clientId = canonicalizeGuid(user?.clientId)
 
   if (!clientId) return <ClientContextUnavailable />
   if (hasPermission('billing:view')) {
-    return <Navigate to={`/billing/clients/${clientId}/account`} replace />
+    return <Navigate to={billingPath(audience, clientId, 'account')} replace />
   }
-  if (hasPermission('platform:packages:manage')) {
-    return <Navigate to={`/billing/clients/${clientId}/subscriptions`} replace />
-  }
-
-  if (hasPermission('platform:billing:reconcile')) return <Navigate to={`/billing/clients/${clientId}/reconciliation`} replace />
   return <ClientContextUnavailable />
 }
 
@@ -85,7 +81,7 @@ function CanonicalBillingAccountPage({
 
   return (
     <div className="mx-auto min-w-0 max-w-7xl">
-      <Breadcrumbs items={accountBreadcrumbs(clientId)} />
+      <Breadcrumbs items={useAccountBreadcrumbs(clientId)} />
       <BillingWorkspaceNav clientId={clientId} />
       <div className="mb-6 flex min-w-0 flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
@@ -161,7 +157,7 @@ function DurableBillingAccountPage({
 
   return (
     <div className="mx-auto min-w-0 max-w-7xl">
-      <Breadcrumbs items={accountBreadcrumbs(clientId)} />
+      <Breadcrumbs items={useAccountBreadcrumbs(clientId)} />
       <BillingWorkspaceNav clientId={clientId} />
       <div className="mb-6 min-w-0">
         <h1 className="text-2xl font-bold text-foreground">Account overview</h1>
@@ -209,7 +205,7 @@ function BillingAccountRoute({ clientId }: { clientId: string }) {
 }
 
 export function BillingAccountPage() {
-  const {user,hasPermission}=useAuth()
+  const {user,hasPermission,audience}=useAuth()
   const { clientId: routeClientId } = useParams()
   const clientId = canonicalizeGuid(routeClientId)
   if(clientId && user && canonicalizeGuid(user.clientId)!==clientId && !hasPermission('platform:billing:view'))
@@ -218,7 +214,7 @@ export function BillingAccountPage() {
 
   if (!clientId) return <ClientContextUnavailable />
   if (routeClientId !== clientId) {
-    return <Navigate to={`/billing/clients/${clientId}/account`} replace />
+    return <Navigate to={billingPath(audience, clientId, 'account')} replace />
   }
 
   return <BillingAccountRoute clientId={clientId} />
