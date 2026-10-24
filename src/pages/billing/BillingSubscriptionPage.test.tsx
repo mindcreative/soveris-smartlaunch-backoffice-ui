@@ -4,7 +4,8 @@ import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../../App'
-import { billingApi } from '../../api/billingApi'
+import { billingApi, ClientCapabilitiesContractError, parseClientCapabilities } from '../../api/billingApi'
+import freemiumCapabilities from '../../test/fixtures/customer-freemium-capabilities.json'
 import { queryClient } from '../../queryClient'
 import { billingSubscriptionKeys } from '../../queries/billingQueries'
 import { useAuthStore } from '../../stores/authStore'
@@ -67,6 +68,39 @@ describe('Billing subscription route and page state', () => {
     queryClient.clear()
     localStorage.clear()
     authenticate()
+  })
+
+  it('shows the workspace empty state with the shipping zero-limit freemium response', async () => {
+    useAuthStore.setState({ user: { ...useAuthStore.getState().user!, platformPermissions: [] } })
+    vi.spyOn(billingApi, 'getSubscriptionState').mockResolvedValue(emptyState())
+    vi.spyOn(billingApi, 'getAccountSnapshot').mockResolvedValue(account())
+    vi.spyOn(billingApi, 'getClientCapabilities').mockImplementation(async () =>
+      parseClientCapabilities(JSON.stringify({ ...freemiumCapabilities, clientId: CLIENT_ID }), CLIENT_ID))
+    window.history.replaceState({}, '', `/billing/clients/${CLIENT_ID}/subscriptions`)
+
+    render(<App />)
+
+    expect(await screen.findByText('customer_freemium')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'No current subscription' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Subscription state unavailable' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Create subscription' })).not.toBeInTheDocument()
+  })
+
+  it('identifies capability validation failures without labeling the subscription response invalid', async () => {
+    useAuthStore.setState({ user: { ...useAuthStore.getState().user!, platformPermissions: [] } })
+    vi.spyOn(billingApi, 'getSubscriptionState').mockResolvedValue(emptyState())
+    vi.spyOn(billingApi, 'getAccountSnapshot').mockResolvedValue(account())
+    vi.spyOn(billingApi, 'getClientCapabilities').mockRejectedValue(
+      new ClientCapabilitiesContractError('private diagnostic must not be displayed'))
+    window.history.replaceState({}, '', `/billing/clients/${CLIENT_ID}/subscriptions`)
+
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Capability policy unavailable' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Subscription state unavailable' })).not.toBeInTheDocument()
+    expect(screen.queryByText('private diagnostic must not be displayed')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'No current subscription' })).not.toBeInTheDocument()
+    await waitFor(() => expect(queryClient.getQueryData(billingSubscriptionKeys.state(CLIENT_ID))).toBeUndefined())
   })
 
   it('renders creation only for an active configured account with no current subscription', async () => {

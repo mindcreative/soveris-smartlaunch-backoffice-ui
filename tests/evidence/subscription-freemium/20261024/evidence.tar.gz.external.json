@@ -1,0 +1,227 @@
+{
+  "schema": "soveris-evidence/v1",
+  "repository": "soveris-smartlaunch-backoffice-ui",
+  "original_path": "tests/evidence/subscription-freemium/20261024/evidence.tar.gz",
+  "sha256": "1e7f03137aac9a37e21fd78bb9778508e7c26231dcddd480d59ca04c70c65be9",
+  "size": 286202,
+  "object_key": "objects/soveris-smartlaunch-backoffice-ui/tests/evidence/subscription-freemium/20261024/evidence.tar.gz/1e7f03137aac9a37e21fd78bb9778508e7c26231dcddd480d59ca04c70c65be9/archive",
+  "members": [
+    {
+      "path": "run",
+      "type": "directory"
+    },
+    {
+      "path": "run/billing-regression.log",
+      "type": "file",
+      "size": 411,
+      "sha256": "759ea61fc93a0b1d4baa06c7af1695824d52648ea8fdef3c3b2943efe7fb12ad"
+    },
+    {
+      "path": "run/browser-diagnostic.log",
+      "type": "file",
+      "size": 1726,
+      "sha256": "90ed7ba3215752c1d37ceaf5ec2f745f5cbd1990ae232f629be0e3378ecb21a2"
+    },
+    {
+      "path": "run/browser-result.json",
+      "type": "file",
+      "size": 616,
+      "sha256": "7183499b2a5dd611fb259bc5b72ed5ff32552d7414ca28a63103bb6b9f6b10d6"
+    },
+    {
+      "path": "run/browser-successor.log",
+      "type": "file",
+      "size": 346,
+      "sha256": "2fbf876bc4aad813bf2048c6610cf1020893cf17db571d260fbe0b7fec80a47c"
+    },
+    {
+      "path": "run/browser.log",
+      "type": "file",
+      "size": 1615,
+      "sha256": "31fdab404d9171da071ea24bd14e4a82da06b7766b31d544868c98a29bea07f4"
+    },
+    {
+      "path": "run/build.log",
+      "type": "file",
+      "size": 1332,
+      "sha256": "4b3759f6a6c62e17b74161bd70bc4e4674f6c78a284a6b9a148e947057c87cfc"
+    },
+    {
+      "path": "run/capabilities.json",
+      "type": "file",
+      "size": 4313,
+      "sha256": "9b1b023e6acf2cd662ba80a0cebf7e9cd1cbed9fa7c55bb0245d8cab72517854"
+    },
+    {
+      "path": "run/cleanup-plan.json",
+      "type": "file",
+      "size": 1215,
+      "sha256": "2762b9219a7b73cd0e788d291a1f89f40326201ee1823d523a9c2f6e5d53dc3d"
+    },
+    {
+      "path": "run/final-identities.json",
+      "type": "file",
+      "size": 1583,
+      "sha256": "de91514234aabfcec2b6742559be8547ea4b78d333210c7d52e44f1d67738920"
+    },
+    {
+      "path": "run/green.log",
+      "type": "file",
+      "size": 445,
+      "sha256": "a23b0646dbd130527c01f8a977355c9b624e7885aedde31a8c43f2854e4dd81d"
+    },
+    {
+      "path": "run/pre-review-inventory.json",
+      "type": "file",
+      "size": 3302,
+      "sha256": "ea291853ca6fded0c04d4c8a446e5a8d270b411646b2d5e182f0bc017385ca04"
+    },
+    {
+      "path": "run/red-source-identities.json",
+      "type": "file",
+      "size": 568,
+      "sha256": "2fab1f777d63545d58cadc7723758fbc5a206b5c1aa77010dd924daccfe941dc"
+    },
+    {
+      "path": "run/red.log",
+      "type": "file",
+      "size": 31842,
+      "sha256": "cef730bccaeed02b3d005fc4b457639cfc40fa7d3d0bb1a5d854834090b81597"
+    },
+    {
+      "path": "run/source",
+      "type": "directory"
+    },
+    {
+      "path": "run/source/before",
+      "type": "directory"
+    },
+    {
+      "path": "run/source/before/src",
+      "type": "directory"
+    },
+    {
+      "path": "run/source/before/src/api",
+      "type": "directory"
+    },
+    {
+      "path": "run/source/before/src/api/billingApi.ts",
+      "type": "file",
+      "size": 138622,
+      "sha256": "959ce937e810bdfaeecf2ba30137ab463b1af9d636bd05050928683f64ad03bd"
+    },
+    {
+      "path": "run/source/before/src/pages",
+      "type": "directory"
+    },
+    {
+      "path": "run/source/before/src/pages/billing",
+      "type": "directory"
+    },
+    {
+      "path": "run/source/before/src/pages/billing/BillingSubscriptionPage.tsx",
+      "type": "file",
+      "size": 29570,
+      "sha256": "cd1c665500897d0ad631e23eb200436d437dfc10cf7fa5c2450741b738532736"
+    },
+    {
+      "path": "run/source/final",
+      "type": "directory"
+    },
+    {
+      "path": "run/source/final/src",
+      "type": "directory"
+    },
+    {
+      "path": "run/source/final/src/api",
+      "type": "directory"
+    },
+    {
+      "path": "run/source/final/src/api/billingApi.test.ts",
+      "type": "file",
+      "size": 50928,
+      "sha256": "d22deaae1d362fe4aa5c8f463680fb9e63ef27f1728c27769f94d9cedf97dad8"
+    },
+    {
+      "path": "run/source/final/src/api/billingApi.ts",
+      "type": "file",
+      "size": 138777,
+      "sha256": "9ae4ad43d2cc4b2be78f5cfb95b74217755884bd14480def1001ea7703a4c8fe"
+    },
+    {
+      "path": "run/source/final/src/pages",
+      "type": "directory"
+    },
+    {
+      "path": "run/source/final/src/pages/billing",
+      "type": "directory"
+    },
+    {
+      "path": "run/source/final/src/pages/billing/BillingSubscriptionPage.test.tsx",
+      "type": "file",
+      "size": 15672,
+      "sha256": "24e910c19bfcb5cecde34de923a79cc64463df97b7bb93b569e9844b39d8f06f"
+    },
+    {
+      "path": "run/source/final/src/pages/billing/BillingSubscriptionPage.tsx",
+      "type": "file",
+      "size": 30106,
+      "sha256": "02f5939a5b2ed25042abd0bcc89c77749fb3e52fe320304d7c443ece06295686"
+    },
+    {
+      "path": "run/source/final/src/test",
+      "type": "directory"
+    },
+    {
+      "path": "run/source/final/src/test/fixtures",
+      "type": "directory"
+    },
+    {
+      "path": "run/source/final/src/test/fixtures/customer-freemium-capabilities.json",
+      "type": "file",
+      "size": 6053,
+      "sha256": "63a7486f58122ea7dfa20ed66d5bae03d7a83b258e9169cb0782624e91f3ec20"
+    },
+    {
+      "path": "run/subscriptions-fixed.png",
+      "type": "file",
+      "size": 216550,
+      "sha256": "0b43fddea5cf24a2bf12038218bedd88193357330a041864164d5f235f75db37"
+    },
+    {
+      "path": "run/subscriptions.json",
+      "type": "file",
+      "size": 242,
+      "sha256": "1cb0cfdc0e2983d7cdacc464cfc47e367d2bbbb1cb990ad399cfe2580ff881cd"
+    },
+    {
+      "path": "run/verification-summary.json",
+      "type": "file",
+      "size": 1266,
+      "sha256": "e41aead5bfb277bd4f14a265647e3bf76b0a190e32044d76ef07ffd25efc57e2"
+    },
+    {
+      "path": "run/verify-browser-diagnostic.cjs",
+      "type": "file",
+      "size": 2824,
+      "sha256": "e300263d68cc9689b71e69f813f5602a333ed031f909067a7cec8c721d44b21a"
+    },
+    {
+      "path": "run/verify-browser.cjs",
+      "type": "file",
+      "size": 2824,
+      "sha256": "c16fb45e78aa1e6c5fd30530df94d211c32dc2edf3c66e24ffe28c439bc482ac"
+    }
+  ],
+  "verification": {
+    "status": "PASS",
+    "backup_uuid": "24CE9E8FCE9E593E",
+    "copies_verified": [
+      "primary",
+      "backup"
+    ],
+    "restored_from": "backup",
+    "members_verified": 39,
+    "checked_at": "2026-10-24T19:46:50.181974+00:00"
+  }
+}

@@ -121,7 +121,7 @@ function TerminalHistory({ state, hasNextPage, isLoadingMore, continuationError,
 }
 
 type DurableSubscriptionError = {
-  source: 'subscription' | 'account' | 'permission'
+  source: 'subscription' | 'account' | 'permission' | 'capabilities'
   error: Error | ApiError
 }
 
@@ -129,7 +129,7 @@ function WorkspaceCapabilities({ clientId, onDurableError }: { clientId: string;
   const query = useClientCapabilities(clientId)
   useEffect(() => {
     if (query.error && (query.error instanceof ClientCapabilitiesContractError || [401,403].includes(errorStatus(query.error) ?? 0)))
-      onDurableError({source:'subscription', error:query.error})
+      onDurableError({source:'capabilities', error:query.error})
   }, [query.error, onDurableError])
   return <CapabilityPolicyContext clientId={clientId} capabilities={query.data} isLoading={query.isPending} isFetching={query.isFetching} error={query.error} onRetry={() => void query.refetch()} />
 }
@@ -343,6 +343,12 @@ function PermissionAwareSubscriptionPage({ clientId }: { clientId: string }) {
     let content: React.ReactNode
     if (durable.source === 'permission') {
       content = <Forbidden message="Subscription permission is no longer available. Private subscription data was removed." />
+    } else if (durable.source === 'capabilities') {
+      content = status === 403
+        ? <Forbidden message="The server denied access to Client capability policy evidence." />
+        : status === 401
+          ? <ErrorDisplay message="Session ended" detail="Sign in again to request private Client capability policy evidence." />
+          : <ErrorDisplay message="Capability policy unavailable" detail="The server response did not match the Client capabilities contract. No policy values have been displayed." />
     } else if (durable.source === 'subscription' && status === 403) {
       content = <Forbidden message="The server denied subscription access for this Client." />
     } else if (durable.source === 'subscription' && status === 401) {

@@ -549,7 +549,9 @@ export function parseClientCapabilities(text: string, expectedClientId: string):
     const key = value.key as ClientCapabilityLimitKey
     const unit = CAPABILITY_LIMIT_UNITS.get(key)!
     if (value.unit !== unit) throw capabilityError('limit or usage unit is invalid')
-    const base = { key, unit, value: readCapabilityInt64(value.value, measured ? 'usage.value' : 'limit.value', !measured) }
+    const allowsZero = measured || (policySource === 'customer_freemium' &&
+      (key === 'requests_per_minute' || key === 'concurrent_ai_operations'))
+    const base = { key, unit, value: readCapabilityInt64(value.value, measured ? 'usage.value' : 'limit.value', !allowsZero) }
     if (!measured) return base
     const measuredAt = readCapabilityInstant(value.measuredAt, 'measuredAt')
     if (!isLocalWall(measuredAt) && Date.parse(measuredAt) > Date.parse(evaluatedAt))

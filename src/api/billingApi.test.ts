@@ -1,6 +1,7 @@
 import { clientFixturePermissions } from '../test/authorityFixtures'
 import { useAuthStore } from '../stores/authStore'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import freemiumCapabilities from '../test/fixtures/customer-freemium-capabilities.json'
 import { apiClient } from './apiClient'
 import {
   BillingSubscriptionContractError,
@@ -169,6 +170,35 @@ function capabilitiesJson(overrides: Record<string, unknown> = {}): string {
 }
 
 describe('Client capabilities adapter', () => {
+  it('accepts the shipping freemium response with zero AI rate and concurrency limits', () => {
+    const result = parseClientCapabilities(JSON.stringify(freemiumCapabilities), freemiumCapabilities.clientId)
+    expect(result.policySource).toBe('customer_freemium')
+    expect(result.subscription).toBeNull()
+    expect(result.limits.filter((limit) => limit.value === '0').map((limit) => limit.key))
+      .toEqual(['requests_per_minute', 'concurrent_ai_operations'])
+    expect(result.operations.find((operation) => operation.key === 'ai_content_generation'))
+      .toMatchObject({ outcome: 'denied', resourceLimit: 'denied' })
+  })
+
+  it.each([
+    ['customer_freemium', 'active_products', 0],
+    ['customer_freemium', 'requests_per_minute', -1],
+    ['customer_freemium', 'concurrent_ai_operations', -1],
+    ['customer_subscription', 'requests_per_minute', 0],
+    ['customer_subscription', 'concurrent_ai_operations', 0],
+    ['internal', 'requests_per_minute', 0],
+    ['internal', 'concurrent_ai_operations', 0],
+  ])('rejects invalid limits for %s: %s = %s', (policySource, key, value) => {
+    const payload = JSON.parse(capabilitiesJson())
+    payload.policySource = policySource
+    if (policySource === 'customer_freemium' || policySource === 'internal') payload.subscription = null
+    if (policySource === 'internal') payload.classification = 'soveris_internal'
+    payload.limits = payload.limits.map((limit: { key: string; value: number }) =>
+      limit.key === key ? { ...limit, value } : limit)
+    expect(() => parseClientCapabilities(JSON.stringify(payload), CLIENT_ID))
+      .toThrow(`limit.value must be a JSON non-negative Int64`)
+  })
+
   it('preserves every Int64 lexeme as an exact decimal string', () => {
     const result = parseClientCapabilities(capabilitiesJson(), CLIENT_ID)
     expect(result.classificationRevision).toBe('9223372036854775807')

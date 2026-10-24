@@ -1,0 +1,249 @@
+{
+  "clientId": "98b71ac3-7f62-4ac8-9b28-30444993a001",
+  "classificationSource": "back_office.clients",
+  "classification": "customer",
+  "classificationRevision": 0,
+  "policySource": "customer_freemium",
+  "policyVersion": "epic5-local-v1",
+  "subscription": null,
+  "flags": [
+    {
+      "key": "manual_content_editing",
+      "enabled": true
+    },
+    {
+      "key": "ordinary_image_upload",
+      "enabled": true
+    },
+    {
+      "key": "ai_content_generation",
+      "enabled": false
+    },
+    {
+      "key": "ai_image_generation",
+      "enabled": false
+    },
+    {
+      "key": "ai_source_ingestion",
+      "enabled": false
+    },
+    {
+      "key": "client_domain_binding",
+      "enabled": true
+    },
+    {
+      "key": "product_domain_binding",
+      "enabled": true
+    },
+    {
+      "key": "analytics",
+      "enabled": true
+    },
+    {
+      "key": "ab_testing",
+      "enabled": true
+    }
+  ],
+  "limits": [
+    {
+      "key": "active_products",
+      "unit": "count",
+      "value": 3
+    },
+    {
+      "key": "hostnames",
+      "unit": "count",
+      "value": 10
+    },
+    {
+      "key": "storage_bytes",
+      "unit": "bytes",
+      "value": 67108864
+    },
+    {
+      "key": "requests_per_minute",
+      "unit": "requests_per_minute",
+      "value": 0
+    },
+    {
+      "key": "concurrent_ai_operations",
+      "unit": "count",
+      "value": 0
+    },
+    {
+      "key": "retention_days",
+      "unit": "days",
+      "value": 30
+    }
+  ],
+  "usage": [
+    {
+      "key": "active_products",
+      "unit": "count",
+      "value": 0,
+      "measuredAt": "2026-10-24T19:42:32.671735"
+    },
+    {
+      "key": "hostnames",
+      "unit": "count",
+      "value": 0,
+      "measuredAt": "2026-10-24T19:42:32.671735"
+    },
+    {
+      "key": "storage_bytes",
+      "unit": "bytes",
+      "value": 0,
+      "measuredAt": "2026-10-24T19:42:32.671735"
+    },
+    {
+      "key": "requests_per_minute",
+      "unit": "requests_per_minute",
+      "value": 0,
+      "measuredAt": "2026-10-24T19:42:32.671735"
+    },
+    {
+      "key": "concurrent_ai_operations",
+      "unit": "count",
+      "value": 0,
+      "measuredAt": "2026-10-24T19:42:32.671735"
+    },
+    {
+      "key": "retention_days",
+      "unit": "days",
+      "value": 0,
+      "measuredAt": "2026-10-24T19:42:32.671735"
+    }
+  ],
+  "operations": [
+    {
+      "key": "manual_content_editing",
+      "outcome": "eligible",
+      "permission": "satisfied",
+      "feature": "satisfied",
+      "entitlement": "not_applicable",
+      "resourceLimit": "satisfied",
+      "provider": "not_applicable",
+      "pricing": "not_applicable",
+      "funding": "not_applicable",
+      "denialConditions": []
+    },
+    {
+      "key": "ordinary_image_upload",
+      "outcome": "eligible",
+      "permission": "satisfied",
+      "feature": "satisfied",
+      "entitlement": "not_applicable",
+      "resourceLimit": "satisfied",
+      "provider": "not_applicable",
+      "pricing": "not_applicable",
+      "funding": "not_applicable",
+      "denialConditions": []
+    },
+    {
+      "key": "ai_content_generation",
+      "outcome": "denied",
+      "permission": "satisfied",
+      "feature": "denied",
+      "entitlement": "denied",
+      "resourceLimit": "denied",
+      "provider": "unavailable",
+      "pricing": "unavailable",
+      "funding": "zero_available",
+      "denialConditions": [
+        "feature_not_available",
+        "entitlement_not_available",
+        "limit_reached",
+        "provider_unavailable",
+        "pricing_unavailable",
+        "insufficient_credits"
+      ]
+    },
+    {
+      "key": "ai_image_generation",
+      "outcome": "denied",
+      "permission": "satisfied",
+      "feature": "denied",
+      "entitlement": "denied",
+      "resourceLimit": "denied",
+      "provider": "unavailable",
+      "pricing": "satisfied",
+      "funding": "zero_available",
+      "denialConditions": [
+        "feature_not_available",
+        "entitlement_not_available",
+        "limit_reached",
+        "provider_unavailable",
+        "insufficient_credits"
+      ]
+    },
+    {
+      "key": "ai_source_ingestion",
+      "outcome": "denied",
+      "permission": "satisfied",
+      "feature": "denied",
+      "entitlement": "denied",
+      "resourceLimit": "denied",
+      "provider": "unavailable",
+      "pricing": "unavailable",
+      "funding": "zero_available",
+      "denialConditions": [
+        "feature_not_available",
+        "entitlement_not_available",
+        "limit_reached",
+        "provider_unavailable",
+        "pricing_unavailable",
+        "insufficient_credits"
+      ]
+    },
+    {
+      "key": "client_domain_binding",
+      "outcome": "eligible",
+      "permission": "satisfied",
+      "feature": "satisfied",
+      "entitlement": "not_applicable",
+      "resourceLimit": "satisfied",
+      "provider": "not_applicable",
+      "pricing": "not_applicable",
+      "funding": "not_applicable",
+      "denialConditions": []
+    },
+    {
+      "key": "product_domain_binding",
+      "outcome": "eligible",
+      "permission": "satisfied",
+      "feature": "satisfied",
+      "entitlement": "not_applicable",
+      "resourceLimit": "satisfied",
+      "provider": "not_applicable",
+      "pricing": "not_applicable",
+      "funding": "not_applicable",
+      "denialConditions": []
+    },
+    {
+      "key": "analytics",
+      "outcome": "eligible",
+      "permission": "satisfied",
+      "feature": "satisfied",
+      "entitlement": "not_applicable",
+      "resourceLimit": "satisfied",
+      "provider": "not_applicable",
+      "pricing": "not_applicable",
+      "funding": "not_applicable",
+      "denialConditions": []
+    },
+    {
+      "key": "ab_testing",
+      "outcome": "eligible",
+      "permission": "satisfied",
+      "feature": "satisfied",
+      "entitlement": "not_applicable",
+      "resourceLimit": "satisfied",
+      "provider": "not_applicable",
+      "pricing": "not_applicable",
+      "funding": "not_applicable",
+      "denialConditions": []
+    }
+  ],
+  "evaluatedAt": "2026-10-24T19:42:32.671735",
+  "nextBoundary": null
+}
