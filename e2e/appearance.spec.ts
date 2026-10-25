@@ -263,7 +263,7 @@ for (const path of ['/login', '/log%69n', '/%6cogin', '/dashboard', '/forbidden'
   expect(await page.locator('#root').textContent()).toBe('')
   expect(await page.locator('html').evaluate(el => getComputedStyle(el).backgroundColor)).toBe(expected === 'dark' ? 'rgb(17, 29, 43)' : 'rgb(244, 247, 250)')
   await page.screenshot({ path: info.outputPath(`prepaint-${stored}.png`) })
-  release(); await expect(isLogin ? page.getByRole('button', { name: 'Sign in', exact: true }) : path === '/dashboard' ? page.getByText('1,248') : page.getByRole('heading', { name: '403 — Access Denied' })).toBeVisible()
+  release(); await expect(isLogin ? page.getByRole('button', { name: 'Sign out to continue', exact: true }) : path === '/dashboard' ? page.getByText('1,248') : page.getByRole('heading', { name: '403 — Access Denied' })).toBeVisible()
   await expect(page.locator('html')).toHaveAttribute('data-theme', !isLogin && (stored === 'light' || stored === 'dark') ? stored : expected); await scan(page)
   if (isLogin) {
     const opposite = info.project.name === 'light' ? 'dark' : 'light'

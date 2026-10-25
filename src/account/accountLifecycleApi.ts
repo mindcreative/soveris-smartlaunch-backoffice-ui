@@ -1,0 +1,68 @@
+import { apiClient } from '../api/apiClient'
+import { ACCOUNT_ENDPOINTS, ACCOUNT_LIMITS, ACCOUNT_PROOF_PATTERN } from './constants/accountLifecycle'
+import type { AccountVerificationResponse, CorrectAccountEmailRequest, ForgotAccountPasswordRequest, PendingAccountRequest,
+  PendingAccountResponse, RegisterAccountRequest, ResetAccountPasswordRequest, VerifyAccountRequest } from './models/accountLifecycle'
+
+function invalidResponse(): never {
+  throw { code: 'account_flow_uncertain', message: 'The account result could not be confirmed.' }
+}
+
+async function submit<Response>(path: string, body: unknown, signal?: AbortSignal): Promise<Response> {
+  const response = await apiClient.post<Response>(path, body, { signal, retryOnUnauthorized: false })
+
+  return response.data
+}
+
+export const accountLifecycleApi = {
+  async register(request: RegisterAccountRequest, signal?: AbortSignal): Promise<PendingAccountResponse> {
+    const result = await submit<PendingAccountResponse>(ACCOUNT_ENDPOINTS.register, request, signal)
+
+    if (result?.status !== 'check_email' || !ACCOUNT_PROOF_PATTERN.test(result.pendingToken) ||
+      !Number.isSafeInteger(result.expiresIn) || result.expiresIn <= 0 || result.expiresIn > ACCOUNT_LIMITS.pendingSeconds) {
+      return invalidResponse()
+    }
+
+    return { status: 'check_email', pendingToken: result.pendingToken, expiresIn: result.expiresIn }
+  },
+  async resend(request: PendingAccountRequest, signal?: AbortSignal): Promise<void> {
+    const result = await submit<{ status: string }>(ACCOUNT_ENDPOINTS.resend, request, signal)
+
+    if (result?.status !== 'check_email') {
+      invalidResponse()
+    }
+  },
+  async correctEmail(request: CorrectAccountEmailRequest, signal?: AbortSignal): Promise<void> {
+    const result = await submit<{ status: string }>(ACCOUNT_ENDPOINTS.correctEmail, request, signal)
+
+    if (result?.status !== 'check_email') {
+      invalidResponse()
+    }
+  },
+  async verify(request: VerifyAccountRequest, signal?: AbortSignal): Promise<AccountVerificationResponse> {
+    const result = await submit<AccountVerificationResponse>(ACCOUNT_ENDPOINTS.verify, request, signal)
+
+    if (result?.status === 'activation_complete' && result.loginRequired === true) {
+      return { status: 'activation_complete', loginRequired: true }
+    }
+
+    if (result?.status !== 'activated' || !result.session) {
+      return invalidResponse()
+    }
+
+    return { status: 'activated', session: result.session, nextAction: result.nextAction }
+  },
+  async forgot(request: ForgotAccountPasswordRequest, signal?: AbortSignal): Promise<void> {
+    const result = await submit<{ status: string }>(ACCOUNT_ENDPOINTS.forgot, request, signal)
+
+    if (result?.status !== 'instructions_requested') {
+      invalidResponse()
+    }
+  },
+  async reset(request: ResetAccountPasswordRequest, signal?: AbortSignal): Promise<void> {
+    const result = await submit<{ status: string; loginRequired: boolean }>(ACCOUNT_ENDPOINTS.reset, request, signal)
+
+    if (result?.status !== 'password_reset' || result.loginRequired !== true) {
+      invalidResponse()
+    }
+  },
+}

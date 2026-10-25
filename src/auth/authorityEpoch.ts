@@ -8,6 +8,7 @@ export function authorityTokenIsCurrent(token: string | null): boolean {
 export function currentAuthorityEpoch(): number { return epoch }
 export function retireAuthority(): number {
   epoch++
+  window.dispatchEvent(new CustomEvent('auth:retired'))
   for (const url of privateUrls) URL.revokeObjectURL(url)
   privateUrls.clear()
   return epoch

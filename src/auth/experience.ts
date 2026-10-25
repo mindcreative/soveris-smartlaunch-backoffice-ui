@@ -67,11 +67,32 @@ export function experienceRoute(pathname: string, user: Authority): ExperienceRo
 }
 export function safeReturnPath(from: unknown, user: Authority): string {
   const fallback = permittedLanding(user)
-  if (typeof from !== 'string' || !from.startsWith('/') || from.startsWith('//') || /[\\\u0000-\u0020]/.test(from)) return fallback
+
+  if (typeof from !== 'string' || !/^\/[a-zA-Z0-9/-]+$/.test(from)) {
+    return fallback
+  }
+
+  const segments = from.slice(1).split('/')
+
+  if (segments.some(segment => !segment) || from !== from.toLowerCase()) {
+    return fallback
+  }
+
+  if (segments[0] === 'workspace-access' && segments.length !== 1) {
+    return fallback
+  }
+
   try {
     const url = new URL(from, 'https://workspace.invalid')
-    if (url.origin !== 'https://workspace.invalid') return fallback
+
+    if (url.origin !== 'https://workspace.invalid' || url.pathname !== from || url.search || url.hash) {
+      return fallback
+    }
+
     const route = experienceRoute(url.pathname, user)
-    return route.allowed ? `${route.redirect ?? url.pathname}${url.search}${url.hash}` : fallback
-  } catch { return fallback }
+
+    return route.allowed ? route.redirect ?? url.pathname : fallback
+  } catch {
+    return fallback
+  }
 }

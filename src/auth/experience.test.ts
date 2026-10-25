@@ -56,7 +56,19 @@ describe('experience route inventory', () => {
     expect(permittedLanding(editor)).toBe('/products')
     for (const from of ['/dashboard','//example.com','/\\example.com','https://example.com','/platform/health','/unknown','/products/unknown'])
       expect(safeReturnPath(from,editor)).toBe('/products')
-    expect(safeReturnPath('/products?draft=1#editor',editor)).toBe('/products?draft=1#editor')
+    expect(safeReturnPath('/products?draft=1#editor',actor(['submissions:view','products:view']))).toBe('/products')
     expect(permittedLanding(actor())).toBe('/workspace-access')
+  })
+  it.each(['/products?draft=1', '/products#editor', '/%70roducts', '/products/', '/products//',
+    '/products/../submissions', '/products/%2e%2e/submissions', '/products/%252fadmin', '/products\\other',
+    '/products\u007f', '/products\n', '//elsewhere.test/products', 'https://elsewhere.test/products', '/workspace-access/unknown'])
+  ('rejects supplied noncanonical return input: %s', from => {
+    expect(safeReturnPath(from, actor(['submissions:view', 'products:view']))).toBe('/products')
+  })
+  it('preserves a literal authorized target and an independently authorized operational mapping', () => {
+    expect(safeReturnPath('/submissions', actor(['products:view', 'submissions:view']))).toBe('/submissions')
+    expect(safeReturnPath(`/billing/clients/${foreign}/account`, actor(['products:view'], ['platform:billing:view'])))
+      .toBe(`/platform/clients/${foreign}/account`)
+    expect(safeReturnPath(`/billing/clients/${foreign}/account`, actor(['products:view', 'billing:view']))).toBe('/products')
   })
 })

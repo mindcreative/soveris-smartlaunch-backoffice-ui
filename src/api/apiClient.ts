@@ -1,6 +1,8 @@
 import { AuthorityChangedError, authorityTokenIsCurrent, currentAuthorityEpoch } from '../auth/authorityEpoch'
 import { normalizeRemovalProblem } from './productRemovalProblem'
 import { normalizeDomainProblem } from './domainProblem'
+import { ACCOUNT_ENDPOINTS } from '../account/constants/accountLifecycle'
+import { normalizeAccountError } from '../account/accountLifecycleError'
 import axios, {
   type AxiosInstance,
   type AxiosRequestConfig,
@@ -21,6 +23,8 @@ export interface ApiError {
   errors?: ApiProblemValidationIssue[]
   problemDetails?: ApiErrorResponse
   retryAfterSeconds?: number
+  loginRequired?: boolean
+  correlationId?: string
 }
 
 export interface ApiProblemValidationIssue {
@@ -151,12 +155,15 @@ export class ApiClient {
         const scoped=config as InternalAxiosRequestConfig & { authorityEpoch?: number }; scoped.authorityEpoch=currentAuthorityEpoch()
         const token = this.getAccessToken()
         const authorityLookup=config.url?.endsWith('/auth/current')
-        const publicAuth=['/auth/login','/auth/refresh','/auth/revoke'].some(path=>config.url?.endsWith(path))
+        const lifecycle = Object.values(ACCOUNT_ENDPOINTS).some(path => config.url === path)
+        const publicAuth=lifecycle || ['/auth/login','/auth/refresh','/auth/revoke'].some(path=>config.url?.endsWith(path))
         if(!authorityLookup && !publicAuth && !authorityTokenIsCurrent(token)) {
           window.dispatchEvent(new CustomEvent('auth:storage-changed'))
           throw new AuthorityChangedError()
         }
-        if (token) {
+        if (lifecycle) {
+          config.headers.delete('Authorization')
+        } else if (token) {
           config.headers.set('Authorization', `Bearer ${token}`)
         }
         return config
@@ -193,7 +200,8 @@ export class ApiClient {
           return Promise.reject(new AuthorityChangedError())
         }
         const status=error.response?.status
-        const authPublic=['/auth/login','/auth/refresh','/auth/revoke'].some(path=>originalRequest?.url?.endsWith(path))
+        const lifecycle = Object.values(ACCOUNT_ENDPOINTS).some(path => originalRequest?.url === path)
+        const authPublic=lifecycle || ['/auth/login','/auth/refresh','/auth/revoke'].some(path=>originalRequest?.url?.endsWith(path))
         let problemBody=error.response?.data
         if(problemBody instanceof Blob && problemBody.size<=65536) {
           try {problemBody=await problemBody.text()} catch { /* Keep the bounded generic failure. */ }
@@ -246,6 +254,17 @@ export class ApiClient {
   }
 
   public normalizeError(error: unknown): ApiError {
+    if (error && typeof error === 'object') {
+      const transport = error as { config?: { url?: string }; response?: AxiosResponse<unknown> }
+      const path = transport.config?.url ?? transport.response?.config?.url
+      const lifecycle = Object.values(ACCOUNT_ENDPOINTS).some(endpoint => endpoint === path)
+
+      if (lifecycle) {
+        return normalizeAccountError(decodeErrorBody(transport.response?.data), transport.response?.status,
+          transport.response?.headers?.['retry-after'], transport.response?.headers?.['x-correlation-id'])
+      }
+    }
+
     if (isApiError(error)) {
       return error
     }

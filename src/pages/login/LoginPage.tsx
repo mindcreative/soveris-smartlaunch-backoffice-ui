@@ -1,122 +1,131 @@
-import { CircleAlert, LoaderCircle } from 'lucide-react'
-import type { FC } from 'react'
-import { useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { safeReturnPath } from '../../auth/experience'
 import { useAuthStore } from '../../stores/authStore'
-import { useAuth } from '@/hooks/useAuth'
+import { useAuth } from '../../hooks/useAuth'
+import { AccountLayout } from '../../account/AccountLayout'
+import { PasswordField } from '../../account/PasswordField'
+import { useAccountClock } from '../../account/useAccountAction'
+import { ACCOUNT_BUTTON_CLASS, ACCOUNT_INPUT_CLASS, ACCOUNT_LIMITS, ACCOUNT_LINK_CLASS } from '../../account/constants/accountLifecycle'
+import type { ApiError } from '../../api/apiClient'
 
-const LoginPage: FC = () => {
+export default function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { login } = useAuth()
+  const { login, logout, isAuthenticated, isInitialized, accessToken } = useAuth()
+  const unavailable = useAuthStore(current => current.authorityUnavailable)
+  const now = useAccountClock()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [pending, setPending] = useState(false)
+  const [retryAt, setRetryAt] = useState(0)
+  const operation = useRef<AbortController | null>(null)
+  const summary = useRef<HTMLDivElement>(null)
+  const busy = useRef(false)
+  const state = location.state as { from?: unknown; accountOutcome?: unknown } | null
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  useEffect(() => () => operation.current?.abort(), [])
+
+  useEffect(() => {
+    const retire = () => setPassword('')
+    const hide = () => {
+      operation.current?.abort()
+      flushSync(() => setPassword(''))
+    }
+    window.addEventListener('auth:retired', retire)
+    window.addEventListener('pagehide', hide)
+
+    return () => {
+      window.removeEventListener('auth:retired', retire)
+      window.removeEventListener('pagehide', hide)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (error) {
+      summary.current?.focus()
+    }
+  }, [error])
+
+  async function submit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault()
+
+    if (busy.current || Date.now() < retryAt) {
+      return
+    }
+
+    if (!email || !password) {
+      event.currentTarget.querySelector<HTMLInputElement>(email ? '#password' : '#email')?.focus()
+      setError('Enter your email address and password.')
+
+      return
+    }
+
+    busy.current = true
     setError('')
-    setIsLoading(true)
+    setPending(true)
+    const controller = new AbortController()
+    operation.current = controller
 
     try {
-      await login(email, password)
-      navigate(safeReturnPath((location.state as {from?:unknown} | null)?.from, useAuthStore.getState().user), { replace: true })
-    } catch (err: unknown) {
-      if (err && typeof err === 'object' && 'message' in err) {
-        setError((err as { message: string }).message || 'Login failed. Please check your credentials.')
-      } else {
-        setError('Login failed. Please check your credentials.')
+      const accepted = await login(email, password, controller.signal)
+
+      if (!accepted || controller.signal.aborted) {
+        return
       }
+
+      setPassword('')
+      navigate(safeReturnPath(state?.from, useAuthStore.getState().user), { replace: true, state: null })
+    } catch (failure) {
+      if (controller.signal.aborted) {
+        return
+      }
+
+      const status = failure && typeof failure === 'object' && 'status' in failure ? failure.status : undefined
+      const retry = (failure as ApiError | undefined)?.retryAfterSeconds
+
+      if (status === 429 && typeof retry === 'number' && Number.isSafeInteger(retry) && retry > 0 && retry <= ACCOUNT_LIMITS.maximumRetrySeconds) {
+        setRetryAt(Date.now() + retry * 1000)
+      }
+
+      setPassword('')
+      setError(status === 401 ? 'Login failed. Check your email and password.'
+        : status === 429 ? 'Too many attempts. Wait before trying again.'
+          : 'Login is temporarily unavailable. Try again later.')
     } finally {
-      setIsLoading(false)
+      busy.current = false
+
+      if (!controller.signal.aborted) {
+        setPending(false)
+      }
     }
   }
 
-  return (
-    <div className="min-h-dvh bg-app flex items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
-      <div className="w-full max-w-sm">
-        {/* Card */}
-        <div className="bg-surface rounded-2xl shadow-sm border border-line overflow-hidden">
-          {/* Header */}
-          <div className="px-6 pt-8 text-center sm:px-8">
-            <div className="mx-auto mb-4 w-36" role="img" aria-label="Soveris">
-              <img src="/soveris-light.svg" alt="" className="brand-light h-auto w-full" />
-              <img src="/soveris-dark.svg" alt="" className="brand-dark h-auto w-full" />
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">SmartLaunch</h1>
-            <p className="mt-2 text-sm text-muted">Sign in to manage your workspace.</p>
-          </div>
+  if (!isInitialized) {
+    return <AccountLayout title="Checking current session"><p role="status">Restoring access…</p></AccountLayout>
+  }
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="px-6 pb-8 pt-6 space-y-5 sm:px-8">
-            {error && (
-              <div role="alert" className="bg-danger-soft border border-danger-line rounded-lg px-4 py-3 flex items-start gap-3">
-                <CircleAlert aria-hidden="true" className="w-5 h-5 text-danger shrink-0 mt-0.5" />
-                <p className="text-sm text-danger">{error}</p>
-              </div>
-            )}
+  if (isAuthenticated || accessToken || unavailable) {
+    return <AccountLayout title={isAuthenticated ? 'You are signed in' : 'Current session unavailable'} description="Sign out explicitly before logging in with another account.">
+      <button type="button" className={ACCOUNT_BUTTON_CLASS} onClick={() => void logout()}>Sign out to continue</button>
+    </AccountLayout>
+  }
 
-            {/* Email */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1.5">
-                Email address
-              </label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="block w-full px-3.5 py-2.5 border border-control rounded-lg shadow-sm placeholder-muted text-foreground focus:outline-none focus:ring-2 focus:ring-focus focus:border-transparent text-sm"
-                placeholder="you@example.com"
-              />
-            </div>
-
-            {/* Password */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1.5">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="block w-full px-3.5 py-2.5 border border-control rounded-lg shadow-sm placeholder-muted text-foreground focus:outline-none focus:ring-2 focus:ring-focus focus:border-transparent text-sm"
-                placeholder="••••••••"
-              />
-            </div>
-
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full flex justify-center items-center px-4 py-3 bg-primary-solid hover:bg-primary-hover text-on-accent text-sm font-medium rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isLoading ? (
-                <>
-                  <LoaderCircle aria-hidden="true" className="animate-spin -ml-1 mr-2 h-4 w-4 text-on-accent" />
-                  Signing in...
-                </>
-              ) : (
-                'Sign in'
-              )}
-            </button>
-          </form>
-        </div>
-
-        {/* Footer */}
-        <p className="mt-6 text-center text-xs text-muted">
-          &copy; {new Date().getFullYear()} Soveris SmartLaunch. All rights reserved.
-        </p>
+  return <AccountLayout title="Log in" description="Sign in to manage your workspace.">
+    {state?.accountOutcome === 'activation_complete' && <p role="status" className="text-sm">Activation completed, but the session could not be established. Log in normally to continue.</p>}
+    <form noValidate onSubmit={event => void submit(event)} className="space-y-4" aria-busy={pending}>
+      {error && <div id="login-error" ref={summary} role="alert" tabIndex={-1} className="rounded-lg border border-danger-line bg-danger-soft p-3 text-sm text-danger">{error}</div>}
+      <div><label htmlFor="email" className="block text-sm font-medium">Email address</label>
+        <input id="email" name="email" type="email" autoComplete="email" inputMode="email" autoCapitalize="none" spellCheck={false}
+          required value={email} onChange={event => setEmail(event.target.value)} aria-invalid={!!error} aria-describedby={error ? 'login-error' : undefined} className={ACCOUNT_INPUT_CLASS} />
       </div>
-    </div>
-  )
+      <PasswordField value={password} onChange={setPassword} errorSummaryId={error ? 'login-error' : undefined} />
+      <Link to="/forgot-password" className={ACCOUNT_LINK_CLASS}>Forgot password?</Link>
+      {pending && <p role="status" className="text-sm text-muted">Signing in…</p>}
+      {now < retryAt && <p role="status" className="text-sm text-muted">Wait at least {Math.ceil((retryAt - now) / 1000)} seconds before trying again.</p>}
+      <button type="submit" disabled={pending || now < retryAt} className={`${ACCOUNT_BUTTON_CLASS} w-full`}>{pending ? 'Signing in…' : 'Sign in'}</button>
+    </form>
+  </AccountLayout>
 }
-
-export default LoginPage

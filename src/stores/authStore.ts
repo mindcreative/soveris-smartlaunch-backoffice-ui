@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
-import type { AuthUser, UserRole } from '../types/auth'
+import type { AuthResponse, AuthUser, UserRole } from '../types/auth'
 import { authApi } from '../api/endpoints'
 import { hasPermission } from '../auth/permissions'
 import { parseCurrentAuthority } from '../auth/currentAuthority'
@@ -15,6 +15,7 @@ function clearPrivateState(): Promise<void> {
   queryClient.clear()
   return retiring
 }
+
 function tokens(access: string | null, refresh: string | null): void {
   try {
     if (access) localStorage.setItem('backoffice_access_token', access)
@@ -23,6 +24,35 @@ function tokens(access: string | null, refresh: string | null): void {
     else localStorage.removeItem('backoffice_refresh_token')
   } catch { /* Storage availability never confers authority. */ }
 }
+
+type StoredTokenSnapshot =
+  | { available: true; accessToken: string | null; refreshToken: string | null }
+  | { available: false }
+
+function storedTokenSnapshot(): StoredTokenSnapshot {
+  try {
+    return {
+      available: true,
+      accessToken: localStorage.getItem('backoffice_access_token'),
+      refreshToken: localStorage.getItem('backoffice_refresh_token'),
+    }
+  } catch {
+    return { available: false }
+  }
+}
+
+function sameStoredTokens(left: StoredTokenSnapshot, right: StoredTokenSnapshot): boolean {
+  if (left.available !== right.available) {
+    return false
+  }
+
+  if (!left.available || !right.available) {
+    return true
+  }
+
+  return left.accessToken === right.accessToken && left.refreshToken === right.refreshToken
+}
+
 interface AuthState {
   accessToken: string | null
   refreshTokenValue: string | null
@@ -35,7 +65,8 @@ interface AuthState {
 export interface AuthActions {
   setTokens: (access: string, refresh: string) => void
   setUser: (user: AuthUser) => void
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string, signal?: AbortSignal) => Promise<boolean>
+  acceptActivationSession: (session: AuthResponse, expectedEpoch: number, signal?: AbortSignal) => Promise<boolean>
   logout: () => Promise<void>
   doRefreshToken: () => Promise<void>
   initialize: () => Promise<void>
@@ -79,16 +110,112 @@ export const useAuthStore = create<AuthStore>()(devtools(persist((set, get) => {
     hasRole: role => get().isAuthenticated && get().user?.role === role,
     hasAnyRole: roles => get().isAuthenticated && Boolean(get().user && roles.includes(get().user!.role)),
     hasPermission: permission => get().isAuthenticated && hasPermission(get().user,permission),
-    login: async (email,password) => {
-      const retiring=clear(),epoch=currentAuthorityEpoch()
+    login: async (email, password, signal) => {
+      const retiring = clear()
+      const epoch = currentAuthorityEpoch()
       await retiring
-      if(currentAuthorityEpoch()!==epoch) return
+
+      if (currentAuthorityEpoch() !== epoch || signal?.aborted) {
+        return false
+      }
+
+      const initialTokens = storedTokenSnapshot()
+
+      if (initialTokens.available && (initialTokens.accessToken || initialTokens.refreshToken)) {
+        return false
+      }
+
       set({ isLoading: true })
+
       try {
-        const result=await authApi.login({ email,password })
-        if (currentAuthorityEpoch()!==epoch) return
-        accept(result.user,result.accessToken,result.refreshToken)
-      } catch (error) { if(currentAuthorityEpoch()===epoch) await clear(); throw error }
+        const result = await authApi.login({ email, password }, signal)
+
+        if (currentAuthorityEpoch() !== epoch || !sameStoredTokens(initialTokens, storedTokenSnapshot())) {
+          return false
+        }
+
+        if (signal?.aborted) {
+          set({ isLoading: false })
+
+          return false
+        }
+
+        accept(result.user, result.accessToken, result.refreshToken)
+
+        return true
+      } catch (error) {
+        if (signal?.aborted) {
+          if (currentAuthorityEpoch() === epoch && sameStoredTokens(initialTokens, storedTokenSnapshot())) {
+            set({ isLoading: false })
+          }
+
+          return false
+        }
+
+        if (currentAuthorityEpoch() === epoch && sameStoredTokens(initialTokens, storedTokenSnapshot())) {
+          await clear()
+        }
+
+        throw error
+      }
+    },
+    acceptActivationSession: async (session, expectedEpoch, signal) => {
+      if (currentAuthorityEpoch() !== expectedEpoch || get().accessToken || get().isAuthenticated || signal?.aborted) {
+        return false
+      }
+
+      const activation = parseCurrentAuthority(session.user)
+      const access = session.accessToken
+      const refresh = session.refreshToken
+
+      if (typeof access !== 'string' || !access || typeof refresh !== 'string' || !refresh) {
+        throw { code: 'account_flow_unavailable', loginRequired: true }
+      }
+
+      try {
+        if (localStorage.getItem('backoffice_access_token') || localStorage.getItem('backoffice_refresh_token')) {
+          return false
+        }
+      } catch {
+        throw { code: 'account_flow_unavailable', loginRequired: true }
+      }
+
+      tokens(access, refresh)
+      bindAuthorityToken(null)
+      set({ accessToken: access, refreshTokenValue: refresh, user: null, isAuthenticated: false, isLoading: true })
+
+      try {
+        const current = parseCurrentAuthority(await authApi.currentAuthority())
+        const sameOperation = currentAuthorityEpoch() === expectedEpoch && get().accessToken === access &&
+          localStorage.getItem('backoffice_access_token') === access && localStorage.getItem('backoffice_refresh_token') === refresh
+
+        if (!sameOperation) {
+          return false
+        }
+
+        if (signal?.aborted) {
+          await clear()
+
+          return false
+        }
+
+        const sameSession = current.id === activation.id && current.clientId === activation.clientId &&
+          current.sessionId === activation.sessionId && current.securityRevision === activation.securityRevision
+
+        if (!sameSession) {
+          throw { code: 'account_flow_unavailable', loginRequired: true }
+        }
+
+        accept(current, access, refresh)
+
+        return true
+      } catch {
+        if (currentAuthorityEpoch() === expectedEpoch) {
+          await clear()
+        }
+
+        throw { code: 'account_flow_unavailable', loginRequired: true }
+      }
     },
     logout: async () => {
       const refresh=get().refreshTokenValue

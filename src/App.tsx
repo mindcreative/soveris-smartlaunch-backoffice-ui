@@ -8,6 +8,14 @@ import 'react-toastify/dist/ReactToastify.css'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import { AdminShell } from './components/layout/AdminShell'
 import Login from './pages/login/LoginPage'
+import Signup from './pages/account/SignupPage'
+import CheckEmail from './pages/account/CheckEmailPage'
+import VerifyEmail from './pages/account/VerifyEmailPage'
+import ForgotPassword from './pages/account/ForgotPasswordPage'
+import ResetPassword from './pages/account/ResetPasswordPage'
+import { AccountBoundary } from './account/AccountBoundary'
+import { AccountFlowLifetime } from './account/AccountFlowLifetime'
+import { ACCOUNT_ROUTES } from './account/constants/accountLifecycle'
 import Dashboard from './pages/dashboard/DashboardPage'
 import Submissions from './pages/submissions/SubmissionsPage'
 import Analytics from './pages/analytics/AnalyticsPage'
@@ -56,9 +64,17 @@ function Application() {
   return (
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
+          <AccountFlowLifetime />
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
+            <Route element={<AccountBoundary />}>
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/check-email" element={<CheckEmail />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+            </Route>
             <Route path="/forbidden" element={<Forbidden />} />
 
             {/* Protected routes under AdminShell */}
@@ -132,7 +148,8 @@ function Application() {
 }
 
 function SessionAppearance() {
-  const isLogin = !!useMatch('/login')
+  const accountMatch = useMatch('/:accountRoute')
+  const isLogin = ACCOUNT_ROUTES.some(route => route === '/' + accountMatch?.params.accountRoute?.toLowerCase())
   const { user, isAuthenticated, isInitialized, accessToken, refreshTokenValue } = useAuth()
   // Match the existing auth restoration policy without making appearance an
   // authority for access. Login always stays on System, including submit/restore.

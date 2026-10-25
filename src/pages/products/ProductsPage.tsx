@@ -11,6 +11,7 @@ import { Badge } from '../../components/shared/Badge'
 import { EmptyState } from '../../components/shared/EmptyState'
 import { ErrorDisplay, Forbidden } from '../../components/shared/ErrorDisplay'
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner'
+import { firstProductHandoff } from '../../account/sessionHandoff'
 
 function ProductBadges({ product }: { product: Product }) {
   return <div className="flex flex-wrap gap-2"><Badge variant={product.status === 'active' ? 'success' : 'neutral'}>{product.status === 'active' ? 'Active' : 'Archived'}</Badge><Badge variant={product.publicationStatus === 'published' ? 'success' : 'info'}>{product.publicationStatus === 'published' ? 'Published' : 'Unpublished'}</Badge><Badge variant={product.completeness.isComplete ? 'success' : 'warning'}>{product.completeness.isComplete ? 'Complete' : 'Incomplete'}</Badge></div>
@@ -41,6 +42,7 @@ export default function ProductsPage() {
   const [publication, setPublication] = useState<ProductFilters['publication']>('all')
   const [page, setPage] = useState(1)
   const [createOpen, setCreateOpen] = useState(false)
+  const firstProduct = useRef(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
   const filters = useMemo<ProductFilters>(() => ({ page, pageSize: 20, status, publication, ...(search.trim() && { search: search.trim() }) }), [page, publication, search, status])
@@ -48,6 +50,21 @@ export default function ProductsPage() {
 
   useEffect(() => { headingRef.current?.focus() }, [])
   useEffect(() => { setCreateOpen(false); setSelectedProduct(null) }, [clientId, canView, canCreate, canUpdate])
+  useEffect(() => {
+    if (!canView || !canCreate) {
+      firstProduct.current = false
+
+      return
+    }
+
+    if (firstProductHandoff.consume()) {
+      firstProduct.current = true
+    }
+
+    if (firstProduct.current) {
+      setCreateOpen(true)
+    }
+  }, [clientId, canView, canCreate, user?.sessionId])
   useEffect(() => { setRemovalProduct(null) }, [clientId, canView, canDelete, removalScope.generation])
 
   if (!canView || !clientId) return <Forbidden message="You do not have permission to view products for this Client." />
@@ -71,7 +88,7 @@ export default function ProductsPage() {
     </>}
     {canDelete && <ProductRemovalHistory key={`${removalScope.actorId}:${clientId}:${removalScope.generation}`} scope={removalScope} />}
     {canDelete && removalProduct?.clientId === clientId && <ProductRemovalModal key={`${removalScope.actorId}:${clientId}:${removalScope.generation}:${removalProduct.id}`} clientId={clientId} product={removalProduct} onClose={() => setRemovalProduct(null)} onArchive={canUpdate ? (product) => setSelectedProduct(product) : undefined} returnFocusRef={headingRef} />}
-    <ProductCreateModal clientId={clientId} isOpen={createOpen} onClose={() => setCreateOpen(false)} onCreated={(product) => { setCreateOpen(false); setSelectedProduct(product) }} />
+    <ProductCreateModal clientId={clientId} isOpen={createOpen} title={firstProduct.current ? 'Create your first product' : undefined} onClose={() => { firstProduct.current = false; setCreateOpen(false) }} onCreated={(product) => { firstProduct.current = false; setCreateOpen(false); setSelectedProduct(product) }} />
     <ProductEditorModal clientId={clientId} product={selectedProduct} onClose={() => setSelectedProduct(null)} />
   </div>
 }

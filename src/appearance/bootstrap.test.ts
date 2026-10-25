@@ -1,8 +1,10 @@
 import { matchRoutes } from 'react-router-dom'
 import { expect, it } from 'vitest'
 import bootstrap from '../../public/appearance-init.js?raw'
+import { ACCOUNT_ROUTES } from '../account/constants/accountLifecycle'
 
-it.each(['/login', '/LOGIN/', '/log%69n', '/%6cogin', '/login%2F', '/%2Flogin', '/dashboard'])('prepaint uses the router Login boundary for %s', pathname => {
+it.each(['/login', '/LOGIN/', '/log%69n', '/%6cogin', '/login%2F', '/%2Flogin', '/dashboard',
+  ...ACCOUNT_ROUTES.flatMap(route => [route, route.toUpperCase() + '/', route.replace('a', '%61'), route + '%2F'])])('prepaint uses the public account router boundary for %s', pathname => {
   for (const systemDark of [false, true]) {
     const root = { dataset: {} as Record<string, string>, style: {} as Record<string, string> }
     const override = systemDark ? 'light' : 'dark'
@@ -13,7 +15,7 @@ it.each(['/login', '/LOGIN/', '/log%69n', '/%6cogin', '/login%2F', '/%2Flogin', 
         ? JSON.stringify({ version: 2, state: { accessToken: token, refreshTokenValue:'refresh' } })
         : key === 'backoffice_access_token' ? token : key === 'backoffice_refresh_token' ? 'refresh' : override,
     })
-    const isLogin = !!matchRoutes([{ path: '/login' }], pathname)
+    const isLogin = !!matchRoutes(ACCOUNT_ROUTES.map(path => ({ path })), pathname)
     const expected = isLogin ? systemDark ? 'dark' : 'light' : override
     expect(root.dataset.theme).toBe(expected)
     expect(root.style.colorScheme).toBe(expected)

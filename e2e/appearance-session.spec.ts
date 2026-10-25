@@ -39,8 +39,8 @@ async function choose(page: Page, name: string) {
 test('login branding follows live System and preserves form input at narrow sizes', async ({ page }, info) => {
   await page.addInitScript(() => localStorage.setItem('soveris-backoffice-appearance', 'dark'))
   await page.goto('/login')
-  await expect(page).toHaveTitle('Soveris SmartLaunch')
-  await expect(page.getByRole('heading', { name: 'SmartLaunch', exact: true })).toBeVisible()
+  await expect(page).toHaveTitle('Log in · SmartLaunch · Soveris')
+  await expect(page.getByRole('heading', { name: 'Log in', exact: true })).toBeVisible()
   await expect(page.getByRole('img', { name: 'Soveris', exact: true })).toBeVisible()
   await expect(page.getByText('Sign in to manage your workspace.', { exact: true })).toBeVisible()
   await expect(page.getByText(/Back.?office/i)).toHaveCount(0)
@@ -94,7 +94,7 @@ test('accounts retain independent choices, logout restores System, another brows
   } finally { await context.close() }
   // Authenticated direct login visits still use System; returning to the app restores A.
   await page.emulateMedia({ colorScheme: 'light' }); await page.goto('/LOGIN/')
-  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Sign out to continue', exact: true })).toBeVisible()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
   await page.goto('/dashboard'); await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
   await page.evaluate(() => dispatchEvent(new Event('auth:cleared')))

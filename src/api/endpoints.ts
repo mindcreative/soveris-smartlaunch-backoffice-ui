@@ -47,8 +47,9 @@ export {
 
 // ==================== AUTH ENDPOINTS ====================
 
-export async function login(credentials: LoginCredentials): Promise<AuthResponse & { user: AuthUser }> {
-  const response = await apiClient.post('/auth/login', credentials)
+export async function login(credentials: LoginCredentials, signal?: AbortSignal): Promise<AuthResponse & { user: AuthUser }> {
+  const response = await apiClient.post('/auth/login', credentials, { signal })
+
   return response.data as AuthResponse & { user: AuthUser }
 }
 

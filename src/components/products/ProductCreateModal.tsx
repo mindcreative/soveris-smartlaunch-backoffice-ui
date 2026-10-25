@@ -6,6 +6,7 @@ import type { Product } from '../../types/content'
 import { Modal } from '../shared/Modal'
 
 interface ProductCreateModalProps {
+  title?: string
   clientId: string
   isOpen: boolean
   onClose: () => void
@@ -26,7 +27,7 @@ function errorMessage(error: unknown): string {
   }
 }
 
-export function ProductCreateModal({ clientId, isOpen, onClose, onCreated }: ProductCreateModalProps) {
+export function ProductCreateModal({ clientId, isOpen, onClose, onCreated, title = 'Create product' }: ProductCreateModalProps) {
   const create = useCreateProduct(clientId)
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
@@ -72,7 +73,7 @@ export function ProductCreateModal({ clientId, isOpen, onClose, onCreated }: Pro
     }
   }
 
-  return <Modal isOpen={isOpen} onClose={close} closeDisabled={create.isPending} title="Create product" initialFocusRef={nameRef} footer={<div className="flex flex-wrap justify-end gap-3">
+  return <Modal isOpen={isOpen} onClose={close} closeDisabled={create.isPending} title={title} initialFocusRef={nameRef} footer={<div className="flex flex-wrap justify-end gap-3">
     <button type="button" onClick={close} disabled={create.isPending} className="min-h-11 rounded-md border border-control px-4 py-2 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-50">Cancel</button>
     <button type="submit" form="create-product-form" disabled={create.isPending || !name.trim() || !slug.trim()} className="min-h-11 rounded-md bg-primary-solid px-4 py-2 text-sm font-medium text-on-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:opacity-50">{create.isPending ? 'Creating product…' : 'Create product'}</button>
   </div>}>
