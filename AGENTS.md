@@ -1,5 +1,14 @@
 # Repository working agreements
 
+## Functional-story coding standards — D20261025-01
+
+- Owner approved **2026-10-25**: from the next functional story taken from backlog, new code and substantially rewritten units follow the agreed standards. Keep unrelated legacy cleanup separate; existing non-backlog stories retain their recorded scope unless amended. Preserve existing security, architecture, database, evidence and repository-specific obligations.
+- Read Business's [standards entry point](../soveris-business/docs/engineering/smartlaunch/README.md) and [functional-story adoption contract](../soveris-business/docs/engineering/smartlaunch/governance-and-adoption.md#functional-story-adoption-contract). Adopt Rules 01–34 and relevant language adaptations as **1.0-draft** at Business commit `2bc1b18c3096d4d017d924724960af08adee19c3`. Verify relevant policy bytes; use a separate read-only checkout of `https://github.com/mindcreative/soveris-business.git` at that full pin if the sibling checkout differs or is absent. Do not overwrite a user's checkout. If the required source is unavailable, report it before dependent edits. This adoption decision supersedes historical pending-activation wording for its scope; it is separate from that older rule snapshot.
+- Story preparation records a **Standards adoption** block: adoption authority, policy/source/configuration identity, changed-unit boundary, Rule-ID dispositions (automated, explicit review, justified N/A or exception), precise legacy baseline and exact verification plan. Implementation follows the block. Unsupported analyzer coverage requires explicit review; existing unchanged debt cannot silently grow or spread into new code.
+- Before acceptance, verify actual file/test selection, supported checks and semantic review; record results, exceptions and open gates in the story. Required-rule violations, missing required verification and unapproved material exceptions block acceptance; guidelines require judgment. Preserve already-adopted gates, including any C# pilot scope; its four-file runner is not a general feature-code check. New tooling/CI scope and unrelated normalization require separate planning.
+- Already-running agents must explicitly reread this guidance. Routine implementation within this approved scope needs no repeated adoption approval. Publication of these local instructions remains separate from this decision.
+
+
 ## External test evidence storage
 
 - For Business and all `soveris-smartlaunch-*` repositories, use the canonical policy in `/home/soveris/Projects/soveris-smartlaunch-infrastructure/docs/evidence-storage.md` and its `scripts/evidence/` commands.
