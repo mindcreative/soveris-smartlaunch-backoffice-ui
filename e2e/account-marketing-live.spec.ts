@@ -35,7 +35,21 @@ test(cases.marketing, async ({ page }) => {
     await page.goto(marketing + path)
     await expect(page.getByRole('heading', { name: 'Soveris Origin', exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Get started free' })).toHaveCount(0)
-    await expect(page.getByRole('link', { name: 'Join the Origin waitlist' })).toHaveAttribute('href', '/signup')
+    const primary = page.getByRole('link', { name: 'Join the Origin waitlist', exact: true })
+    // At the mobile breakpoint the Header copy is in the closed disclosure.
+    const toggle = page.getByRole('button', { name: 'Open navigation', exact: true })
+
+    if (await toggle.isVisible()) {
+      await toggle.click()
+    }
+
+    await expect(primary).toHaveCount(2)
+
+    for (const link of await primary.all()) {
+      await expect(link).toHaveAttribute('href', '/signup')
+    }
+
+    await expect(page.locator('.product-header').getByRole('link', { name: 'Log in', exact: true })).toHaveCount(0)
   }
 
   let visitorRequest = false

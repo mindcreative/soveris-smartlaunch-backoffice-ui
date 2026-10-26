@@ -1,0 +1,42 @@
+{
+  "valid": {
+    "parity": "navigation root slug primary parity fragment history and product preservation",
+    "partial": "navigation full partial required only and unique actual targets",
+    "malformed": "navigation absent unknown qualified and independent content destinations",
+    "login": "navigation platform SmartLaunch desktop mobile real customer login",
+    "isolation": "navigation unrelated platform same slug customer and bound hosts isolation",
+    "disclosure": "navigation disclosure keyboard focus selection outside and Escape lifecycle",
+    "transitions": "navigation route product transition breakpoint and listener cleanup",
+    "accessibility": "navigation axe full partial required mobile open and closed",
+    "responsive": "navigation reflow enlarged text spacing forced colours reduced motion and targets",
+    "form": "navigation editable interest form analytics ownership and no account mutations",
+    "entry": "navigation intentional account generic product and verification routes",
+    "breakpoints": "navigation desktop hides disclosure including 1920 and mobile shows toggle"
+  },
+  "missing-account": {
+    "configuration": "navigation missing-account account configuration and product actions"
+  },
+  "invalid-account": {
+    "configuration": "navigation invalid-account account configuration and product actions"
+  },
+  "missing-platform": {
+    "configuration": "navigation missing-platform account configuration and product actions"
+  },
+  "invalid-platform": {
+    "configuration": "navigation invalid-platform account configuration and product actions"
+  },
+  "local-development": {
+    "parity": "local development navigation root slug primary parity fragment history and product preservation",
+    "partial": "local development navigation full partial required only and unique actual targets",
+    "malformed": "local development navigation absent unknown qualified and independent content destinations",
+    "login": "local development canonical SmartLaunch has exactly one fixed desktop and mobile login destination",
+    "isolation": "local development navigation unrelated platform same slug customer and bound hosts isolation",
+    "disclosure": "local development navigation disclosure keyboard focus selection outside and Escape lifecycle",
+    "transitions": "local development navigation route product transition breakpoint and listener cleanup",
+    "accessibility": "local development navigation axe full partial required mobile open and closed",
+    "responsive": "local development navigation reflow enlarged text spacing forced colours reduced motion and targets",
+    "form": "local development navigation editable interest form analytics ownership and no account mutations",
+    "entry": "local development navigation intentional account generic product and verification routes",
+    "breakpoints": "local development navigation desktop hides disclosure including 1920 and mobile shows toggle"
+  }
+}
