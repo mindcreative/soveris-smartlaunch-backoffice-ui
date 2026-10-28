@@ -77,3 +77,15 @@ export function closestFocusablePointer(pointer: string): string[] {
   }
   return candidates
 }
+
+export function copyPrimaryCta(content: ProductContentV1, groupIndex: number, linkIndex: number): ProductContentV1 {
+  const next = cloneProductContent(content)
+  const link = next.footer?.[groupIndex]?.links[linkIndex]
+
+  if (link) {
+    link.name = content.hero.cta.label
+    link.href = content.hero.cta.href
+  }
+
+  return next
+}

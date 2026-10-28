@@ -1,0 +1,3299 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "reference-001",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-002",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-003",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/smartlaunch#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-004",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-005",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-006",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/smartlaunch#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-007",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-008",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-009",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/smartlaunch#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-010",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-011",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-012",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/smartlaunch#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-013",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-014",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-015",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/smartlaunch#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-016",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-017",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-018",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/smartlaunch#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-019",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-020",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-021",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/smartlaunch#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-022",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-023",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-024",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/smartlaunch#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-025",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-026",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-027",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/smartlaunch#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-028",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-029",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-030",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/smartlaunch#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-031",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-032",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-033",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-034",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-035",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-036",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-037",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": "#faq",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-038",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": "#faq",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-039",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": "#faq",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-040",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-041",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-042",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-043",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-044",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-045",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "absent",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-046",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-047",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-048",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/smartlaunch#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-049",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-050",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-051",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/smartlaunch#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-052",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-053",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-054",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/smartlaunch#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-055",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-056",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-057",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/smartlaunch#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-058",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-059",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-060",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/smartlaunch#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-061",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-062",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-063",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/smartlaunch#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-064",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-065",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-066",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/smartlaunch#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-067",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-068",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-069",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/smartlaunch#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-070",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-071",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-072",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/smartlaunch#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-073",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-074",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-075",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/smartlaunch#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-076",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-077",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-078",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-079",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-080",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-081",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-082",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": "#faq",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-083",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": "#faq",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-084",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": "#faq",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-085",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-086",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-087",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-088",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-089",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-090",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "empty",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-091",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-092",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-093",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/smartlaunch#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-094",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": "#features",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-095",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": "#features",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-096",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/smartlaunch#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": "#features",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-097",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-098",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-099",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/smartlaunch#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-100",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-101",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-102",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/smartlaunch#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-103",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": "#features",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-104",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": "#features",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-105",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "absent",
+        "form": "present"
+      },
+      "href": "/smartlaunch#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": "#features",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-106",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-107",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-108",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/smartlaunch#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-109",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": "#features",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-110",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": "#features",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-111",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/smartlaunch#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": "#features",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-112",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-113",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-114",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/smartlaunch#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-115",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-116",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-117",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/smartlaunch#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-118",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": "#features",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-119",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": "#features",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-120",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "empty",
+        "form": "present"
+      },
+      "href": "/smartlaunch#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": "#features",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-121",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-122",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-123",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": "#hero",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-124",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": "#features",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-125",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": "#features",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-126",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch#features",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": "#features",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-127",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": "#faq",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-128",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": "#faq",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-129",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch#faq",
+      "safe": true,
+      "recognized": true,
+      "target": "faq",
+      "landing": "#faq",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-130",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-131",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-132",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": "#form",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-133",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": "#features",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-134",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": "#features",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-135",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch#principles",
+      "safe": true,
+      "recognized": true,
+      "target": "features",
+      "landing": "#features",
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-136",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "absent",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#hero",
+      "safe": true,
+      "recognized": true,
+      "target": "hero",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-137",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "absent"
+      },
+      "href": "#form",
+      "safe": true,
+      "recognized": true,
+      "target": "form",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-138",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#unknown",
+      "safe": true,
+      "recognized": true,
+      "target": "unknown",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-139",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/#unknown",
+      "safe": true,
+      "recognized": true,
+      "target": "unknown",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-140",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch#unknown",
+      "safe": true,
+      "recognized": true,
+      "target": "unknown",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-141",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#Features",
+      "safe": true,
+      "recognized": true,
+      "target": "Features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-142",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/#Features",
+      "safe": true,
+      "recognized": true,
+      "target": "Features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-143",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch#Features",
+      "safe": true,
+      "recognized": true,
+      "target": "Features",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-144",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#%66eatures",
+      "safe": true,
+      "recognized": true,
+      "target": "%66eatures",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-145",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/#%66eatures",
+      "safe": true,
+      "recognized": true,
+      "target": "%66eatures",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-146",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch#%66eatures",
+      "safe": true,
+      "recognized": true,
+      "target": "%66eatures",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-147",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#questions",
+      "safe": true,
+      "recognized": true,
+      "target": "questions",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-148",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/#questions",
+      "safe": true,
+      "recognized": true,
+      "target": "questions",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-149",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch#questions",
+      "safe": true,
+      "recognized": true,
+      "target": "questions",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-150",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#product-form",
+      "safe": true,
+      "recognized": true,
+      "target": "product-form",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-151",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/#product-form",
+      "safe": true,
+      "recognized": true,
+      "target": "product-form",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-152",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch#product-form",
+      "safe": true,
+      "recognized": true,
+      "target": "product-form",
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "missing_section_target"
+    },
+    {
+      "id": "reference-153",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/other#features",
+      "safe": true,
+      "recognized": false,
+      "target": null,
+      "landing": "/other#features",
+      "nested": "/other#features",
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-154",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/download",
+      "safe": true,
+      "recognized": false,
+      "target": null,
+      "landing": "/download",
+      "nested": "/download",
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-155",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/signup",
+      "safe": true,
+      "recognized": false,
+      "target": null,
+      "landing": "/signup",
+      "nested": "/signup",
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-156",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/?campaign=x#features",
+      "safe": true,
+      "recognized": false,
+      "target": null,
+      "landing": "/?campaign=x#features",
+      "nested": "/?campaign=x#features",
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-157",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch/#features",
+      "safe": true,
+      "recognized": false,
+      "target": null,
+      "landing": "/smartlaunch/#features",
+      "nested": "/smartlaunch/#features",
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-158",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/smartlaunch?x=1#features",
+      "safe": true,
+      "recognized": false,
+      "target": null,
+      "landing": "/smartlaunch?x=1#features",
+      "nested": "/smartlaunch?x=1#features",
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-159",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/%73martlaunch#features",
+      "safe": true,
+      "recognized": false,
+      "target": null,
+      "landing": "/%73martlaunch#features",
+      "nested": "/%73martlaunch#features",
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-160",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "https://docs.example.test/privacy",
+      "safe": true,
+      "recognized": false,
+      "target": null,
+      "landing": "https://docs.example.test/privacy",
+      "nested": "https://docs.example.test/privacy",
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-161",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "https://docs.example.test/terms#details",
+      "safe": true,
+      "recognized": false,
+      "target": null,
+      "landing": "https://docs.example.test/terms#details",
+      "nested": "https://docs.example.test/terms#details",
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-162",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "https://smartlaunch.example.test/#missing",
+      "safe": true,
+      "recognized": false,
+      "target": null,
+      "landing": "https://smartlaunch.example.test/#missing",
+      "nested": "https://smartlaunch.example.test/#missing",
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-163",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/privacy",
+      "safe": true,
+      "recognized": false,
+      "target": null,
+      "landing": "/privacy",
+      "nested": "/privacy",
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-164",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/terms",
+      "safe": true,
+      "recognized": false,
+      "target": null,
+      "landing": "/terms",
+      "nested": "/terms",
+      "path": "/footer/0/links/0/href",
+      "code": null
+    },
+    {
+      "id": "reference-165",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "",
+      "safe": false,
+      "recognized": false,
+      "target": null,
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "unsafe_url"
+    },
+    {
+      "id": "reference-166",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "#",
+      "safe": false,
+      "recognized": false,
+      "target": null,
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "unsafe_url"
+    },
+    {
+      "id": "reference-167",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "//evil.test",
+      "safe": false,
+      "recognized": false,
+      "target": null,
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "unsafe_url"
+    },
+    {
+      "id": "reference-168",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "http://docs.example.test",
+      "safe": false,
+      "recognized": false,
+      "target": null,
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "unsafe_url"
+    },
+    {
+      "id": "reference-169",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "javascript:alert(1)",
+      "safe": false,
+      "recognized": false,
+      "target": null,
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "unsafe_url"
+    },
+    {
+      "id": "reference-170",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "https://user:pass@docs.example.test",
+      "safe": false,
+      "recognized": false,
+      "target": null,
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "unsafe_url"
+    },
+    {
+      "id": "reference-171",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/bad%",
+      "safe": false,
+      "recognized": false,
+      "target": null,
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "unsafe_url"
+    },
+    {
+      "id": "reference-172",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/bad%0",
+      "safe": false,
+      "recognized": false,
+      "target": null,
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "unsafe_url"
+    },
+    {
+      "id": "reference-173",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/bad%GG",
+      "safe": false,
+      "recognized": false,
+      "target": null,
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "unsafe_url"
+    },
+    {
+      "id": "reference-174",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/bad%00",
+      "safe": false,
+      "recognized": false,
+      "target": null,
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "unsafe_url"
+    },
+    {
+      "id": "reference-175",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/bad%1f",
+      "safe": false,
+      "recognized": false,
+      "target": null,
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "unsafe_url"
+    },
+    {
+      "id": "reference-176",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/bad%7F",
+      "safe": false,
+      "recognized": false,
+      "target": null,
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "unsafe_url"
+    },
+    {
+      "id": "reference-177",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/bad%5C",
+      "safe": false,
+      "recognized": false,
+      "target": null,
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "unsafe_url"
+    },
+    {
+      "id": "reference-178",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/bad%FF",
+      "safe": false,
+      "recognized": false,
+      "target": null,
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "unsafe_url"
+    },
+    {
+      "id": "reference-179",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/bad%C0%AF",
+      "safe": false,
+      "recognized": false,
+      "target": null,
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "unsafe_url"
+    },
+    {
+      "id": "reference-180",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/bad%E0%A4",
+      "safe": false,
+      "recognized": false,
+      "target": null,
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "unsafe_url"
+    },
+    {
+      "id": "reference-181",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/bad\\path",
+      "safe": false,
+      "recognized": false,
+      "target": null,
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "unsafe_url"
+    },
+    {
+      "id": "reference-182",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": " /download",
+      "safe": false,
+      "recognized": false,
+      "target": null,
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "unsafe_url"
+    },
+    {
+      "id": "reference-183",
+      "slug": "smartlaunch",
+      "presence": {
+        "hero": "present",
+        "features": "present",
+        "faq": "present",
+        "form": "present"
+      },
+      "href": "/download\n",
+      "safe": false,
+      "recognized": false,
+      "target": null,
+      "landing": null,
+      "nested": null,
+      "path": "/footer/0/links/0/href",
+      "code": "unsafe_url"
+    }
+  ]
+}

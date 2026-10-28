@@ -602,4 +602,89 @@ describe('ProductEditorModal', () => {
     expect(save).toHaveBeenCalledTimes(1)
     expect(contentApi.getContent).toHaveBeenCalledTimes(3)
   })
+  it('keeps local missing-target guidance nonblocking for save and reaches authoritative Publish rejection', async () => {
+    const retained = envelope()
+    delete retained.draft!.content.features
+    retained.draft!.content.footer = [{ heading: 'Product', links: [{ name: 'Read features', href: '#features' }] }]
+    vi.mocked(contentApi.getContent).mockResolvedValue(retained)
+    const save = vi.spyOn(contentApi, 'saveContentDraft').mockImplementation(async (_id, request) => {
+      const saved = { ...retained, draft: { schemaVersion: 1, revision: 8, content: request.content } }
+      vi.mocked(contentApi.getContent).mockResolvedValue(saved)
+      return saved
+    })
+    const publish = vi.spyOn(contentApi, 'publishContent').mockRejectedValue({ status: 422, code: 'content_invalid',
+      errors: [{ path: '/footer/0/links/0/href', keyword: 'reference', code: 'missing_section_target', message: 'Add Features or correct this link. Available targets: #hero, #faq, #form.' }] })
+    const user = userEvent.setup()
+    renderEditor()
+    const href = await screen.findByLabelText('Footer link URL')
+    expect(href).toHaveAccessibleDescription(/#features does not render/)
+    expect(href).not.toHaveAttribute('aria-invalid', 'true')
+    await user.click(screen.getByRole('button', { name: 'Save draft' }))
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
+    await screen.findByText('Draft saved at revision 8.')
+    await user.click(screen.getByRole('button', { name: 'Publish' }))
+    await waitFor(() => expect(publish).toHaveBeenCalledTimes(1))
+    expect(href).toHaveValue('#features')
+    await waitFor(() => expect(screen.getByRole('alert', { name: /correct/i })).toHaveFocus())
+    expect(href).toHaveAttribute('aria-invalid', 'true')
+    await user.click(href)
+    await user.tab()
+    expect(href).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getAllByText('Add Features or correct this link. Available targets: #hero, #faq, #form.')).toHaveLength(2)
+    await user.click(screen.getByRole('button', { name: 'Add Features section' }))
+    // An empty Features collection still provides no rendered target.
+    expect(href).toHaveAccessibleDescription(/#features does not render/)
+    await user.click(screen.getByRole('button', { name: 'Add feature' }))
+    expect(href).not.toHaveAccessibleDescription(/#features does not render/)
+    expect(href).not.toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('copies primary CTA only on explicit action and preserves other authored Footer bytes', async () => {
+    const retained = envelope()
+    retained.draft!.content.footer = [{ heading: 'Actions', links: [
+      { name: 'Distinct', href: full.hero.cta.href }, { name: 'Other', href: '/other' },
+    ] }]
+    vi.mocked(contentApi.getContent).mockResolvedValue(retained)
+    const save = vi.spyOn(contentApi, 'saveContentDraft').mockImplementation(async (_id, request) => ({
+      ...retained, draft: { schemaVersion: 1, revision: 8, content: request.content },
+    }))
+    const user = userEvent.setup()
+    renderEditor()
+    await screen.findByLabelText('Hero title')
+    expect(screen.getAllByLabelText('Footer link name')[0]).toHaveValue('Distinct')
+    const copyActions = screen.getAllByRole('button', { name: /Use primary CTA for footer section 1, link [12]/ })
+    expect(copyActions).toHaveLength(2)
+    await user.click(screen.getByRole('button', { name: 'Use primary CTA for footer section 1, link 1' }))
+    expect(screen.getAllByLabelText('Footer link name')[0]).toHaveValue(full.hero.cta.label)
+    expect(screen.getAllByLabelText('Footer link URL')[0]).toHaveValue(full.hero.cta.href)
+    expect(screen.getByText('Unsaved changes.')).toBeVisible()
+    const primary = screen.getByLabelText('Primary action label')
+    await user.clear(primary)
+    await user.type(primary, 'Later primary label')
+    expect(screen.getAllByLabelText('Footer link name')[0]).toHaveValue(full.hero.cta.label)
+    await user.click(screen.getByRole('button', { name: 'Save draft' }))
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
+    const saved = save.mock.calls[0]![1].content
+    expect(saved.footer).toEqual([{ heading: 'Actions', links: [
+      { name: full.hero.cta.label, href: full.hero.cta.href }, { name: 'Other', href: '/other' },
+    ] }])
+  })
+
+  it('removes the final Footer group as optional absence through ordinary Save', async () => {
+    const retained = envelope()
+    retained.draft!.content.footer = [{ heading: 'Only group', links: [{ name: 'Go', href: '#form' }] }]
+    vi.mocked(contentApi.getContent).mockResolvedValue(retained)
+    const save = vi.spyOn(contentApi, 'saveContentDraft').mockImplementation(async (_id, request) => ({
+      ...retained, draft: { schemaVersion: 1, revision: 8, content: request.content },
+    }))
+    const user = userEvent.setup()
+    renderEditor()
+    await screen.findByLabelText('Hero title')
+    await user.click(screen.getByRole('button', { name: 'Remove footer section 1' }))
+    expect(screen.getByRole('button', { name: 'Add Footer' })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Save draft' }))
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
+    expect(save.mock.calls[0]![1].content).not.toHaveProperty('footer')
+  })
+
 })

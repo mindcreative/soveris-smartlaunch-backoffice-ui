@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { contentApi } from '../../api/endpoints'
 import { productKeys } from '../../queries/productQueries'
 import { getGeneratedProductImageStatus } from '../../api/generatedProductImageApi'
+import { publicationReferences } from '../../contracts/product-content/publicationReferences'
 import { validateProductContent, type ContractIssue, type ContractTarget } from '../../contracts/product-content/validator'
 import { useAuth } from '../../hooks/useAuth'
 import { createUuidV7 } from '../../lib/uuidV7'
@@ -578,14 +579,18 @@ export function ProductEditorModal({ clientId, product, onClose }: ProductEditor
     setDirty(true)
     setStatusText('Unsaved changes.')
     setCommandErrorText('')
-    setValidationErrors((current) => current.filter((error) => !overlaps(error.path, pointer)))
+    const missingTargets = new Set(publicationReferences(next).map(issue => issue.path))
+    setValidationErrors((current) => current.filter((error) =>
+      !overlaps(error.path, pointer) && (error.code !== 'missing_section_target' || missingTargets.has(error.path))))
   }
 
   const onFieldBlur = (pointer: string) => {
     if (!working) return
     const next = issues(validateProductContent(working, 'draft', 1).errors)
+    const missingTargets = new Set(publicationReferences(working).map(issue => issue.path))
     setValidationErrors((current) => [
-      ...current.filter((error) => !overlaps(error.path, pointer)),
+      ...current.filter((error) => !overlaps(error.path, pointer) ||
+        (error.code === 'missing_section_target' && missingTargets.has(error.path))),
       ...next.filter((error) => overlaps(error.path, pointer)),
     ])
   }

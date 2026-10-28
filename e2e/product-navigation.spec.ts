@@ -37,6 +37,21 @@ test.beforeEach(async ({ page }) => {
     })
   }
 
+  // Register only the declared technical document URLs ahead of the local fallback.
+  await page.route('https://docs.example.test/**', async route => {
+    const url = new URL(route.request().url())
+    const allowed = url.pathname === '/terms' && url.search === '' ||
+      url.pathname === '/privacy' && ['', '?version=2'].includes(url.search)
+
+    if (!allowed) {
+      await route.abort('blockedbyclient')
+
+      return
+    }
+
+    await route.fulfill({ contentType: 'text/html', body: '<!doctype html><html lang="en"><title>Technical document fixture</title><h1>Technical document fixture</h1><p>Test content only; no approved legal text.</p></html>' })
+  })
+
   await page.setExtraHTTPHeaders({ 'x-soveris-ingress-client-address': '127.0.0.1' })
   await page.setViewportSize(desktop)
 })
@@ -104,7 +119,7 @@ async function expectTargets(page: Page, features: boolean, questions: boolean) 
 }
 
 async function expectMinimumTargets(page: Page) {
-  const controls = await page.locator('.product-header a, .product-header button, #hero a').all()
+  const controls = await page.locator('.product-header a, .product-header button, #hero a, footer a').all()
 
   for (const control of controls) {
     if (await control.isVisible()) {
@@ -324,10 +339,11 @@ if (stage === 'valid' || localDevelopment) {
     await expect(toggle).toBeFocused()
     await expect(toggle).toHaveAttribute('aria-expanded', 'false')
     await toggle.click()
-    // Footer is unchanged content-owned navigation, exercising a real Next route change.
+    // An explicitly configured independent route preserves the real Next transition check.
     await expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    await page.locator('footer').getByRole('link', { name: 'Privacy', exact: true }).first().evaluate(link => (link as HTMLElement).click())
-    await expect(page.getByRole('heading', { name: '404', exact: true })).toBeVisible()
+    await page.locator('footer').getByRole('link', { name: 'Independent route', exact: true }).evaluate(link => (link as HTMLElement).click())
+    await expect(page).toHaveURL(marketingOrigin + '/navigation-required')
+    await expect(page.locator('#features')).toHaveCount(0)
     await page.goBack()
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     toggle = header(page).locator('button[aria-controls="product-navigation-panel"]')
@@ -354,12 +370,90 @@ if (stage === 'valid' || localDevelopment) {
     await expect(header(page).getByRole('link', { name: 'Get early access', exact: true })).toBeFocused()
   })
 
+  test(cases.footer, async ({ page }) => {
+    for (const [origin, path] of [[marketingOrigin, '/'], [marketingOrigin, '/smartlaunch?campaign=footer'],
+      [customerOrigin, '/smartlaunch?campaign=customer'], [boundOrigin, '/']] as const) {
+      await visit(page, path, origin)
+      const footer = page.getByRole('navigation', { name: 'Footer', exact: true })
+      await expect(footer.getByRole('link', { name: 'Get early access', exact: true })).toHaveAttribute('href', '#form')
+      await footer.getByRole('link', { name: 'Get early access', exact: true }).click()
+      await expect(page).toHaveURL(origin + path + '#form')
+      await expect(page.locator('#form')).toBeFocused()
+      await expectUnobscuredTarget(page, 'form')
+      await expect(page.locator('footer')).toContainText(`© ${new Date().getFullYear()}`)
+      await expect(page.locator('footer a[href="/privacy"], footer a[href="/terms"]')).toHaveCount(0)
+    }
+
+    for (const slug of ['footer-optional', 'footer-missing']) {
+      await visit(page, '/'+slug)
+      await expect(page.locator('footer a, footer nav')).toHaveCount(0)
+      await expect(page.locator('footer')).toContainText('All rights reserved.')
+    }
+
+    await page.route('**/api/bff/submit_pending', route => route.fulfill({ status: 400, json: { error: 'invalid_token' } }))
+    await page.goto(marketingOrigin+'/smartlaunch/verify-submission?token=nonsecret-footer-fixture')
+    await expect(header(page)).toBeVisible()
+    await expect(page.locator('footer a[href^="#"]')).toHaveCount(0)
+    await expect(page.locator('footer').getByRole('link', { name: 'Independent route', exact: true })).toHaveAttribute('href', '/navigation-required')
+  })
+
+  test(cases.footerIdentity, async ({ page }) => {
+    await visit(page, '/footer-duplicates')
+    const footer = page.getByRole('navigation', { name: 'Footer', exact: true })
+    const longLabel = 'L'.repeat(120)
+    await expect(footer.getByRole('link', { name: 'Get early access', exact: true })).toHaveCount(1)
+    await expect(footer.getByRole('link', { name: 'Get early access', exact: true })).toHaveAttribute('href', '#form')
+    await expect(footer.getByRole('link', { name: 'How it works', exact: true })).toHaveAttribute('href', '#features')
+    await expect(footer.getByRole('link', { name: 'Distinct action', exact: true })).toHaveAttribute('href', '#form')
+    await expect(footer.getByRole('link', { name: 'Privacy fixture', exact: true })).toHaveCount(2)
+    await expect(footer.getByRole('link', { name: 'Different name', exact: true })).toHaveAttribute('href', 'https://docs.example.test/privacy')
+    await expect(footer.getByRole('link', { name: longLabel, exact: true })).toHaveAttribute('href', '/long-label')
+    await expect(footer.getByRole('heading', { name: 'Duplicates omitted', exact: true })).toHaveCount(0)
+    expect(await footer.getByRole('heading').allTextContents()).toEqual(['Product', 'Documents'])
+    await page.setViewportSize(mobile)
+    await expectMinimumTargets(page)
+    await expectNoOverflow(page)
+    const scan = await new AxeBuilder({ page }).include('footer').analyze()
+    expect(scan.violations).toEqual([])
+  })
+
+  test(cases.footerInteraction, async ({ page, context }) => {
+    await visit(page, '/footer-duplicates?campaign=kept')
+    const footer = page.getByRole('navigation', { name: 'Footer', exact: true })
+    const features = footer.getByRole('link', { name: 'How it works', exact: true })
+    await features.focus()
+    await expect(features).toBeFocused()
+    expect(await features.evaluate(element => getComputedStyle(element).outlineStyle)).not.toBe('none')
+    await page.keyboard.press('Enter')
+    await expect(page).toHaveURL(marketingOrigin+'/footer-duplicates?campaign=kept#features')
+    await expect(page.locator('#features')).toBeFocused()
+    await expectUnobscuredTarget(page, 'features')
+    const repeatedFragmentHistoryLength = await page.evaluate(() => history.length)
+    await features.click()
+    await expect(page.locator('#features')).toBeFocused()
+    expect(await page.evaluate(() => history.length)).toBe(repeatedFragmentHistoryLength)
+    await footer.getByRole('link', { name: 'Get early access', exact: true }).click()
+    await page.goBack()
+    await expect(page).toHaveURL(marketingOrigin+'/footer-duplicates?campaign=kept#features')
+    await page.reload()
+    await expectUnobscuredTarget(page, 'features')
+    const opened = context.waitForEvent('page')
+    await features.click({ modifiers: ['Control'] })
+    const modified = await opened
+    await expect(modified).toHaveURL(marketingOrigin+'/footer-duplicates?campaign=kept#features')
+    await modified.close()
+    await expect(page).toHaveURL(marketingOrigin+'/footer-duplicates?campaign=kept#features')
+    await footer.getByRole('link', { name: 'Terms fixture', exact: true }).click()
+    await expect(page).toHaveURL('https://docs.example.test/terms')
+    await expect(page.getByRole('heading', { name: 'Technical document fixture', exact: true })).toBeVisible()
+  })
+
   test(cases.accessibility, async ({ page }) => {
     for (const slug of ['smartlaunch', 'navigation-features', 'navigation-faq', 'navigation-required']) {
       for (const viewport of [desktop, mobile]) {
         await page.setViewportSize(viewport)
         await visit(page, '/' + slug)
-        const results = await new AxeBuilder({ page }).include('.product-header').include('#hero').include('#features').include('#faq').include('#form').analyze()
+        const results = await new AxeBuilder({ page }).include('.product-header').include('#hero').include('#features').include('#faq').include('#form').include('footer').analyze()
         expect(results.violations.map(violation => ({ id: violation.id, targets: violation.nodes.map(node => node.target) }))).toEqual([])
 
         if (viewport === mobile) {

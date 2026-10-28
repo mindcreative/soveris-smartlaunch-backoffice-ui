@@ -11,7 +11,10 @@
     "responsive": "navigation reflow enlarged text spacing forced colours reduced motion and targets",
     "form": "navigation editable interest form analytics ownership and no account mutations",
     "entry": "navigation intentional account generic product and verification routes",
-    "breakpoints": "navigation desktop hides disclosure including 1920 and mobile shows toggle"
+    "breakpoints": "navigation desktop hides disclosure including 1920 and mobile shows toggle",
+    "footer": "footer root slug customer bound nested omission and copyright",
+    "footerIdentity": "footer resolved identity exact primary independent documents and first occurrence",
+    "footerInteraction": "footer keyboard native history modified clicks and external technical fixture"
   },
   "missing-account": {
     "configuration": "navigation missing-account account configuration and product actions"
@@ -37,6 +40,9 @@
     "responsive": "local development navigation reflow enlarged text spacing forced colours reduced motion and targets",
     "form": "local development navigation editable interest form analytics ownership and no account mutations",
     "entry": "local development navigation intentional account generic product and verification routes",
-    "breakpoints": "local development navigation desktop hides disclosure including 1920 and mobile shows toggle"
+    "breakpoints": "local development navigation desktop hides disclosure including 1920 and mobile shows toggle",
+    "footer": "local development footer root slug customer bound nested omission and copyright",
+    "footerIdentity": "local development footer resolved identity exact primary independent documents and first occurrence",
+    "footerInteraction": "local development footer keyboard native history modified clicks and external technical fixture"
   }
 }

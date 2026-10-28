@@ -99,7 +99,7 @@ function decodedUnsafe(value: string): boolean {
   }
 }
 
-function safeLink(value: unknown): boolean {
+export function safeLink(value: unknown): boolean {
   if (typeof value !== "string" || value.length > 2_048 || decodedUnsafe(value) || value.startsWith("//")) return false;
   if (value.startsWith("/")) return true;
   if (value.startsWith("#")) return value.length > 1;

@@ -1,7 +1,10 @@
 import type { ProductContentValidationIssue, ProductContentV1 } from '../../types/content'
 import type { ProductImageRole } from '../../types/productImages'
 import type { ProductImageUploadView } from '../../queries/productImageQueries'
-import { issueMessage, pointerToFieldId } from './productEditorModel'
+import { publicationReferences } from '../../contracts/product-content/publicationReferences'
+import { NAVIGATION_HREF_HELP } from '../../contracts/product-content/navigation/constants'
+import { footerNavigationAdvice } from './footerNavigationAdvice'
+import { copyPrimaryCta, issueMessage, pointerToFieldId } from './productEditorModel'
 
 interface EditableLink { label: string; href: string }
 interface EditableImage { src: string; alt: string }
@@ -113,17 +116,21 @@ function ProductImageUploadField({
   </div>
 }
 
-function Input({ label, path, value, errors, disabled, multiline, type = 'text', min, max, onChange, onBlur }: {
+function Input({ label, path, value, errors, advice = [], help, disabled, multiline, type = 'text', min, max, onChange, onBlur }: {
   label: string; path: string; value: string | number; errors: ProductContentValidationIssue[]; disabled?: boolean
   multiline?: boolean; type?: 'text' | 'number' | 'url'; min?: number; max?: number
+  advice?: ProductContentValidationIssue[]; help?: string
   onChange: (value: string) => void; onBlur: () => void
 }) {
   const error = errors.find((issue) => issue.path === path)
   const id = pointerToFieldId(path)
   const errorId = `${id}-error`
+  const fieldAdvice = advice.filter(issue => issue.path === path)
+  const helpId = `${id}-guidance`
+  const description = [error ? errorId : '', help || fieldAdvice.length ? helpId : ''].filter(Boolean).join(' ') || undefined
   const classes = `mt-1 min-h-11 w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${error ? 'border-danger-line' : 'border-control'}`
-  const common = { id, value, disabled, 'aria-invalid': error ? true : undefined, 'aria-describedby': error ? errorId : undefined, onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange(event.target.value), onBlur, className: classes }
-  return <div><label htmlFor={id} className="block text-sm font-medium text-foreground">{label}</label>{multiline ? <textarea {...common} rows={3} maxLength={max} /> : <input {...common} type={type} min={min} max={max} maxLength={type === 'number' ? undefined : max} />}{error && <p id={errorId} className="mt-1 text-sm text-danger">{issueMessage(error)}</p>}</div>
+  const common = { id, value, disabled, 'aria-invalid': error ? true : undefined, 'aria-describedby': description, onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange(event.target.value), onBlur, className: classes }
+  return <div><label htmlFor={id} className="block text-sm font-medium text-foreground">{label}</label>{multiline ? <textarea {...common} rows={3} maxLength={max} /> : <input {...common} type={type} min={min} max={max} maxLength={type === 'number' ? undefined : max} />}{(help || fieldAdvice.length > 0) && <div id={helpId} className="mt-1 space-y-1 text-sm text-foreground">{help && <p>{help}</p>}{fieldAdvice.map((issue, index) => <p key={`${issue.code}-${index}`}>{issue.message}</p>)}</div>}{error && <p id={errorId} className="mt-1 text-sm text-danger">{issueMessage(error)}</p>}</div>
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -169,13 +176,14 @@ export function ProductContentFields({
   onImageRetry,
   onImageCancel,
 }: ProductContentFieldsProps) {
+  const advice = [...publicationReferences(value), ...footerNavigationAdvice(value)]
   const content = value as unknown as EditableContent
   const update = (pointer: string, mutate: (draft: EditableContent) => void) => {
     const draft = structuredClone(content)
     mutate(draft)
     onChange(draft as unknown as ProductContentV1, pointer)
   }
-  const field = (label: string, path: string, current: string | number, set: (draft: EditableContent, value: string) => void, options: Partial<Parameters<typeof Input>[0]> = {}) => <Input label={label} path={path} value={current} errors={errors} disabled={disabled} onChange={(next) => update(path, (draft) => set(draft, next))} onBlur={() => onBlur(path)} {...options} />
+  const field = (label: string, path: string, current: string | number, set: (draft: EditableContent, value: string) => void, options: Partial<Parameters<typeof Input>[0]> = {}) => <Input label={label} path={path} value={current} errors={errors} advice={advice} help={path.endsWith('/href') ? NAVIGATION_HREF_HELP : undefined} disabled={disabled} onChange={(next) => update(path, (draft) => set(draft, next))} onBlur={() => onBlur(path)} {...options} />
   const buttonClass = 'min-h-11 rounded-md border border-control px-3 py-2 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-50'
 
   return <div className="space-y-5">
@@ -240,7 +248,14 @@ export function ProductContentFields({
     </Section>
 
     <Section title="Footer (optional)">
-      {!content.footer ? <button id={pointerToFieldId('/footer')} type="button" disabled={disabled} onClick={() => update('/footer', (draft) => { draft.footer = [{ heading: '', links: [] }] })} className={buttonClass}>Add Footer</button> : <>{content.footer.map((section, sectionIndex) => { const base = `/footer/${sectionIndex}`; return <div key={sectionIndex} className="space-y-3 rounded-md border border-line p-3">{field(`Footer section ${sectionIndex + 1} heading`, `${base}/heading`, section.heading, (draft, next) => { draft.footer![sectionIndex]!.heading = next }, { max: 120 })}{section.links.map((link, linkIndex) => <div key={linkIndex} className="grid gap-3 rounded bg-subtle p-3 sm:grid-cols-2">{field('Footer link name', `${base}/links/${linkIndex}/name`, link.name, (draft, next) => { draft.footer![sectionIndex]!.links[linkIndex]!.name = next }, { max: 120 })}{field('Footer link URL', `${base}/links/${linkIndex}/href`, link.href, (draft, next) => { draft.footer![sectionIndex]!.links[linkIndex]!.href = next }, { max: 2048 })}<button type="button" disabled={disabled} onClick={() => update(`${base}/links/${linkIndex}`, (draft) => { draft.footer![sectionIndex]!.links.splice(linkIndex, 1) })} className={buttonClass}>Remove footer link {linkIndex + 1}</button></div>)}<button id={pointerToFieldId(`${base}/links`)} type="button" disabled={disabled || section.links.length >= 8} onClick={() => update(`${base}/links`, (draft) => { draft.footer![sectionIndex]!.links.push({ name: '', href: '' }) })} className={buttonClass}>Add footer link</button><button type="button" disabled={disabled} onClick={() => update(base, (draft) => { draft.footer!.splice(sectionIndex, 1) })} className={buttonClass}>Remove footer section {sectionIndex + 1}</button></div> })}<div className="flex flex-wrap gap-2"><button type="button" disabled={disabled || content.footer.length >= 4} onClick={() => update('/footer', (draft) => { draft.footer!.push({ heading: '', links: [] }) })} className={buttonClass}>Add footer section</button><button type="button" disabled={disabled} onClick={() => update('/footer', (draft) => { delete draft.footer })} className={buttonClass}>Remove Footer</button></div></>}
+      {!content.footer ? <button id={pointerToFieldId('/footer')} type="button" disabled={disabled} onClick={() => update('/footer', (draft) => { draft.footer = [{ heading: '', links: [] }] })} className={buttonClass}>Add Footer</button> : <>{content.footer.map((section, sectionIndex) => { const base = `/footer/${sectionIndex}`; return <div key={sectionIndex} className="space-y-3 rounded-md border border-line p-3">{field(`Footer section ${sectionIndex + 1} heading`, `${base}/heading`, section.heading, (draft, next) => { draft.footer![sectionIndex]!.heading = next }, { max: 120 })}{section.links.map((link, linkIndex) => <div key={linkIndex} className="grid gap-3 rounded bg-subtle p-3 sm:grid-cols-2">{field('Footer link name', `${base}/links/${linkIndex}/name`, link.name, (draft, next) => { draft.footer![sectionIndex]!.links[linkIndex]!.name = next }, { max: 120 })}{field('Footer link URL', `${base}/links/${linkIndex}/href`, link.href, (draft, next) => { draft.footer![sectionIndex]!.links[linkIndex]!.href = next }, { max: 2048 })}<button type="button" disabled={disabled} onClick={() => {
+          onChange(copyPrimaryCta(value, sectionIndex, linkIndex), `${base}/links/${linkIndex}`)
+        }} aria-label={`Use primary CTA for footer section ${sectionIndex + 1}, link ${linkIndex + 1}`} className={buttonClass}>Use primary CTA</button><button type="button" disabled={disabled} onClick={() => update(`${base}/links/${linkIndex}`, (draft) => { draft.footer![sectionIndex]!.links.splice(linkIndex, 1) })} className={buttonClass}>Remove footer link {linkIndex + 1}</button></div>)}<button id={pointerToFieldId(`${base}/links`)} type="button" disabled={disabled || section.links.length >= 8} onClick={() => update(`${base}/links`, (draft) => { draft.footer![sectionIndex]!.links.push({ name: '', href: '' }) })} className={buttonClass}>Add footer link</button><button type="button" disabled={disabled} onClick={() => update(base, (draft) => { draft.footer!.splice(sectionIndex, 1)
+
+          if (draft.footer!.length === 0) {
+            delete draft.footer
+          }
+         })} className={buttonClass}>Remove footer section {sectionIndex + 1}</button></div> })}<div className="flex flex-wrap gap-2"><button type="button" disabled={disabled || content.footer.length >= 4} onClick={() => update('/footer', (draft) => { draft.footer!.push({ heading: '', links: [] }) })} className={buttonClass}>Add footer section</button><button type="button" disabled={disabled} onClick={() => update('/footer', (draft) => { delete draft.footer })} className={buttonClass}>Remove Footer</button></div></>}
     </Section>
 
     <Section title="SEO (optional)">
