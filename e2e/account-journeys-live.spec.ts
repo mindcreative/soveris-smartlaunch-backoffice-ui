@@ -61,6 +61,13 @@ function mail(email: string, kind = 'verify', excluded: string[] = []): string {
 async function verify(page: Page, proof: string): Promise<void> {
   await page.goto('/verify-email#proof=' + proof)
   await expect(page).toHaveURL(origin + '/verify-email')
+  await expect(page.getByRole('button', { name: 'Check sign-in method' })).toBeVisible()
+  const contextResponse = page.waitForResponse(response => response.url().endsWith(prefix + '/registration/proof-context'))
+  await page.getByRole('button', { name: 'Check sign-in method' }).click()
+
+  if ((await contextResponse).status() !== 200) {
+    return
+  }
   await page.getByLabel('Original signup password').fill(password)
   await page.getByRole('button', { name: 'Verify email', exact: true }).click()
 }
@@ -135,6 +142,7 @@ test(cases.happy, async ({ page, browser }, info) => {
     expect(bridge('snapshot', { email })).toMatchObject({ users: 0, clients: 0, consumed: 0 })
     expect(await continuation.evaluate(() => !localStorage.getItem('backoffice_access_token') && !localStorage.getItem('backoffice_refresh_token'))).toBe(true)
     expect(await continuation.evaluate(values => values.every(value => !JSON.stringify([history.state, localStorage, sessionStorage]).includes(value)), [pending, proof, password])).toBe(true)
+    await continuation.getByRole('button', { name: 'Check sign-in method' }).click()
     await continuation.getByLabel('Original signup password').fill(password)
     await continuation.getByRole('button', { name: 'Verify email', exact: true }).click()
     await expect(continuation.getByRole('dialog', { name: 'Create your first product' })).toBeVisible()
@@ -159,7 +167,7 @@ test(cases.continuation, async ({ page, browser }) => {
   await signup(page, email)
   const proof = mail(email)
   await page.goto('/verify-email#proof=' + proof)
-  await expect(page.getByLabel('Original signup password')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Check sign-in method' })).toBeVisible()
   await page.reload()
   await expect(page.getByText(/reopen the newest applicable email link/i)).toBeVisible()
   expect(bridge('snapshot', { email }).consumed).toBe(0)

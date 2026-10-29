@@ -10,6 +10,7 @@ export interface PendingAccountResponse {
   status: 'check_email'
   pendingToken: string
   expiresIn: number
+  authMethod?: 'email_password' | 'google'
 }
 
 export interface PendingAccountRequest {
@@ -34,6 +35,7 @@ export interface PendingAccount {
   email: string
   expiresAt: number
   nextRequestAt: number
+  authMethod?: 'email_password' | 'google'
 }
 
 export type VerifyAccountRequest = { proof: string } & (

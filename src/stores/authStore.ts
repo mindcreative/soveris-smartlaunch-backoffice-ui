@@ -183,13 +183,14 @@ export const useAuthStore = create<AuthStore>()(devtools(persist((set, get) => {
       tokens(access, refresh)
       bindAuthorityToken(null)
       set({ accessToken: access, refreshTokenValue: refresh, user: null, isAuthenticated: false, isLoading: true })
+      const installedTokens: StoredTokenSnapshot = { available: true, accessToken: access, refreshToken: refresh }
+      const ownsAcceptance = () => currentAuthorityEpoch() === expectedEpoch && get().accessToken === access &&
+        get().refreshTokenValue === refresh && sameStoredTokens(installedTokens, storedTokenSnapshot())
 
       try {
         const current = parseCurrentAuthority(await authApi.currentAuthority())
-        const sameOperation = currentAuthorityEpoch() === expectedEpoch && get().accessToken === access &&
-          localStorage.getItem('backoffice_access_token') === access && localStorage.getItem('backoffice_refresh_token') === refresh
 
-        if (!sameOperation) {
+        if (!ownsAcceptance()) {
           return false
         }
 
@@ -210,10 +211,11 @@ export const useAuthStore = create<AuthStore>()(devtools(persist((set, get) => {
 
         return true
       } catch {
-        if (currentAuthorityEpoch() === expectedEpoch) {
-          await clear()
+        if (!ownsAcceptance()) {
+          return false
         }
 
+        await clear()
         throw { code: 'account_flow_unavailable', loginRequired: true }
       }
     },

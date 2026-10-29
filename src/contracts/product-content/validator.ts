@@ -1,8 +1,5 @@
-import Ajv2020, { type ErrorObject, type ValidateFunction } from "ajv/dist/2020.js";
-import addFormats from "ajv-formats";
-import draftSchema from "./v1/product-content.schema.json";
-import publishSchema from "./v1/product-content-publish.schema.json";
-import formSchema from "./v1/form-profile.schema.json";
+import type { ErrorObject } from "ajv";
+import { draftValidator, publishValidator } from "@/contracts/product-content/generated/validators.cjs";
 import type {
   Checkbox,
   Email,
@@ -30,20 +27,6 @@ export interface ContractResult {
   errors: ContractIssue[];
   warnings: ContractIssue[];
 }
-
-const ajv = new Ajv2020({
-  allErrors: true,
-  coerceTypes: false,
-  removeAdditional: false,
-  strict: true,
-  useDefaults: false,
-});
-addFormats(ajv);
-ajv.addSchema(formSchema);
-ajv.addSchema(draftSchema);
-
-const draftValidator = ajv.getSchema(draftSchema.$id) as ValidateFunction;
-const publishValidator = ajv.compile(publishSchema);
 
 function escapePointer(value: string): string {
   return value.replace(/~/gu, "~0").replace(/\//gu, "~1");

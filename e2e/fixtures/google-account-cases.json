@@ -1,0 +1,7 @@
+{
+  "trusted": "google signed ownership activates once and repeat login keeps the same account",
+  "mailbox": "google unrelated email requires real mail and independent continuation",
+  "denial": "google invalid signature and foreign browser leave no account effects",
+  "cancel": "google denied consent and duplicate completion remain recoverable",
+  "link": "google collision requires fresh password proof and separate confirmation without another workspace"
+}

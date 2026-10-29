@@ -2,10 +2,32 @@ import { test, expect } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { currentAuthorityFixture } from '../src/test/authorityFixtures'
 import { fulfillLocal, installTimeZoneRoute } from './localPresentationMocks'
+import { readFileSync } from 'node:fs'
 
 test.use({ trace: 'off', screenshot: 'off', video: 'off' })
 
 const proof = 'A'.repeat(43)
+
+test('built account starts under its enforced CSP while dynamic evaluation stays blocked', async ({ page }) => {
+  const template = readFileSync(new URL('../nginx.conf', import.meta.url), 'utf8')
+  const policy = template.match(/add_header Content-Security-Policy "([^"]+)" always;/)![1]
+    .replace('__ACCOUNT_API_CONNECT_ORIGIN__', '')
+  await page.route('**/signup', async route => {
+    const response = await route.fetch()
+    await route.fulfill({ response, headers: { ...response.headers(), 'Content-Security-Policy': policy } })
+  })
+  await page.goto('/signup')
+  await expect(page.getByLabel('Email address')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Continue with Google', exact: true })).toBeVisible()
+  await page.route('**/fixtures/csp-probe.js', route => route.fulfill({ contentType: 'application/javascript',
+    body: "try { Function('return true')(); document.documentElement.dataset.cspEvalBlocked = 'false' } catch { document.documentElement.dataset.cspEvalBlocked = 'true' }" }))
+  await page.evaluate(() => {
+    const script = document.createElement('script')
+    script.src = '/fixtures/csp-probe.js'
+    document.head.append(script)
+  })
+  await expect(page.locator('html')).toHaveAttribute('data-csp-eval-blocked', 'true')
+})
 
 test('proof is scrubbed before optional requests and never posts on open, reload, back or prefetch', async ({ page }) => {
   const posts: string[] = []
@@ -13,12 +35,16 @@ test('proof is scrubbed before optional requests and never posts on open, reload
   await page.route('**/api/backoffice/**', route => {
     posts.push(route.request().method())
 
+    if (route.request().url().endsWith('/registration/proof-context')) {
+      return route.fulfill({ json: { authMethod: 'email_password', expiresIn: 300, completed: false } })
+    }
+
     return route.fulfill({ status: 400, json: { code: 'invalid_or_expired_proof' } })
   })
   page.on('request', request => { referrers.push(request.headers().referer ?? '') })
   await page.goto('/verify-email#proof=' + proof)
   await expect(page).toHaveURL(/\/verify-email$/)
-  await expect(page.getByLabel('Original signup password')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Check sign-in method' })).toBeVisible()
   expect(posts).toEqual([])
   expect(referrers.every(value => !value.includes(proof))).toBe(true)
   expect(await page.evaluate(() => JSON.stringify([history.state, localStorage, sessionStorage]).includes('A'.repeat(43)))).toBe(false)
@@ -26,6 +52,7 @@ test('proof is scrubbed before optional requests and never posts on open, reload
   await expect(page.getByText(/reopen the newest applicable email link/i)).toBeVisible()
   await page.goto('/verify-email#proof=' + proof)
   await expect(page).toHaveURL(/\/verify-email$/)
+  await page.getByRole('button', { name: 'Check sign-in method' }).click()
   await expect(page.getByLabel('Original signup password')).toBeVisible()
   await page.getByLabel('Original signup password').fill('discard on the next link')
   await page.goto('/verify-email#proof=' + proof + '&proof=' + proof)
@@ -35,7 +62,7 @@ test('proof is scrubbed before optional requests and never posts on open, reload
   await page.getByRole('link', { name: 'Log in', exact: true }).click()
   await page.goBack()
   await expect(page).toHaveURL(/\/verify-email$/)
-  expect(posts).toEqual([])
+  expect(posts).toEqual(['POST'])
 })
 
 test('each public account screen follows System, reflows and passes axe without secret artifacts', async ({ page }, info) => {
@@ -44,6 +71,7 @@ test('each public account screen follows System, reflows and passes axe without 
     ['/signup', 'Create account'], ['/login', 'Log in'], ['/check-email', 'Check your email'],
     ['/verify-email#proof=' + proof, 'Verify your email'], ['/forgot-password', 'Forgot password?'],
     ['/reset-password#proof=' + proof, 'Reset your password'],
+    ['/account/google/complete', 'Finish Google sign-in'],
   ]
 
   for (const [path, title] of pages) {
@@ -102,6 +130,7 @@ test('fresh activation authorization opens the existing creation modal once with
   let currentLookups = 0
   const authority = currentAuthorityFixture({ permissions: ['products:view', 'products:create'] })
   await installTimeZoneRoute(page)
+  await page.route('**/api/backoffice/auth/registration/proof-context', route => route.fulfill({ json: { authMethod: 'email_password', expiresIn: 300, completed: false } }))
   await page.route('**/api/backoffice/auth/registration/verify', route => route.fulfill({ json: {
     status: 'activated', nextAction: 'create_first_product', session: { accessToken: 'fixture-access', refreshToken: 'fixture-refresh', expiresIn: 3600, user: authority },
   } }))
@@ -118,6 +147,7 @@ test('fresh activation authorization opens the existing creation modal once with
     return fulfillLocal(route, { json: { items: [], page: 1, totalPages: 1, totalCount: 0, pageSize: 20 } })
   })
   await page.goto('/verify-email#proof=' + proof)
+  await page.getByRole('button', { name: 'Check sign-in method' }).click()
   await page.getByLabel('Original signup password').fill('original')
   await page.getByRole('button', { name: 'Verify email', exact: true }).click()
   await expect(page).toHaveURL(/\/products$/)
@@ -147,7 +177,9 @@ test('reset and completed activation replay never grant session authority', asyn
   expect(resets).toBe(1)
   expect(await page.evaluate(() => localStorage.getItem('backoffice_access_token') === null)).toBe(true)
   await page.route('**/api/backoffice/auth/registration/verify', route => route.fulfill({ json: { status: 'activation_complete', loginRequired: true } }))
+  await page.route('**/api/backoffice/auth/registration/proof-context', route => route.fulfill({ json: { authMethod: 'email_password', expiresIn: 300, completed: false } }))
   await page.goto('/verify-email#proof=' + proof)
+  await page.getByRole('button', { name: 'Check sign-in method' }).click()
   await page.getByLabel('Original signup password').fill('original')
   await page.getByRole('button', { name: 'Verify email', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Activation complete' })).toBeVisible()

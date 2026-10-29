@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { googleAccountApi } from '../../account/googleAccountApi'
 import { AccountLayout } from '../../account/AccountLayout'
 import { AccountFeedback } from '../../account/AccountFeedback'
 import { accountEmail } from '../../account/credentials'
@@ -9,6 +10,7 @@ import { useAccountAction, useAccountClock } from '../../account/useAccountActio
 import { ACCOUNT_BUTTON_CLASS, ACCOUNT_INPUT_CLASS, ACCOUNT_LIMITS, ACCOUNT_LINK_CLASS } from '../../account/constants/accountLifecycle'
 
 export default function CheckEmailPage() {
+  const navigate = useNavigate()
   const action = useAccountAction()
   const now = useAccountClock()
   const pending = accountFlow.pending()
@@ -17,6 +19,7 @@ export default function CheckEmailPage() {
   const [notice, setNotice] = useState('')
   const [invalidPending, setInvalidPending] = useState(false)
   const available = pending && !invalidPending
+  const google = pending?.authMethod === 'google'
   const remaining = Math.max(0, Math.ceil((Math.max(pending?.nextRequestAt ?? 0, action.retryAt) - now) / 1000))
 
   function request(kind: 'resend' | 'correct', form?: HTMLFormElement): void {
@@ -62,22 +65,30 @@ export default function CheckEmailPage() {
 
   return <AccountLayout title="Check your email">
     {available ? <>
-      <p className="break-words text-sm">Requested destination: {pending.email}</p>
+      <p className="break-words text-sm">{google ? 'Verification requested for the address from your Google account.' : `Requested destination: ${pending.email}`}</p>
       <p className="text-sm text-muted">If eligible and within delivery limits, an email can arrive. This response does not guarantee delivery. Open the newest applicable link and deliberately verify your email.</p>
-      <p className="text-sm text-muted">This signup request expires in at most {Math.max(1, Math.ceil((pending.expiresAt - now) / 60000))} minutes. Resend and correction do not extend its lifetime or change the original password.</p>
+      <p className="text-sm text-muted">This signup request expires in at most {Math.max(1, Math.ceil((pending.expiresAt - now) / 60000))} minutes. {google ? 'Resend does not extend its lifetime. Continue with the same Google identity; no local password is created.' : 'Resend and correction do not extend its lifetime or change the original password.'}</p>
       <AccountFeedback error={action.error} pending={action.pending} />
       {notice && <p role="status" className="text-sm">{notice}</p>}
       {remaining > 0 && <p className="text-sm text-muted">You can request another email in {remaining} seconds. Delivery limits still apply.</p>}
       <button type="button" disabled={action.pending || remaining > 0} className={ACCOUNT_BUTTON_CLASS} onClick={() => request('resend')}>Request another email</button>
-      <form noValidate className="space-y-3" onSubmit={event => { event.preventDefault(); request('correct', event.currentTarget) }}>
+      {!google && <form noValidate className="space-y-3" onSubmit={event => { event.preventDefault(); request('correct', event.currentTarget) }}>
         <label htmlFor="correct-email" className="block text-sm font-medium">Correct email address</label>
         <input id="correct-email" name="email" type="email" autoComplete="email" inputMode="email" value={correction}
           onChange={event => setCorrection(event.target.value)} className={ACCOUNT_INPUT_CLASS} required aria-invalid={!!emailError} aria-describedby={emailError ? 'correct-email-error' : undefined} />
         {emailError && <p id="correct-email-error" className="text-sm text-danger">{emailError}</p>}
         <button type="submit" disabled={action.pending || remaining > 0} className={ACCOUNT_BUTTON_CLASS}>Request email correction</button>
-      </form>
-    </> : <p role="status" className="text-sm">This signup request is expired or unavailable in this page. Reopen your email link and use your original signup password. Reload cannot recover the pending request.</p>}
+      </form>}
+    </> : <p role="status" className="text-sm">This signup request is expired or unavailable in this page. Reopen your email link and check its sign-in method to continue. Reload cannot recover the pending request.</p>}
     <p className="text-sm text-muted">A fresh signup is a separate capped attempt and might not send immediately. Requesting another email does not revalidate an old link.</p>
-    <Link to="/signup" onClick={() => accountFlow.clear()} className={ACCOUNT_LINK_CLASS}>Start a fresh signup</Link>
+    {google && pending ? <button type="button" className={ACCOUNT_LINK_CLASS} disabled={action.pending} onClick={() => void action.run(async operation => {
+      await googleAccountApi.cancel(pending.pendingToken, operation.signal)
+
+      if (operation.isCurrent()) {
+        accountFlow.clear()
+        navigate('/signup', { replace: true, state: null })
+      }
+    })}>Start again with another Google account</button>
+      : <Link to="/signup" onClick={() => accountFlow.clear()} className={ACCOUNT_LINK_CLASS}>Start a fresh signup</Link>}
   </AccountLayout>
 }

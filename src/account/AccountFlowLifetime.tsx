@@ -14,7 +14,7 @@ export function AccountFlowLifetime() {
       return
     }
 
-    const pendingContinuation = Boolean(matchPath('/signup', from) && matchPath('/check-email', pathname))
+    const pendingContinuation = Boolean((matchPath('/signup', from) || matchPath('/account/google/complete', from)) && matchPath('/check-email', pathname))
 
     accountFlow.leavePage(pendingContinuation)
   }, [pathname])

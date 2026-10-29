@@ -14,6 +14,15 @@ async function submit<Response>(path: string, body: unknown, signal?: AbortSigna
 }
 
 export const accountLifecycleApi = {
+  async proofContext(proof: string, signal?: AbortSignal): Promise<{ authMethod: 'email_password' | 'google'; expiresIn: number; completed: boolean }> {
+    const result = await submit<{ authMethod: string; expiresIn: number; completed: boolean }>(ACCOUNT_ENDPOINTS.proofContext, { proof }, signal)
+
+    if (typeof result.completed !== 'boolean' || result.authMethod !== 'email_password' && result.authMethod !== 'google' || !Number.isSafeInteger(result.expiresIn) || result.expiresIn <= 0 || result.expiresIn > 1800) {
+      return invalidResponse()
+    }
+
+    return { authMethod: result.authMethod, expiresIn: result.expiresIn, completed: result.completed }
+  },
   async register(request: RegisterAccountRequest, signal?: AbortSignal): Promise<PendingAccountResponse> {
     const result = await submit<PendingAccountResponse>(ACCOUNT_ENDPOINTS.register, request, signal)
 

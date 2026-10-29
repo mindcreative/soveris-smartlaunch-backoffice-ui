@@ -1,6 +1,25 @@
 import { currentAuthorityEpoch } from '../auth/authorityEpoch'
 import { useAuthStore } from '../stores/authStore'
 import type { FirstProductHandoffDependencies, IFirstProductHandoff } from './models/accountLifecycle'
+import type { AuthResponse } from '../types/auth'
+
+export function acceptedAccountSessionIsCurrent(session: AuthResponse): boolean {
+  const current = useAuthStore.getState()
+  const expected = session.user
+  const user = current.user
+
+  if (!expected || !user) {
+    return false
+  }
+
+  try {
+    return current.isAuthenticated && current.accessToken === session.accessToken && current.refreshTokenValue === session.refreshToken &&
+      user.sessionId === expected.sessionId && user.id === expected.id &&
+      localStorage.getItem('backoffice_access_token') === session.accessToken && localStorage.getItem('backoffice_refresh_token') === session.refreshToken
+  } catch {
+    return false
+  }
+}
 
 class FirstProductHandoff implements IFirstProductHandoff {
   private _intent: { sessionId: string; epoch: number } | null = null

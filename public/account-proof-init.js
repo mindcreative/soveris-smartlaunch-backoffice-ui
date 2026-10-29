@@ -15,9 +15,10 @@
 
     var route = pathname.replace(/\/+$/, '').toLowerCase();
     var action = route === '/verify-email' || route === '/reset-password';
+    var google = route === '/account/google/complete' || route === '/account/google/link';
     var misplacedProof = /(?:^#|&)proof(?:=|&|$)/i.test(location.hash) || /(?:^\?|&)proof(?:=|&|$)/i.test(location.search);
 
-    if (action || misplacedProof) {
+    if (action || google || misplacedProof) {
       captured = null;
       var match = /^#proof=([A-Za-z0-9_-]{42}[AEIMQUYcgkosw048])$/.exec(location.hash);
 
@@ -26,11 +27,11 @@
           expiresAt: Date.now() + (route === '/verify-email' ? 1800000 : 900000) };
       }
 
-      history.replaceState(null, '', action ? route : location.pathname);
+      history.replaceState(null, '', action || google ? route : location.pathname);
       match = null;
     }
 
-    if (notify && (action || misplacedProof)) {
+    if (notify && (action || google || misplacedProof)) {
       window.dispatchEvent(new Event('account:proof-entry'));
     }
   }

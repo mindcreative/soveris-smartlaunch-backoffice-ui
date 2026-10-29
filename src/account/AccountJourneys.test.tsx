@@ -13,6 +13,7 @@ beforeEach(() => {
   localStorage.clear()
   useAuthStore.setState({ user: null, accessToken: null, refreshTokenValue: null, isAuthenticated: false,
     isInitialized: true, isLoading: false, authorityUnavailable: false })
+  vi.spyOn(accountLifecycleApi, 'proofContext').mockResolvedValue({ authMethod: 'email_password', expiresIn: 1800, completed: false })
 })
 
 function open(path: string) {
@@ -67,7 +68,7 @@ describe('minimal account journeys', () => {
     const resend = vi.spyOn(accountLifecycleApi, 'resend')
     open('/check-email')
 
-    expect(screen.getByText(/reopen.*email.*original signup password/i)).toBeInTheDocument()
+    expect(screen.getByText(/reopen.*email.*check its sign-in method/i)).toBeInTheDocument()
     expect(register).not.toHaveBeenCalled()
     expect(resend).not.toHaveBeenCalled()
   })
@@ -118,6 +119,7 @@ describe('minimal account journeys', () => {
     expect(screen.queryByRole('button', { name: 'Verify email' })).not.toBeInTheDocument()
     expect(verify).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Sign out to continue' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Check sign-in method' }))
     await screen.findByLabelText('Original signup password')
 
     expect(accountFlow.proof('verify')).not.toBeNull()
@@ -128,6 +130,7 @@ describe('minimal account journeys', () => {
     accountFlow.setProof({ kind: 'verify', proof: 'A'.repeat(43), expiresAt: Date.now() + 100000 })
     const verify = vi.spyOn(accountLifecycleApi, 'verify').mockRejectedValue({ status: 503, code: 'account_flow_unavailable', loginRequired: true })
     open('/verify-email')
+    await userEvent.click(screen.getByRole('button', { name: 'Check sign-in method' }))
     await userEvent.type(screen.getByLabelText('Original signup password'), 'original')
     await userEvent.click(screen.getByRole('button', { name: 'Verify email' }))
     await screen.findByRole('heading', { name: 'Activation complete' })
@@ -183,6 +186,7 @@ describe('minimal account journeys', () => {
     let fail!: (error: unknown) => void
     const lookup = vi.spyOn(authApi, 'currentAuthority').mockImplementation(() => new Promise((_resolve, reject) => { fail = reject }))
     open('/verify-email')
+    await userEvent.click(screen.getByRole('button', { name: 'Check sign-in method' }))
     fireEvent.change(screen.getByLabelText('Original signup password'), { target: { value: 'original' } })
     await userEvent.click(screen.getByRole('button', { name: 'Verify email' }))
     await waitFor(() => expect(lookup).toHaveBeenCalledTimes(1))

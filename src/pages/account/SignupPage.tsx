@@ -4,6 +4,7 @@ import { AccountLayout } from '../../account/AccountLayout'
 import { PasswordField } from '../../account/PasswordField'
 import { AccountFeedback } from '../../account/AccountFeedback'
 import { AccountNotices } from '../../account/AccountNotices'
+import { GoogleAccountButton, GoogleAccountSeparator } from '../../account/GoogleAccountButton'
 import { accountEmail, newPasswordError } from '../../account/credentials'
 import { accountFlow } from '../../account/accountFlow'
 import { accountLifecycleApi } from '../../account/accountLifecycleApi'
@@ -48,7 +49,10 @@ export default function SignupPage() {
     }, () => setPassword(''))
   }
 
-  return <AccountLayout title="Create account" description="Start with your email and a password. Verify your email before opening a workspace.">
+  return <AccountLayout title="Create account" description="Choose Google or an email and password. Your email must be verified before opening a workspace.">
+    <AccountNotices />
+    <GoogleAccountButton intent="signup" disabled={action.pending} />
+    <GoogleAccountSeparator />
     <form noValidate onSubmit={submit} className="space-y-4" aria-busy={action.pending}>
       <AccountFeedback error={action.error} pending={action.pending} />
       <div><label htmlFor="email" className="block text-sm font-medium">Email address</label>
@@ -58,7 +62,6 @@ export default function SignupPage() {
         {emailError && <p id="email-error" className="mt-1 text-sm text-danger">{emailError}</p>}
       </div>
       <PasswordField value={password} onChange={setPassword} newPassword error={passwordError} />
-      <AccountNotices />
       <button type="submit" disabled={action.pending || now < action.retryAt} className={ACCOUNT_BUTTON_CLASS}>Create account</button>
     </form>
   </AccountLayout>

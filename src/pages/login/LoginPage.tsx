@@ -6,6 +6,8 @@ import { useAuthStore } from '../../stores/authStore'
 import { useAuth } from '../../hooks/useAuth'
 import { AccountLayout } from '../../account/AccountLayout'
 import { PasswordField } from '../../account/PasswordField'
+import { GoogleAccountButton, GoogleAccountSeparator } from '../../account/GoogleAccountButton'
+import { GOOGLE_ACCOUNT } from '../../account/constants/googleAccount'
 import { useAccountClock } from '../../account/useAccountAction'
 import { ACCOUNT_BUTTON_CLASS, ACCOUNT_INPUT_CLASS, ACCOUNT_LIMITS, ACCOUNT_LINK_CLASS } from '../../account/constants/accountLifecycle'
 import type { ApiError } from '../../api/apiClient'
@@ -24,7 +26,7 @@ export default function LoginPage() {
   const operation = useRef<AbortController | null>(null)
   const summary = useRef<HTMLDivElement>(null)
   const busy = useRef(false)
-  const state = location.state as { from?: unknown; accountOutcome?: unknown } | null
+  const state = location.state as { from?: unknown; accountOutcome?: unknown; googleLink?: unknown } | null
 
   useEffect(() => () => operation.current?.abort(), [])
 
@@ -77,7 +79,7 @@ export default function LoginPage() {
       }
 
       setPassword('')
-      navigate(safeReturnPath(state?.from, useAuthStore.getState().user), { replace: true, state: null })
+      navigate(state?.googleLink === true ? GOOGLE_ACCOUNT.linkPath : safeReturnPath(state?.from, useAuthStore.getState().user), { replace: true, state: null })
     } catch (failure) {
       if (controller.signal.aborted) {
         return
@@ -114,6 +116,8 @@ export default function LoginPage() {
   }
 
   return <AccountLayout title="Log in" description="Sign in to manage your workspace.">
+    <GoogleAccountButton intent="login" disabled={pending} />
+    <GoogleAccountSeparator />
     {state?.accountOutcome === 'activation_complete' && <p role="status" className="text-sm">Activation completed, but the session could not be established. Log in normally to continue.</p>}
     <form noValidate onSubmit={event => void submit(event)} className="space-y-4" aria-busy={pending}>
       {error && <div id="login-error" ref={summary} role="alert" tabIndex={-1} className="rounded-lg border border-danger-line bg-danger-soft p-3 text-sm text-danger">{error}</div>}

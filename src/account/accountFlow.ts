@@ -24,7 +24,7 @@ export function createAccountFlow(dependencies: AccountFlowDependencies): Accoun
       return pending
     },
     setPending: (receipt, email, requestStartedAt = dependencies.now()) => {
-      pending = { pendingToken: receipt.pendingToken, email,
+      pending = { pendingToken: receipt.pendingToken, email, authMethod: receipt.authMethod ?? 'email_password',
         expiresAt: Math.min(dependencies.now(), requestStartedAt) + receipt.expiresIn * 1000,
         nextRequestAt: dependencies.now() + ACCOUNT_LIMITS.resendPacingSeconds * 1000 }
     },

@@ -15,9 +15,11 @@ COPY . .
 # Vite embeds public configuration into the static bundle at build time.
 ARG VITE_API_BASE_URL=https://backoffice-api.soveris.com/api/backoffice
 ARG VITE_APP_ENV=production
+ARG GOOGLE_ACCOUNT_API_UPSTREAM=http://back-office-api:8030
 
 # Build the application
 RUN npm run build
+RUN node scripts/render-account-nginx.mjs nginx.conf /tmp/account-nginx.conf "$VITE_API_BASE_URL" "$GOOGLE_ACCOUNT_API_UPSTREAM"
 
 # Production stage
 FROM nginx:alpine
@@ -26,7 +28,7 @@ FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
 
 # Copy nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /tmp/account-nginx.conf /etc/nginx/conf.d/default.conf
 
 # Expose port 80
 EXPOSE 80

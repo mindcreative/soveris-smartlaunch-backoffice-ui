@@ -13,6 +13,8 @@ import CheckEmail from './pages/account/CheckEmailPage'
 import VerifyEmail from './pages/account/VerifyEmailPage'
 import ForgotPassword from './pages/account/ForgotPasswordPage'
 import ResetPassword from './pages/account/ResetPasswordPage'
+import GoogleComplete from './pages/account/GoogleCompletePage'
+import GoogleLink from './pages/account/GoogleLinkPage'
 import { AccountBoundary } from './account/AccountBoundary'
 import { AccountFlowLifetime } from './account/AccountFlowLifetime'
 import { ACCOUNT_ROUTES } from './account/constants/accountLifecycle'
@@ -74,7 +76,9 @@ function Application() {
               <Route path="/verify-email" element={<VerifyEmail />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/account/google/complete" element={<GoogleComplete />} />
             </Route>
+            <Route path="/account/google/link" element={<GoogleLink />} />
             <Route path="/forbidden" element={<Forbidden />} />
 
             {/* Protected routes under AdminShell */}
@@ -149,7 +153,9 @@ function Application() {
 
 function SessionAppearance() {
   const accountMatch = useMatch('/:accountRoute')
-  const isLogin = ACCOUNT_ROUTES.some(route => route === '/' + accountMatch?.params.accountRoute?.toLowerCase())
+  const googleMatch = useMatch('/account/google/:action')
+  const isLogin = ACCOUNT_ROUTES.some(route => route === '/' + accountMatch?.params.accountRoute?.toLowerCase()) ||
+    ['complete', 'link'].includes(googleMatch?.params.action?.toLowerCase() ?? '')
   const { user, isAuthenticated, isInitialized, accessToken, refreshTokenValue } = useAuth()
   // Match the existing auth restoration policy without making appearance an
   // authority for access. Login always stays on System, including submit/restore.

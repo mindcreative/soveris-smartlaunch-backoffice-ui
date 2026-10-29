@@ -6,6 +6,7 @@ import { currentAuthorityEpoch } from '../auth/authorityEpoch'
 import { accountFlow } from './accountFlow'
 import { AccountLayout } from './AccountLayout'
 import { ACCOUNT_BUTTON_CLASS } from './constants/accountLifecycle'
+import { googleAccountApi } from './googleAccountApi'
 
 export function AccountBoundary() {
   const initialized = useAuthStore(state => state.isInitialized)
@@ -23,13 +24,16 @@ export function AccountBoundary() {
     }
 
     const retire = () => {
+      if (location.pathname === '/account/google/complete' || accountFlow.pending()?.authMethod === 'google') {
+        void googleAccountApi.cancel().catch(() => undefined)
+      }
       accountFlow.clear()
       setGeneration(previous => previous + 1)
     }
     window.addEventListener('auth:retired', retire)
 
     return () => window.removeEventListener('auth:retired', retire)
-  }, [initialized])
+  }, [initialized, location.pathname])
 
   useEffect(() => {
     accountFlow.cancel()
@@ -88,7 +92,7 @@ export function AccountBoundary() {
     return <AccountLayout title="Checking current session"><p role="status">Restoring access…</p></AccountLayout>
   }
 
-  const acceptingThisActivation = loading && /^\/verify-email\/*$/i.test(location.pathname)
+  const acceptingThisActivation = loading && /^(?:\/verify-email|\/account\/google\/complete)\/*$/i.test(location.pathname)
 
   if (signedIn || unavailable || (useAuthStore.getState().accessToken && !acceptingThisActivation)) {
     return <AccountLayout title="Continue with another account" description="A current or unverified session is present. Sign out explicitly before starting an account action.">

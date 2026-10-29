@@ -1,4 +1,4 @@
-export const ACCOUNT_ROUTES = ['/signup', '/login', '/check-email', '/verify-email', '/forgot-password', '/reset-password'] as const
+export const ACCOUNT_ROUTES = ['/signup', '/login', '/check-email', '/verify-email', '/forgot-password', '/reset-password', '/account/google/complete', '/account/google/link'] as const
 
 export const ACCOUNT_ENDPOINTS = {
   register: '/auth/register',
@@ -7,6 +7,7 @@ export const ACCOUNT_ENDPOINTS = {
   verify: '/auth/registration/verify',
   forgot: '/auth/password/forgot',
   reset: '/auth/password/reset',
+  proofContext: '/auth/registration/proof-context',
 } as const
 
 export const ACCOUNT_LIMITS = {
@@ -26,6 +27,7 @@ export const ACCOUNT_ERROR_MESSAGES = {
   invalid_account_request: 'Check the email and password requirements and try again. Common or easily guessed passwords are not accepted.',
   invalid_or_expired_proof: 'This link or continuation could not be accepted. Reopen the newest applicable email or request a fresh recovery link.',
   invalid_pending_authority: 'This signup request is no longer available. Reopen your email link and use your original signup password.',
+  invalid_google_flow: 'This Google attempt could not be accepted. Start a fresh Google sign-in. Existing accounts require their own fresh proof before linking.',
   account_flow_limited: 'Too many attempts. Wait before trying again.',
   account_flow_unavailable: 'Account services are temporarily unavailable. Try again later.',
   account_flow_uncertain: 'The result could not be confirmed. If you completed activation, try logging in. Otherwise reopen your email before retrying.',

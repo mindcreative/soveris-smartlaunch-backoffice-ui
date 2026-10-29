@@ -9,7 +9,7 @@
     // their segment. Malformed paths keep their raw value, as the router does.
     var pathname = location.pathname;
     try { pathname = pathname.split('/').map(function (segment) { return decodeURIComponent(segment).replace(/\//g, '%2F'); }).join('/'); } catch (_) {}
-    var publicAccount = ['/login', '/signup', '/check-email', '/verify-email', '/forgot-password', '/reset-password']
+    var publicAccount = ['/login', '/signup', '/check-email', '/verify-email', '/forgot-password', '/reset-password', '/account/google/complete', '/account/google/link']
       .indexOf(pathname.replace(/\/+$/, '').toLowerCase()) !== -1;
     if (!publicAccount) {
       var session = JSON.parse(localStorage.getItem('backoffice-auth-persist') || 'null');
