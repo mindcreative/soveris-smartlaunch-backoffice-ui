@@ -1,5 +1,6 @@
 import { apiClient } from '../api/apiClient'
-import { ACCOUNT_ENDPOINTS, ACCOUNT_LIMITS, ACCOUNT_PROOF_PATTERN } from './constants/accountLifecycle'
+import { accountAdmissionApi } from './accountAdmissionApi'
+import { ACCOUNT_ENDPOINTS } from './constants/accountLifecycle'
 import type { AccountVerificationResponse, CorrectAccountEmailRequest, ForgotAccountPasswordRequest, PendingAccountRequest,
   PendingAccountResponse, RegisterAccountRequest, ResetAccountPasswordRequest, VerifyAccountRequest } from './models/accountLifecycle'
 
@@ -23,15 +24,8 @@ export const accountLifecycleApi = {
 
     return { authMethod: result.authMethod, expiresIn: result.expiresIn, completed: result.completed }
   },
-  async register(request: RegisterAccountRequest, signal?: AbortSignal): Promise<PendingAccountResponse> {
-    const result = await submit<PendingAccountResponse>(ACCOUNT_ENDPOINTS.register, request, signal)
-
-    if (result?.status !== 'check_email' || !ACCOUNT_PROOF_PATTERN.test(result.pendingToken) ||
-      !Number.isSafeInteger(result.expiresIn) || result.expiresIn <= 0 || result.expiresIn > ACCOUNT_LIMITS.pendingSeconds) {
-      return invalidResponse()
-    }
-
-    return { status: 'check_email', pendingToken: result.pendingToken, expiresIn: result.expiresIn }
+  register(request: RegisterAccountRequest, signal?: AbortSignal, csrf?: string): Promise<PendingAccountResponse> {
+    return accountAdmissionApi.register(request, signal, csrf)
   },
   async resend(request: PendingAccountRequest, signal?: AbortSignal): Promise<void> {
     const result = await submit<{ status: string }>(ACCOUNT_ENDPOINTS.resend, request, signal)

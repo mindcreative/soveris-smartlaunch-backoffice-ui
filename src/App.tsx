@@ -15,6 +15,7 @@ import ForgotPassword from './pages/account/ForgotPasswordPage'
 import ResetPassword from './pages/account/ResetPasswordPage'
 import GoogleComplete from './pages/account/GoogleCompletePage'
 import GoogleLink from './pages/account/GoogleLinkPage'
+import { AccountDocumentPolicy } from './account/AccountDocumentPolicy'
 import { AccountBoundary } from './account/AccountBoundary'
 import { AccountFlowLifetime } from './account/AccountFlowLifetime'
 import { ACCOUNT_ROUTES } from './account/constants/accountLifecycle'
@@ -67,7 +68,7 @@ function Application() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <AccountFlowLifetime />
-          <Routes>
+          <AccountDocumentPolicy><Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
             <Route element={<AccountBoundary />}>
@@ -129,7 +130,7 @@ function Application() {
 
             {/* Catch-all */}
             <Route path="*" element={<Landing />} />
-          </Routes>
+          </Routes></AccountDocumentPolicy>
 
           <ToastContainer
             icon={NotificationIcon}

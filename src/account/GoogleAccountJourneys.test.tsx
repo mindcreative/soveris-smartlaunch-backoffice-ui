@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, it, vi } from 'vitest'
 import App from '../App'
+import { ADMISSION_FIXTURE, completeAccountChallenge, mockAccountAdmission } from '../test/accountAdmissionFixture'
 import { authApi } from '../api/endpoints'
 import { useAuthStore } from '../stores/authStore'
 import { currentAuthorityFixture } from '../test/authorityFixtures'
@@ -10,6 +11,7 @@ import { accountLifecycleApi } from './accountLifecycleApi'
 import { googleAccountApi } from './googleAccountApi'
 
 beforeEach(async () => {
+  mockAccountAdmission()
   await useAuthStore.getState().clearSession()
   localStorage.clear()
   accountFlow.clear()
@@ -29,10 +31,20 @@ it.each(['/signup', '/login'])('offers a deliberate branded Google action and se
   expect(button.compareDocumentPosition(screen.getByLabelText('Email address')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(screen.getByText('or')).toBeInTheDocument()
   expect(start).not.toHaveBeenCalled()
+  if (path === '/signup') {
+    await completeAccountChallenge()
+  }
+
   await userEvent.click(button)
   await screen.findByRole('alert')
 
-  expect(start).toHaveBeenCalledWith(path === '/signup' ? 'signup' : 'login', undefined, expect.any(AbortSignal))
+  if (path === '/signup') {
+    expect(start).toHaveBeenCalledWith('signup', undefined, expect.any(AbortSignal), {
+      contextId: ADMISSION_FIXTURE.contextId, token: 'fixture-challenge-token', csrf: ADMISSION_FIXTURE.csrf,
+    })
+  } else {
+    expect(start).toHaveBeenCalledWith('login', undefined, expect.any(AbortSignal))
+  }
   expect(screen.queryByText('private-canary')).not.toBeInTheDocument()
   expect(useAuthStore.getState().isAuthenticated).toBe(false)
   expect(document.querySelector('script[src*="google"],iframe')).toBeNull()

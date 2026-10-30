@@ -16,10 +16,11 @@ COPY . .
 ARG VITE_API_BASE_URL=https://backoffice-api.soveris.com/api/backoffice
 ARG VITE_APP_ENV=production
 ARG GOOGLE_ACCOUNT_API_UPSTREAM=http://back-office-api:8030
+ARG ACCOUNT_CHALLENGE_ORIGIN=
 
 # Build the application
 RUN npm run build
-RUN node scripts/render-account-nginx.mjs nginx.conf /tmp/account-nginx.conf "$VITE_API_BASE_URL" "$GOOGLE_ACCOUNT_API_UPSTREAM"
+RUN node scripts/render-account-nginx.mjs nginx.conf /tmp/account-nginx.conf "$VITE_API_BASE_URL" "$GOOGLE_ACCOUNT_API_UPSTREAM" "$ACCOUNT_CHALLENGE_ORIGIN"
 
 # Production stage
 FROM nginx:alpine

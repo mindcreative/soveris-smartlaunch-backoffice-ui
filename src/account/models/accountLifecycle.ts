@@ -4,6 +4,8 @@ export interface RegisterAccountRequest {
   email: string
   password: string
   returnIntent?: 'create_first_product'
+  admissionContext?: string
+  turnstileToken?: string
 }
 
 export interface PendingAccountResponse {

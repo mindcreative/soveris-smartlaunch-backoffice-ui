@@ -27,7 +27,7 @@ export function AccountLayout({ title, description, children }: AccountLayoutPro
           <Link to="/login" className={ACCOUNT_LINK_CLASS}>Log in</Link>
         </nav>
       </main>
-      <p className="mt-6 text-center text-xs text-muted">© {new Date().getFullYear()} Soveris SmartLaunch. All rights reserved.</p>
+      <footer className="mt-6 text-center text-xs text-muted">© {new Date().getFullYear()} Soveris SmartLaunch. All rights reserved.</footer>
     </div>
   </div>
 }

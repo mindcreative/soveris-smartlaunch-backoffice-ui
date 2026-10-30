@@ -1,0 +1,16 @@
+server {
+    listen 80;
+    server_name __CHALLENGE_HOST__;
+    root /usr/share/nginx/html;
+    access_log off;
+    error_log /dev/null crit;
+    if ($host != "__CHALLENGE_HOST__") { return 404; }
+    add_header Cache-Control "no-store" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Content-Security-Policy "default-src 'none'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; connect-src https://challenges.cloudflare.com; img-src data: https://challenges.cloudflare.com; style-src 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors __ACCOUNT_ORIGIN__" always;
+    location = / { limit_except GET { deny all; } try_files /index.html =404; }
+    location = /challenge.js { limit_except GET { deny all; } try_files $uri =404; }
+    location = /challenge-config.js { limit_except GET { deny all; } try_files $uri =404; }
+    location / { return 404; }
+}

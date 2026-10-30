@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AxiosInstance } from 'axios'
 import { apiClient } from '../api/apiClient'
 import { bindAuthorityToken } from '../auth/authorityEpoch'
@@ -11,12 +11,23 @@ beforeEach(() => {
   bindAuthorityToken('unrelated-full-session')
 })
 
+afterEach(() => vi.unstubAllGlobals())
+
 describe('exact anonymous lifecycle transport', () => {
   const pendingToken = 'A'.repeat(43)
   const proof = 'Q'.repeat(42) + 'A'
 
   it('sends exact DTOs with neither a full bearer nor implicit continuation properties', async () => {
     const sent: { path: string | undefined; body: unknown }[] = []
+    vi.stubGlobal('fetch', vi.fn(async (path: string, config: RequestInit) => {
+      expect(config.headers).not.toHaveProperty('Authorization')
+      expect(config.headers).toHaveProperty('X-Account-Admission-CSRF', proof)
+      sent.push({ path, body: JSON.parse(String(config.body)) })
+
+      return new Response(JSON.stringify({ status: 'check_email', pendingToken, expiresIn: 86400 }), {
+        status: 202, headers: { 'Content-Type': 'application/json' },
+      })
+    }))
     transport.defaults.adapter = async config => {
       expect(config.headers.has('Authorization')).toBe(false)
       sent.push({ path: config.url, body: JSON.parse(config.data) })
@@ -31,7 +42,7 @@ describe('exact anonymous lifecycle transport', () => {
       return { data, status: 200, statusText: 'OK', headers: {}, config }
     }
 
-    await accountLifecycleApi.register({ email: 'test@example.test', password: ' exact password ', returnIntent: 'create_first_product' })
+    await accountLifecycleApi.register({ email: 'test@example.test', password: ' exact password ', returnIntent: 'create_first_product', admissionContext: pendingToken, turnstileToken: 'fixture-token' }, undefined, proof)
     await accountLifecycleApi.resend({ pendingToken })
     await accountLifecycleApi.correctEmail({ pendingToken, email: 'next@example.test' })
     await accountLifecycleApi.verify({ proof, pendingToken })
@@ -40,7 +51,7 @@ describe('exact anonymous lifecycle transport', () => {
     await accountLifecycleApi.reset({ proof, newPassword: ' replacement password ' })
 
     expect(sent).toEqual([
-      { path: '/auth/register', body: { email: 'test@example.test', password: ' exact password ', returnIntent: 'create_first_product' } },
+      { path: '/api/backoffice/auth/register', body: { email: 'test@example.test', password: ' exact password ', returnIntent: 'create_first_product', admissionContext: pendingToken, turnstileToken: 'fixture-token' } },
       { path: '/auth/registration/resend', body: { pendingToken } },
       { path: '/auth/registration/correct-email', body: { pendingToken, email: 'next@example.test' } },
       { path: '/auth/registration/verify', body: { proof, pendingToken } },
@@ -86,7 +97,7 @@ describe('exact anonymous lifecycle transport', () => {
     }
 
     await expect(accountLifecycleApi.verify({ proof, pendingToken })).rejects.toEqual({
-      code: 'account_flow_unavailable', status: 503, message: 'Account services are temporarily unavailable. Try again later.',
+      code: 'account_flow_unavailable', status: 503, message: 'Account services are temporarily unavailable. Please try again shortly.',
       loginRequired: true, retryAfterSeconds: 90, correlationId,
     })
   })
@@ -98,7 +109,7 @@ describe('exact anonymous lifecycle transport', () => {
     }
 
     await expect(accountLifecycleApi.resend({ pendingToken })).rejects.toEqual({
-      code: 'account_flow_limited', status: 429, message: 'Too many attempts. Wait before trying again.',
+      code: 'account_flow_limited', status: 429, message: 'Too many attempts. Please wait and try again.',
     })
   })
 
@@ -107,6 +118,7 @@ describe('exact anonymous lifecycle transport', () => {
       throw { code: 'ERR_CANCELED', message: 'private-canary', config, request: { password: 'private-canary' } }
     }
 
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue({ code: 'ERR_CANCELED', message: 'private-canary', config: { password: 'private-canary' } }))
     const failure = await accountLifecycleApi.register({ email: 'test@example.test', password: 'private-canary' }).catch(error => error)
 
     expect(Object.keys(failure).sort()).toEqual(['code', 'message', 'status'])

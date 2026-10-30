@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useTurnstileChallenge } from '../../account/useTurnstileChallenge'
+import { TurnstileChallenge } from '../../account/TurnstileChallenge'
 import { useNavigate } from 'react-router-dom'
 import { AccountLayout } from '../../account/AccountLayout'
 import { PasswordField } from '../../account/PasswordField'
@@ -14,6 +16,7 @@ import { ACCOUNT_BUTTON_CLASS, ACCOUNT_INPUT_CLASS } from '../../account/constan
 export default function SignupPage() {
   const navigate = useNavigate()
   const action = useAccountAction()
+  const challenge = useTurnstileChallenge()
   const now = useAccountClock()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -35,7 +38,9 @@ export default function SignupPage() {
 
     void action.run(async operation => {
       const requestStartedAt = Date.now()
-      const receipt = await accountLifecycleApi.register({ email: canonical, password, returnIntent: 'create_first_product' }, operation.signal)
+      const admission = challenge.consume()
+      const receipt = await accountLifecycleApi.register({ email: canonical, password, returnIntent: 'create_first_product',
+        admissionContext: admission.contextId, turnstileToken: admission.token }, operation.signal, admission.csrf)
 
       if (!operation.isCurrent()) {
         return
@@ -46,12 +51,13 @@ export default function SignupPage() {
       // the server's absolute pending lifetime in this local UX projection.
       accountFlow.setPending(receipt, canonical, requestStartedAt)
       navigate('/check-email', { replace: true, state: null })
-    }, () => setPassword(''))
+    })
   }
 
   return <AccountLayout title="Create account" description="Choose Google or an email and password. Your email must be verified before opening a workspace.">
     <AccountNotices />
-    <GoogleAccountButton intent="signup" disabled={action.pending} />
+    <TurnstileChallenge challenge={challenge} />
+    <GoogleAccountButton intent="signup" disabled={action.pending || challenge.status !== 'ready'} admission={challenge.consume} />
     <GoogleAccountSeparator />
     <form noValidate onSubmit={submit} className="space-y-4" aria-busy={action.pending}>
       <AccountFeedback error={action.error} pending={action.pending} />
@@ -62,7 +68,7 @@ export default function SignupPage() {
         {emailError && <p id="email-error" className="mt-1 text-sm text-danger">{emailError}</p>}
       </div>
       <PasswordField value={password} onChange={setPassword} newPassword error={passwordError} />
-      <button type="submit" disabled={action.pending || now < action.retryAt} className={ACCOUNT_BUTTON_CLASS}>Create account</button>
+      <button type="submit" disabled={action.pending || now < action.retryAt || challenge.status !== 'ready'} className={ACCOUNT_BUTTON_CLASS}>Create account</button>
     </form>
   </AccountLayout>
 }

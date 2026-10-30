@@ -1,0 +1,455 @@
+{
+  "schemaVersion": 1,
+  "policyVersion": "account-abuse-v1",
+  "purpose": "Required verification inventory; entries are requirements, never execution claims.",
+  "cases": [
+    {
+      "id": "V1.strict_options",
+      "lane": "V1",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V1.turnstile_response_shapes",
+      "lane": "V1",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V1.trusted_peer_identity",
+      "lane": "V1",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V1.operation_catalogue",
+      "lane": "V1",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V1.challenge_protocol",
+      "lane": "V1",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V1.admission_transport",
+      "lane": "V1",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V1.operator_cli",
+      "lane": "V1",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V1.standards",
+      "lane": "V1",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V2.empty_baseline_repeat",
+      "lane": "V2",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V2.effective_grants",
+      "lane": "V2",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V2.pause_default",
+      "lane": "V2",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V2.pause_revision_replay",
+      "lane": "V2",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V2.pause_activation_race",
+      "lane": "V2",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V2.post_lock_expiry",
+      "lane": "V2",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V2.activation_exactly_once",
+      "lane": "V2",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V2.pending_email_limits",
+      "lane": "V2",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V2.cleanup_boundaries",
+      "lane": "V2",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V2.smtp_slot_authority",
+      "lane": "V2",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V3.atomic_dimensions",
+      "lane": "V3",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V3.nat_distinct_targets",
+      "lane": "V3",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V3.same_target_different_network",
+      "lane": "V3",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V3.two_replica_concurrency",
+      "lane": "V3",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V3.single_use_context",
+      "lane": "V3",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V3.namespace_flood",
+      "lane": "V3",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V3.missing_corrupt_state",
+      "lane": "V3",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V3.timeout_oom",
+      "lane": "V3",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V3.flush_restart_restore",
+      "lane": "V3",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V3.process_restart",
+      "lane": "V3",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V3.secret_rotation",
+      "lane": "V3",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V4.proxy_spoofing",
+      "lane": "V4",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V4.exact_operations",
+      "lane": "V4",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V4.direct_admission_bypass",
+      "lane": "V4",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V4.provider_rejections",
+      "lane": "V4",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V4.provider_deadlines",
+      "lane": "V4",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V4.google_creation_vs_login_link",
+      "lane": "V4",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V4.pause_outages",
+      "lane": "V4",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V4.independent_forbidden_effects",
+      "lane": "V4",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V5.last_product_slot",
+      "lane": "V5",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V5.reactivate_restore_race",
+      "lane": "V5",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V5.mixed_asset_reservations",
+      "lane": "V5",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V5.receipt_recovery",
+      "lane": "V5",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V5.cross_client",
+      "lane": "V5",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V5.physical_enospc",
+      "lane": "V5",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V5.staging_crash_cleanup",
+      "lane": "V5",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V5.two_worker_smtp_limit",
+      "lane": "V5",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V5.smtp_uncertain_reconciliation",
+      "lane": "V5",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V6.account_google_navigation_regression",
+      "lane": "V6",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V6.challenge_outcomes",
+      "lane": "V6",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V6.message_binding",
+      "lane": "V6",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V6.explicit_retry_fields",
+      "lane": "V6",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V6.pending_memory",
+      "lane": "V6",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V6.document_csp_bfcache",
+      "lane": "V6",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V6.mobile_keyboard_zoom_axe",
+      "lane": "V6",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V6.privacy",
+      "lane": "V6",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V6.enumeration_100_samples",
+      "lane": "V6",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V7.real_turnstile",
+      "lane": "V7",
+      "required": true,
+      "kind": "real-provider/manual"
+    },
+    {
+      "id": "V7.real_expiry_replay_hostname",
+      "lane": "V7",
+      "required": true,
+      "kind": "real-provider/manual"
+    },
+    {
+      "id": "V7.manual_keyboard_screenreader",
+      "lane": "V7",
+      "required": true,
+      "kind": "real-provider/manual"
+    },
+    {
+      "id": "V7.manual_400_zoom_200_text",
+      "lane": "V7",
+      "required": true,
+      "kind": "real-provider/manual"
+    },
+    {
+      "id": "V7.mobile_touch",
+      "lane": "V7",
+      "required": true,
+      "kind": "real-provider/manual"
+    },
+    {
+      "id": "V8.authorization_sessions",
+      "lane": "V8",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V8.account_lifecycle",
+      "lane": "V8",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V8.google",
+      "lane": "V8",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V8.notification",
+      "lane": "V8",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V8.products_storage",
+      "lane": "V8",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V8.navigation_footer",
+      "lane": "V8",
+      "required": true,
+      "kind": "deterministic"
+    },
+    {
+      "id": "V9.final_hosts_tls_cookies_csp",
+      "lane": "V9",
+      "required": true,
+      "kind": "final-environment"
+    },
+    {
+      "id": "V9.actual_proxy",
+      "lane": "V9",
+      "required": true,
+      "kind": "final-environment"
+    },
+    {
+      "id": "V9.credential_operator_custody",
+      "lane": "V9",
+      "required": true,
+      "kind": "final-environment"
+    },
+    {
+      "id": "V9.alerts_retention",
+      "lane": "V9",
+      "required": true,
+      "kind": "final-environment"
+    },
+    {
+      "id": "V9.measured_capacity_quotas",
+      "lane": "V9",
+      "required": true,
+      "kind": "final-environment"
+    },
+    {
+      "id": "V9.provider_email",
+      "lane": "V9",
+      "required": true,
+      "kind": "final-environment"
+    },
+    {
+      "id": "V9.package_mfa_release",
+      "lane": "V9",
+      "required": true,
+      "kind": "final-environment"
+    }
+  ],
+  "browserCases": {
+    "isolation": "Challenge resources stay in a distinct child with host-only admission cookies",
+    "messages": "Foreign origin source nonce and open messages cannot enable signup",
+    "retry": "Blocked provider requires deliberate retry and preserves typed fields",
+    "denial": "A recoverable mutation denial clears challenge without replay or account effects",
+    "documents": "Signup document seals before login and reloads before reentry and variants",
+    "history": "Back forward and restored signup documents retain the frame policy boundary",
+    "mobile": "Challenge keyboard controls fit a 320 pixel layout without accessibility violations",
+    "proxy": "Built proxy rejects method query suffix encoded and oversized admission aliases"
+  }
+}

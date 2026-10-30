@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { completeChallenge, installChallengeProvider } from './accountAbuseProvider'
 import { execFileSync } from 'node:child_process'
 import { randomUUID, createHash } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -40,6 +41,7 @@ async function signup(page: Page, email: string): Promise<string> {
   await page.goto('/signup')
   await page.getByLabel('Email address').fill(email)
   await page.getByLabel('Password', { exact: true }).fill(password)
+  await completeChallenge(page)
   const receipt = page.waitForResponse(response => response.url().endsWith(prefix + '/register'))
   await page.getByRole('button', { name: 'Create account', exact: true }).click()
   const response = await receipt
@@ -80,7 +82,9 @@ async function rememberSession(page: Page): Promise<{ access: string; refresh: s
   return session
 }
 
-test.beforeEach(() => {
+test.beforeEach(async ({ context }) => {
+  expect(bridge('begin-case', {}).ready).toBe(true)
+  await installChallengeProvider(context)
   sensitive.clear()
   sensitive.add(password)
   sensitive.add(newPassword)

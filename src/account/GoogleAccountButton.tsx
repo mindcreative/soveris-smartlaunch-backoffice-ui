@@ -2,20 +2,24 @@ import { accountFlow } from './accountFlow'
 import { googleAccountApi } from './googleAccountApi'
 import { useAccountAction, useAccountClock } from './useAccountAction'
 import { AccountFeedback } from './AccountFeedback'
+import type { SignupChallengeAdmission } from './models/turnstile'
 import type { GoogleIntent } from './models/googleAccount'
 
-export function GoogleAccountButton({ intent, proof, label = 'Continue with Google', disabled = false }: {
+export function GoogleAccountButton({ intent, proof, label = 'Continue with Google', disabled = false, admission }: {
   intent: GoogleIntent
   proof?: string
   label?: string
   disabled?: boolean
+  admission?: () => SignupChallengeAdmission
 }) {
   const action = useAccountAction()
   const now = useAccountClock()
 
   function start(): void {
     void action.run(async operation => {
-      const response = await googleAccountApi.start(intent, proof, operation.signal)
+      const signup = intent === 'signup' ? admission?.() : undefined
+      const response = signup ? await googleAccountApi.start(intent, proof, operation.signal, signup)
+        : await googleAccountApi.start(intent, proof, operation.signal)
 
       if (!operation.isCurrent()) {
         return

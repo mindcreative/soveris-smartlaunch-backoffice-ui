@@ -2,13 +2,16 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App'
+import { ADMISSION_FIXTURE, completeAccountChallenge, mockAccountAdmission } from '../test/accountAdmissionFixture'
 import { accountFlow } from './accountFlow'
 import { accountLifecycleApi } from './accountLifecycleApi'
+import { accountAdmissionApi } from './accountAdmissionApi'
 import { useAuthStore } from '../stores/authStore'
 import { currentAuthorityFixture } from '../test/authorityFixtures'
 import { authApi } from '../api/endpoints'
 
 beforeEach(() => {
+  mockAccountAdmission()
   accountFlow.clear()
   localStorage.clear()
   useAuthStore.setState({ user: null, accessToken: null, refreshTokenValue: null, isAuthenticated: false,
@@ -22,9 +25,19 @@ function open(path: string) {
 }
 
 describe('minimal account journeys', () => {
-  it.each(['/signup', '/SIGNUP', '/signup/', '/SiGnUp/'])('preserves pending signup from %s without creating session authority', async path => {
+  it.each(['/signup', '/SIGNUP', '/signup/', '/SiGnUp/'])('enforces the signup document boundary at %s without creating session authority', async path => {
     const register = vi.spyOn(accountLifecycleApi, 'register').mockResolvedValue({ status: 'check_email', pendingToken: 'A'.repeat(43), expiresIn: 86400 })
     open(path)
+
+    if (path !== '/signup') {
+      expect(screen.queryByLabelText('Email address')).not.toBeInTheDocument()
+      expect(screen.queryByTitle('Complete the account security check')).not.toBeInTheDocument()
+      expect(register).not.toHaveBeenCalled()
+
+      return
+    }
+
+    await completeAccountChallenge()
     const user = userEvent.setup()
     const password = ' exact signup password '
     await user.type(screen.getByLabelText('Email address'), 'User+Tag@example.test')
@@ -37,7 +50,7 @@ describe('minimal account journeys', () => {
     await user.click(screen.getByRole('button', { name: 'Create account' }))
     await screen.findByRole('heading', { name: 'Check your email' })
 
-    expect(register).toHaveBeenCalledWith({ email: 'user+tag@example.test', password, returnIntent: 'create_first_product' }, expect.any(AbortSignal))
+    expect(register).toHaveBeenCalledWith({ email: 'user+tag@example.test', password, returnIntent: 'create_first_product', admissionContext: ADMISSION_FIXTURE.contextId, turnstileToken: 'fixture-challenge-token' }, expect.any(AbortSignal), ADMISSION_FIXTURE.csrf)
     expect(accountFlow.pending()).toMatchObject({ pendingToken: 'A'.repeat(43), email: 'user+tag@example.test' })
     expect(screen.getByLabelText('Correct email address')).toBeInTheDocument()
     expect(useAuthStore.getState().isAuthenticated).toBe(false)
@@ -101,6 +114,7 @@ describe('minimal account journeys', () => {
     open('/signup')
     fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'a@example.test' } })
     fireEvent.change(screen.getByLabelText('Password', { exact: true }), { target: { value: 'long enough password' } })
+    await completeAccountChallenge()
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
     await userEvent.click(screen.getByRole('link', { name: 'Log in' }))
     await act(async () => { finish({ status: 'check_email', pendingToken: 'A'.repeat(43), expiresIn: 86400 }) })
@@ -147,6 +161,7 @@ describe('minimal account journeys', () => {
     open('/signup')
     fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'a@example.test' } })
     fireEvent.change(screen.getByLabelText('Password', { exact: true }), { target: { value: 'long enough password' } })
+    await completeAccountChallenge()
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
     await act(async () => { await useAuthStore.getState().clearSession(); finish() })
 
@@ -159,7 +174,7 @@ describe('minimal account journeys', () => {
     fireEvent.change(screen.getByLabelText('Password', { exact: true }), { target: { value: 'private draft password' } })
     act(() => window.dispatchEvent(new Event('pagehide')))
 
-    expect(screen.getByLabelText('Password', { exact: true })).toHaveValue('')
+    expect(screen.queryByLabelText('Password', { exact: true })).not.toBeInTheDocument()
     expect(accountFlow.pending()).toBeNull()
   })
 
@@ -196,5 +211,37 @@ describe('minimal account journeys', () => {
     expect(window.location.pathname).toBe('/signup')
     expect(useAuthStore.getState().isAuthenticated).toBe(false)
     expect(accountFlow.proof('verify')).toBeNull()
+  })
+})
+
+
+describe('abuse denial recovery', () => {
+  it.each([
+    ['challenge_required', 400, 'Please complete the security check again.'],
+    ['registration_paused', 503, 'New registrations are temporarily paused. Existing customers can still log in.'],
+    ['account_rate_limited', 429, 'Too many attempts. Please wait and try again.'],
+    ['account_temporarily_unavailable', 503, 'Account services are temporarily unavailable. Please try again shortly.'],
+  ] as const)('retains fields and requires an explicit fresh check after %s', async (code, status, message) => {
+    const register = vi.spyOn(accountLifecycleApi, 'register').mockRejectedValue({ code, status, retryAfterSeconds: 5 })
+    open('/signup')
+    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'owned-recovery@example.test' } })
+    fireEvent.change(screen.getByLabelText('Password', { exact: true }), { target: { value: 'owned recovery fixture phrase' } })
+    await completeAccountChallenge()
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    const feedback = await screen.findByRole('alert')
+
+    expect(feedback).toHaveTextContent(message)
+    expect(feedback).toHaveFocus()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Email address')).toHaveValue('owned-recovery@example.test')
+    expect(screen.getByLabelText('Password', { exact: true })).toHaveValue('owned recovery fixture phrase')
+    expect(screen.getByRole('button', { name: 'Create account' })).toBeDisabled()
+    expect(register).toHaveBeenCalledTimes(1)
+    expect(accountAdmissionApi.context).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Retry security check' }))
+    await waitFor(() => expect(accountAdmissionApi.context).toHaveBeenCalledTimes(2))
+
+    expect(register).toHaveBeenCalledTimes(1)
+    expect(useAuthStore.getState().isAuthenticated).toBe(false)
   })
 })

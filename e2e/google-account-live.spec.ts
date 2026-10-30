@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { completeChallenge, installChallengeProvider } from './accountAbuseProvider'
 import { execFileSync } from 'node:child_process'
 import { randomUUID, createHash } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -44,6 +45,11 @@ async function provider(page: Page, email: string, scenario: 'trusted' | 'mailbo
 
 async function enter(page: Page, path: '/signup' | '/login'): Promise<void> {
   await page.goto(path)
+
+  if (path === '/signup') {
+    await completeChallenge(page)
+  }
+
   await page.getByRole('button', { name: 'Continue with Google', exact: true }).click()
   await expect(page).toHaveURL('http://127.0.0.1:5173/account/google/complete')
   expect(await page.evaluate(() => !JSON.stringify([history.state, sessionStorage]).includes('code='))).toBe(true)
@@ -76,6 +82,8 @@ function captureSecrets(value: unknown): void {
 }
 
 test.beforeEach(async ({ context }) => {
+  expect(fixture('begin-case', {}).ready).toBe(true)
+  await installChallengeProvider(context)
   secrets.clear()
   context.on('response', response => {
     if (!response.url().includes('/api/backoffice/auth/')) {
@@ -196,6 +204,7 @@ test(cases.link, async ({ page }) => {
   await page.goto('/signup')
   await page.getByLabel('Email address').fill(email)
   await page.getByLabel('Password', { exact: true }).fill(password)
+  await completeChallenge(page)
   await page.getByRole('button', { name: 'Create account', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible()
   const proof = fixture('mail', { email, kind: 'verify', excluded: [] }).proof as string

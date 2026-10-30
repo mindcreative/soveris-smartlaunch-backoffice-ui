@@ -1,3 +1,5 @@
+import type { SignupChallengeAdmission } from './models/turnstile'
+import { ACCOUNT_ADMISSION } from './constants/turnstile'
 import { normalizeAccountError } from './accountLifecycleError'
 import { ACCOUNT_PROOF_PATTERN } from './constants/accountLifecycle'
 import { GOOGLE_ACCOUNT } from './constants/googleAccount'
@@ -82,16 +84,19 @@ async function context(signal?: AbortSignal): Promise<GoogleContext> {
   return { csrf: result.csrf, expiresIn: result.expiresIn, enabled: true }
 }
 
-async function submit(path: string, body: unknown, signal?: AbortSignal, accessToken?: string): Promise<Record<string, unknown>> {
+async function submit(path: string, body: unknown, signal?: AbortSignal, accessToken?: string, additionalHeaders: Record<string, string> = {}): Promise<Record<string, unknown>> {
   const browser = await context(signal)
 
-  return request(path, body, signal, { 'X-Account-CSRF': browser.csrf,
+  return request(path, body, signal, { 'X-Account-CSRF': browser.csrf, ...additionalHeaders,
     ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) })
 }
 
 export const googleAccountApi = {
-  async start(intent: GoogleIntent, proof?: string, signal?: AbortSignal): Promise<GoogleStart> {
-    const result = await submit('/start', { intent, ...(proof ? { proof } : {}) }, signal)
+  async start(intent: GoogleIntent, proof?: string, signal?: AbortSignal, admission?: SignupChallengeAdmission): Promise<GoogleStart> {
+    const signup = intent === 'signup' ? admission : undefined
+    const result = await submit('/start', { intent, ...(proof ? { proof } : {}),
+      ...(signup ? { admissionContext: signup.contextId, turnstileToken: signup.token } : {}) }, signal, undefined,
+      signup ? { [ACCOUNT_ADMISSION.csrfHeader]: signup.csrf } : {})
 
     if (typeof result.authorizationUrl !== 'string' || result.authorizationUrl.length > 8192 || typeof result.expiresIn !== 'number' ||
       !Number.isSafeInteger(result.expiresIn) || result.expiresIn <= 0 || result.expiresIn > GOOGLE_ACCOUNT.maximumSeconds) {
