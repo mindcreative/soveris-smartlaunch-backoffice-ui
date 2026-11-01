@@ -1,3 +1,5 @@
+import { useNavigate } from 'react-router-dom'
+import { MFA_ROUTES } from '../../account/constants/mfa'
 import { useEffect, useState, type RefObject } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Check, ChevronDown, LogOut, Menu, Monitor, Moon, Sun } from 'lucide-react'
@@ -13,6 +15,7 @@ interface TopBarProps {
 const choices = [{ value: 'system', label: 'System', Icon: Monitor }, { value: 'light', label: 'Light', Icon: Sun }, { value: 'dark', label: 'Dark', Icon: Moon }] as const
 
 export function TopBar({ onOpenMobileNavigation, menuButtonRef }: TopBarProps) {
+  const navigate = useNavigate()
   const { user, logout } = useAuth(), appearance = useAppearance(), location = useLocation()
   const [open, setOpen] = useState<'appearance' | 'user' | null>(null)
   useEffect(() => { setOpen(null) }, [location.key, user?.id, user?.clientId, user?.role])
@@ -42,6 +45,7 @@ export function TopBar({ onOpenMobileNavigation, menuButtonRef }: TopBarProps) {
           <div role="presentation" className="break-words border-b border-line px-3 py-3 text-sm">
             <p className="font-semibold">{name}</p><p className="mt-1 text-muted">{user?.email}</p><p className="mt-1 text-muted">{user?.role}</p>
           </div>
+          <button type="button" role="menuitem" tabIndex={-1} className="header-menu-item" onClick={() => { setOpen(null); navigate(MFA_ROUTES.security) }}>Account security</button>
           <button type="button" role="menuitem" tabIndex={-1} className="header-menu-item" onClick={() => { setOpen(null); void logout() }}><LogOut aria-hidden="true" size={18} />Logout</button>
         </HeaderMenu>
       </div>

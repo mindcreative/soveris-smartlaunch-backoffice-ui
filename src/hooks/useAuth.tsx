@@ -1,3 +1,4 @@
+import { hasMfaAssurance } from '../auth/mfaAuthority'
 import { createContext, useContext, useEffect, ReactNode } from 'react'
 import { useAuthStore } from '../stores/authStore'
 import { hasAnyPermission as projectedAny, hasPermission as projected } from '../auth/permissions'
@@ -44,14 +45,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     window.addEventListener('storage',storage)
     window.addEventListener('auth:storage-changed',synchronize)
-    // Also reconcile after a tab was frozen or restored from browser history.
-    window.addEventListener('pageshow',synchronize)
-    window.addEventListener('focus',synchronize)
+    const verifyCurrent = () => {
+      const state = useAuthStore.getState()
+
+      if (state.user?.assuranceGeneration && !hasMfaAssurance(state.user)) {
+        state.retirePrivileged()
+      }
+
+      void state.synchronizeSessionFromStorage().then(() => useAuthStore.getState().revalidateAuthority())
+        .catch(() => useAuthStore.getState().suspendAuthority())
+    }
+    // An unchanged JWT cannot preserve expired or revoked platform assurance.
+    window.addEventListener('pageshow',verifyCurrent)
+    window.addEventListener('focus',verifyCurrent)
     return () => {
       window.removeEventListener('storage',storage)
       window.removeEventListener('auth:storage-changed',synchronize)
-      window.removeEventListener('pageshow',synchronize)
-      window.removeEventListener('focus',synchronize)
+      window.removeEventListener('pageshow',verifyCurrent)
+      window.removeEventListener('focus',verifyCurrent)
     }
   }, [])
 

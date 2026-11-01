@@ -8,11 +8,16 @@ const apiBasePath = parsedApiBaseUrl.pathname
 const apiProxyTarget = apiBaseUrl.startsWith('/') ? 'http://localhost:5000' : parsedApiBaseUrl.origin
 const googlePrefix = '/api/backoffice/auth/google/'
 const googleUpstream = process.env.GOOGLE_ACCOUNT_API_UPSTREAM
+const mfaUpstream = googleUpstream || apiProxyTarget
+const mfaPrefix = '/api/backoffice/auth/mfa/'
+const mfaPaths = ['status', 'reauth/password', 'enrollment/start', 'enrollment/confirm', 'enrollment/cancel', 'challenge/start', 'challenge/verify', 'challenge/cancel',
+  'recovery-codes/regenerate', 'factor/remove', 'login/verify', 'login/cancel', 'recovery/consume', 'recovery/redeem', 'recovery/cancel', 'recovery/enrollment/start', 'recovery/enrollment/confirm']
+const mfaMethods = new Map([...mfaPaths.map(action => [mfaPrefix + action, action === 'status' ? 'GET' : 'POST'] as const), ['/api/backoffice/auth/login', 'POST'] as const])
 const challengeOrigin = process.env.ACCOUNT_CHALLENGE_ORIGIN || ''
 const admissionPaths = ['/api/backoffice/auth/admission/context', '/api/backoffice/auth/register']
-const googleMethods = new Map(['context', 'callback', 'start', 'complete', 'cancel', 'link-proof', 'link']
+const googleMethods = new Map(['context', 'callback', 'start', 'complete', 'cancel', 'link-proof', 'link', 'reauth-start', 'reauth-complete', 'reauth-cancel']
   .map(action => [googlePrefix + action, action === 'context' ? 'GET' : 'POST']))
-const accountDocument = /^\/(signup|login|check-email|verify-email|forgot-password|reset-password|account\/google\/(complete|link))\/*$/i
+const accountDocument = /^\/(signup|login|check-email|verify-email|forgot-password|reset-password|account\/google\/(complete|link|reauth-complete)|account\/security|account\/mfa\/(enroll|challenge|recover))\/*$/i
 
 if (challengeOrigin) {
   const child = new URL(challengeOrigin)
@@ -71,9 +76,10 @@ export default defineConfig({
         const admission = /^\/api\/backoffice\/auth\/(admission|register)/i.test(parsed.pathname) ||
           /^\/api\/backoffice\/auth\/(admission|register)/i.test(decoded)
         const google = /^\/api\/backoffice\/auth\/google/i.test(parsed.pathname) || /^\/api\/backoffice\/auth\/google/i.test(decoded)
-        const protectedRoute = admission || google
-        const expectedMethod = admission ? 'POST' : googleMethods.get(target)
-        const maximumBody = admission ? 16384 : 8192
+        const mfa = /^\/api\/backoffice\/auth\/(mfa|login)/i.test(parsed.pathname) || /^\/api\/backoffice\/auth\/(mfa|login)/i.test(decoded)
+        const protectedRoute = admission || google || mfa
+        const expectedMethod = admission ? 'POST' : mfa ? mfaMethods.get(target) : googleMethods.get(target)
+        const maximumBody = admission ? 16384 : mfa || target.startsWith(googlePrefix + 'reauth-') ? 4096 : 8192
         const length = request.headers['content-length']
         const validLength = typeof length === 'string' && /^\d{1,5}$/.test(length) && Number(length) <= maximumBody
 
@@ -87,12 +93,12 @@ export default defineConfig({
 
         if (accountDocument.test(parsed.pathname)) {
           const frame = target === '/signup' && challengeOrigin ? challengeOrigin : "'none'"
-          response.setHeader('Content-Security-Policy', `default-src 'self'; script-src 'self'; connect-src 'self' ${parsedApiBaseUrl.origin}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-src ${frame}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`)
+          response.setHeader('Content-Security-Policy', `default-src 'self'; script-src 'self'; connect-src 'self' ${parsedApiBaseUrl.origin}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; frame-src ${frame}; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`)
           response.setHeader('Cache-Control', 'no-store')
           response.setHeader('Referrer-Policy', 'no-referrer')
         }
 
-        if (!googleUpstream && protectedRoute) {
+        if (!googleUpstream && (admission || google)) {
           response.writeHead(503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' })
           response.end('{"code":"account_flow_unavailable"}')
 
@@ -124,6 +130,9 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     proxy: {
+      ...Object.fromEntries([...mfaMethods.keys()].map(route => [route, {
+        target: mfaUpstream, changeOrigin: true, followRedirects: false, proxyTimeout: 15000, configure: proxyHeaders,
+      }])),
       ...(googleUpstream ? {
         [googlePrefix]: { target: googleUpstream, changeOrigin: true, followRedirects: false, proxyTimeout: 10000, configure: proxyHeaders },
         ...Object.fromEntries(admissionPaths.map(path => [path, {

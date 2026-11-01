@@ -1,3 +1,4 @@
+import { currentPrivilegedGeneration, setPrivilegedExperience } from '../../auth/mfaAuthority'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
@@ -21,17 +22,21 @@ export function AdminShell() {
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const unavailableHeading = useRef<HTMLHeadingElement>(null)
   const route = experienceRoute(location.pathname, user)
-  const identity = JSON.stringify([route.audience,route.target,user?.id,user?.clientId,user?.sessionId,user?.securityRevision,user?.permissions,user?.platformPermissions])
-  const principal = JSON.stringify([user?.id,user?.clientId,user?.sessionId,user?.securityRevision,user?.permissions,user?.platformPermissions])
+  const privileged = route.audience === 'platform' ? [user?.platformPermissions, user?.assuranceGeneration,
+    user?.assuranceExpiresAt, user?.freshAssuranceExpiresAt, currentPrivilegedGeneration()] : []
+  const identity = JSON.stringify([route.audience, route.target, user?.id, user?.clientId, user?.sessionId, user?.securityRevision, user?.permissions, ...privileged])
+  const principal = JSON.stringify([user?.id, user?.clientId, user?.sessionId, user?.securityRevision, user?.permissions, ...privileged])
   const previousPrincipal = useRef<string | null>(null)
   const [bound, setBound] = useState<string | null>(null)
   useLayoutEffect(() => {
     // The auth store owns identity/session epochs. An audience/target change
     // within that identity needs its own retirement without interrupting restore.
+    setPrivilegedExperience(route.audience === 'platform')
     bindExperienceScope(identity,queryClient,previousPrincipal.current===principal && isAuthenticated && !isLoading)
     previousPrincipal.current=principal
     setBound(identity)
   }, [identity,principal,isAuthenticated,isLoading])
+  useLayoutEffect(() => () => setPrivilegedExperience(false), [])
   useEffect(() => { if(unavailable) unavailableHeading.current?.focus() }, [unavailable])
 
   useEffect(() => {

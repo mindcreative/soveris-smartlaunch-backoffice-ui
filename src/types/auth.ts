@@ -1,6 +1,8 @@
+import type { MfaProjection } from '../account/models/mfa'
+
 export type UserRole = 'ClientOwner' | 'ClientAdmin' | 'Editor' | 'Viewer'
 
-export interface AuthUser {
+export interface AuthUser extends Partial<MfaProjection> {
   id: string
   email: string
   displayName: string

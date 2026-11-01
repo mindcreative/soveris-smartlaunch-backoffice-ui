@@ -1,3 +1,8 @@
+import { useNavigate } from 'react-router-dom'
+import { mfaApi } from '../../account/mfaApi'
+import { mfaFlow } from '../../account/mfaFlow'
+import { MFA_ROUTES } from '../../account/constants/mfa'
+import { hasFreshMfa } from '../../auth/mfaAuthority'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AccountLayout } from '../../account/AccountLayout'
@@ -10,6 +15,7 @@ import { ACCOUNT_BUTTON_CLASS, ACCOUNT_LINK_CLASS } from '../../account/constant
 import { useAuthStore } from '../../stores/authStore'
 
 export default function GoogleLinkPage() {
+  const navigate = useNavigate()
   const current = useAuthStore()
   const action = useAccountAction()
   const [password, setPassword] = useState('')
@@ -29,11 +35,13 @@ export default function GoogleLinkPage() {
     }
     window.addEventListener('auth:retired', retire)
     window.addEventListener('pagehide', clearProof)
+    window.addEventListener('auth:privileged-retired', clearProof)
 
     return () => {
       proof.current = null
       window.removeEventListener('auth:retired', retire)
       window.removeEventListener('pagehide', clearProof)
+      window.removeEventListener('auth:privileged-retired', clearProof)
     }
   }, [])
 
@@ -45,6 +53,8 @@ export default function GoogleLinkPage() {
     }
 
     void action.run(async operation => {
+      await useAuthStore.getState().revalidateAuthority()
+      if (!operation.isCurrent()) return
       const value = await googleAccountApi.linkProof(password, current.accessToken!, operation.signal)
 
       if (operation.isCurrent()) {
@@ -65,6 +75,8 @@ export default function GoogleLinkPage() {
     }
 
     void action.run(async operation => {
+      await useAuthStore.getState().revalidateAuthority()
+      if (!operation.isCurrent()) return
       await googleAccountApi.link(value, current.accessToken!, operation.signal)
 
       if (!operation.isCurrent()) {
@@ -91,6 +103,10 @@ export default function GoogleLinkPage() {
 
   return <AccountLayout title="Confirm Google linking" description="Link only the Google identity from the current attempt to this signed-in account. Your password and workspace stay the same.">
     <AccountFeedback error={action.error} pending={action.pending} />
+    {current.user?.mfaState === 'enrolled' && !hasFreshMfa(current.user) && <button type="button" className={ACCOUNT_LINK_CLASS} disabled={action.pending} onClick={() => void action.run(async operation => {
+      const bound = await mfaApi.startChallenge('google_link', operation.signal)
+      if (operation.isCurrent()) { mfaFlow.setStepUp(bound); mfaFlow.setReturn('/account/google/link'); mfaFlow.offerHandoff(MFA_ROUTES.challenge); navigate(MFA_ROUTES.challenge, { state: null }) }
+    })}>Verify authenticator for privileged linking</button>}
     {proved ? <><p>Confirm that you want to link this Google identity. Linking retires current sessions and requires a fresh Google sign-in.</p>
       <button type="button" className={ACCOUNT_BUTTON_CLASS} disabled={action.pending} onClick={link}>Confirm and link Google</button></>
       : <form onSubmit={prove} className="space-y-4"><PasswordField label="Existing account password" value={password} onChange={setPassword} />

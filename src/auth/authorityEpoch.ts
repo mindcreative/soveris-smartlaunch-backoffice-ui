@@ -1,3 +1,5 @@
+import { registerPrivilegedObjectUrl, releasePrivilegedObjectUrl } from './mfaAuthority'
+
 let epoch = 0
 let validatedAccessToken: string | null | undefined
 const privateUrls = new Set<string>()
@@ -9,14 +11,17 @@ export function currentAuthorityEpoch(): number { return epoch }
 export function retireAuthority(): number {
   epoch++
   window.dispatchEvent(new CustomEvent('auth:retired'))
-  for (const url of privateUrls) URL.revokeObjectURL(url)
+  for (const url of privateUrls) {
+    releasePrivilegedObjectUrl(url)
+    URL.revokeObjectURL(url)
+  }
   privateUrls.clear()
   return epoch
 }
 export function privateObjectUrl(blob: Blob): string {
-  const url = URL.createObjectURL(blob); privateUrls.add(url); return url
+  const url = URL.createObjectURL(blob); privateUrls.add(url); registerPrivilegedObjectUrl(url); return url
 }
-export function releasePrivateObjectUrl(url: string): void { privateUrls.delete(url); URL.revokeObjectURL(url) }
+export function releasePrivateObjectUrl(url: string): void { privateUrls.delete(url); releasePrivilegedObjectUrl(url); URL.revokeObjectURL(url) }
 export class AuthorityChangedError extends Error {
   readonly code = 'AUTHORITY_CHANGED'
   constructor() { super('Session authority changed. Reload the current view.'); this.name = 'AuthorityChangedError' }

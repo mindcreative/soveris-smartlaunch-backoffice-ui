@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react'
+import { act, fireEvent, screen } from '@testing-library/react'
 import { vi } from 'vitest'
 import { accountAdmissionApi } from '../account/accountAdmissionApi'
 import { CHALLENGE_MESSAGES } from '../account/constants/turnstile'
@@ -15,8 +15,10 @@ export function mockAccountAdmission(): void {
 
 export async function completeAccountChallenge(): Promise<void> {
   const frame = await screen.findByTitle('Complete the account security check') as HTMLIFrameElement
-  fireEvent(window, new MessageEvent('message', {
+  await act(async () => { await Promise.resolve() })
+  await act(async () => { fireEvent(window, new MessageEvent('message', {
     origin: ADMISSION_FIXTURE.challengeOrigin, source: frame.contentWindow,
     data: { type: CHALLENGE_MESSAGES.success, nonce: ADMISSION_FIXTURE.nonce, token: 'fixture-challenge-token' },
-  }))
+  })) })
+  await screen.findByText('Security check complete.')
 }

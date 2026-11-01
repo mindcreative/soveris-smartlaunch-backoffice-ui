@@ -1,3 +1,9 @@
+import { MfaBoundary } from './account/MfaBoundary'
+import MfaSecurity from './pages/account/MfaSecurityPage'
+import MfaEnroll from './pages/account/MfaEnrollPage'
+import MfaChallenge from './pages/account/MfaChallengePage'
+import MfaRecovery from './pages/account/MfaRecoveryPage'
+import GoogleReauthComplete from './pages/account/GoogleReauthCompletePage'
 import { pendingAppearanceSubject } from './appearance/sessionHint'
 import { NotificationIcon, NotificationClose } from './appearance/NotificationIcon'
 import { AppearanceProvider, useAppearance } from './appearance/AppearanceProvider'
@@ -68,7 +74,7 @@ function Application() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <AccountFlowLifetime />
-          <AccountDocumentPolicy><Routes>
+          <MfaBoundary><AccountDocumentPolicy><Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
             <Route element={<AccountBoundary />}>
@@ -80,6 +86,11 @@ function Application() {
               <Route path="/account/google/complete" element={<GoogleComplete />} />
             </Route>
             <Route path="/account/google/link" element={<GoogleLink />} />
+            <Route path="/account/security" element={<MfaSecurity />} />
+            <Route path="/account/mfa/enroll" element={<MfaEnroll />} />
+            <Route path="/account/mfa/challenge" element={<MfaChallenge />} />
+            <Route path="/account/mfa/recover" element={<MfaRecovery />} />
+            <Route path="/account/google/reauth-complete" element={<GoogleReauthComplete />} />
             <Route path="/forbidden" element={<Forbidden />} />
 
             {/* Protected routes under AdminShell */}
@@ -130,7 +141,7 @@ function Application() {
 
             {/* Catch-all */}
             <Route path="*" element={<Landing />} />
-          </Routes></AccountDocumentPolicy>
+          </Routes></AccountDocumentPolicy></MfaBoundary>
 
           <ToastContainer
             icon={NotificationIcon}
@@ -155,8 +166,10 @@ function Application() {
 function SessionAppearance() {
   const accountMatch = useMatch('/:accountRoute')
   const googleMatch = useMatch('/account/google/:action')
+  const mfaMatch = useMatch('/account/mfa/:action')
+  const securityMatch = useMatch('/account/security')
   const isLogin = ACCOUNT_ROUTES.some(route => route === '/' + accountMatch?.params.accountRoute?.toLowerCase()) ||
-    ['complete', 'link'].includes(googleMatch?.params.action?.toLowerCase() ?? '')
+    ['complete', 'link', 'reauth-complete'].includes(googleMatch?.params.action?.toLowerCase() ?? '') || ['enroll', 'challenge', 'recover'].includes(mfaMatch?.params.action?.toLowerCase() ?? '') || !!securityMatch
   const { user, isAuthenticated, isInitialized, accessToken, refreshTokenValue } = useAuth()
   // Match the existing auth restoration policy without making appearance an
   // authority for access. Login always stays on System, including submit/restore.

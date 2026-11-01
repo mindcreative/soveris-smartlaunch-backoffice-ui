@@ -16,6 +16,7 @@ beforeEach(async () => {
   localStorage.clear()
   accountFlow.clear()
   vi.spyOn(authApi, 'revoke').mockResolvedValue()
+  vi.spyOn(authApi, 'currentAuthority').mockImplementation(async () => useAuthStore.getState().user!)
 })
 
 function open(path: string) {

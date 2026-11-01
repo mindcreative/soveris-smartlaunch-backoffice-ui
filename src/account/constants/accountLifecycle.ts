@@ -1,4 +1,4 @@
-export const ACCOUNT_ROUTES = ['/signup', '/login', '/check-email', '/verify-email', '/forgot-password', '/reset-password', '/account/google/complete', '/account/google/link'] as const
+export const ACCOUNT_ROUTES = ['/signup', '/login', '/check-email', '/verify-email', '/forgot-password', '/reset-password', '/account/google/complete', '/account/google/link', '/account/security', '/account/mfa/enroll', '/account/mfa/challenge', '/account/mfa/recover', '/account/google/reauth-complete'] as const
 
 export const ACCOUNT_ENDPOINTS = {
   register: '/auth/register',

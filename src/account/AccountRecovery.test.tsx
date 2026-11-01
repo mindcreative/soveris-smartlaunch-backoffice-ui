@@ -101,7 +101,7 @@ describe('recovery and login', () => {
     fireEvent.change(screen.getByLabelText('Password', { exact: true }), { target: { value: 'old' } })
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
 
-    expect(post).toHaveBeenCalledWith('/auth/login', { email: 'fixture@example.test', password: 'old' }, { signal: expect.any(AbortSignal) })
+    expect(post).toHaveBeenCalledWith('/auth/login', { email: 'fixture@example.test', password: 'old' }, { signal: expect.any(AbortSignal), baseURL: '/api/backoffice', retryOnUnauthorized: false })
     await userEvent.click(screen.getByRole('link', { name: 'Create account' }))
     await waitFor(() => expect(cancelled).toHaveBeenCalledTimes(1))
 

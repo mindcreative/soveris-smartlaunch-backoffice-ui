@@ -1,3 +1,5 @@
+import { currentAuthorityFixture } from '../../test/authorityFixtures'
+import { authApi } from '../../api/endpoints'
 import { viewerFixturePermissions } from '../../test/authorityFixtures'
 import { clientFixturePermissions } from '../../test/authorityFixtures'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
@@ -18,10 +20,10 @@ function authenticate(role: 'ClientAdmin' | 'Viewer' = 'ClientAdmin') {
   useAuthStore.setState({
     accessToken: 'token', refreshTokenValue: 'refresh', isLoading: false,
     isAuthenticated: true, isInitialized: true,
-    user: {
-      id: 'operator', email: 'operator@example.com', displayName: 'Operator', role, permissions: role==='ClientAdmin'?clientFixturePermissions:[], platformPermissions: role==='ClientAdmin'?['platform:billing:view','platform:packages:manage']:[],
+    user: currentAuthorityFixture({
+      id: '01990000-0000-7000-8000-000000000001', email: 'operator@example.com', displayName: 'Operator', role, permissions: role==='ClientAdmin'?clientFixturePermissions:[], platformPermissions: role==='ClientAdmin'?['platform:billing:view','platform:packages:manage']:[],
       clientId: CLIENT_ID, accessToken: 'token', refreshToken: 'refresh', expiresIn: 3600,
-    },
+    }),
   })
 }
 
@@ -68,6 +70,7 @@ describe('Billing subscription route and page state', () => {
     queryClient.clear()
     localStorage.clear()
     authenticate()
+    vi.spyOn(authApi, 'currentAuthority').mockImplementation(async () => useAuthStore.getState().user!)
   })
 
   it('shows the workspace empty state with the shipping zero-limit freemium response', async () => {

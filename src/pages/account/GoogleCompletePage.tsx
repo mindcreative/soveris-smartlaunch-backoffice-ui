@@ -1,4 +1,7 @@
-import { useState } from 'react'
+import { mfaFlow } from '../../account/mfaFlow'
+import { MFA_ROUTES } from '../../account/constants/mfa'
+import { listenForRecoveryParent } from '../../account/mfaRecoveryPopup'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AccountLayout } from '../../account/AccountLayout'
 import { AccountFeedback } from '../../account/AccountFeedback'
@@ -14,6 +17,20 @@ import { useAuthStore } from '../../stores/authStore'
 
 export default function GoogleCompletePage() {
   const navigate = useNavigate()
+  const recoveryParent = useRef<((result: unknown) => void) | null>(null)
+  const [recoveryRefresh, setRecoveryRefresh] = useState(false)
+
+  useEffect(() => {
+    const stop = listenForRecoveryParent(send => {
+      recoveryParent.current = send
+      setRecoveryRefresh(true)
+    })
+
+    return () => {
+      recoveryParent.current = null
+      stop()
+    }
+  }, [])
   const action = useAccountAction()
   const now = useAccountClock()
   const [finished, setFinished] = useState(false)
@@ -27,6 +44,26 @@ export default function GoogleCompletePage() {
       const result = await googleAccountApi.complete(operation.signal)
 
       if (!operation.isCurrent()) {
+        return
+      }
+
+      if (recoveryParent.current) {
+        if (result.status === 'mfa_required') {
+          recoveryParent.current(result)
+          setMessage('Identity confirmation sent to the original recovery window. Return there to continue within its original deadline.')
+        } else {
+          setMessage('This identity cannot refresh the original recovery attempt. Close this window and use the same recovery identity.')
+        }
+
+        return
+      }
+
+      if (result.status === 'mfa_required') {
+        mfaFlow.setLogin({ challenge: result.challenge, csrfToken: result.csrfToken })
+        mfaFlow.offerHandoff(MFA_ROUTES.challenge)
+        accountFlow.clear()
+        navigate(MFA_ROUTES.challenge, { replace: true, state: null })
+
         return
       }
 
@@ -86,6 +123,7 @@ export default function GoogleCompletePage() {
   }
 
   return <AccountLayout title="Finish Google sign-in">
+    {recoveryRefresh && <p className="text-sm">Confirm the same Google identity for the recovery window. This action does not complete MFA or extend recovery.</p>}
     <p role="status" className="text-sm">{message}</p>
     <AccountFeedback error={action.error} pending={action.pending} />
     {!finished && <button type="button" className={ACCOUNT_BUTTON_CLASS} disabled={action.pending || now < action.retryAt} onClick={complete}>Finish sign-in</button>}

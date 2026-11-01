@@ -1,3 +1,4 @@
+import { hasMfaAssurance, parseMfaProjection } from './mfaAuthority'
 import type { AuthUser } from '../types/auth'
 
 const guid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -16,9 +17,12 @@ export function parseCurrentAuthority(value: unknown): AuthUser {
       BigInt(v.securityRevision) > 9223372036854775807n ||
       !['ClientOwner','ClientAdmin','Editor','Viewer'].includes(String(v.role)) ||
       typeof v.email !== 'string' || typeof v.displayName !== 'string') throw new Error('Login with a current session to continue')
-  return { id: v.id as string, clientId: v.clientId as string, clientRoleId: v.clientRoleId as string,
+  const mfa = parseMfaProjection(v)
+  const platform = permissions(v.platformPermissions ?? [], platformPermissions)
+
+  return { ...mfa, id: v.id as string, clientId: v.clientId as string, clientRoleId: v.clientRoleId as string,
     sessionId: v.sessionId, securityRevision: v.securityRevision, role: v.role as AuthUser['role'],
     email: v.email, displayName: v.displayName, permissions: permissions(v.permissions, clientPermissions),
-    platformPermissions: permissions(v.platformPermissions ?? [],platformPermissions),
+    platformPermissions: hasMfaAssurance(mfa) ? platform : [],
     accessToken: '', refreshToken: '', expiresIn: 0 }
 }

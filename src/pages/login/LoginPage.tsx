@@ -1,3 +1,5 @@
+import { mfaFlow } from '../../account/mfaFlow'
+import { MFA_ROUTES } from '../../account/constants/mfa'
 import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
@@ -73,6 +75,15 @@ export default function LoginPage() {
 
     try {
       const accepted = await login(email, password, controller.signal)
+
+      if (accepted === 'mfa_required' && !controller.signal.aborted) {
+        setPassword('')
+        mfaFlow.setReturn(state?.from, state?.googleLink === true)
+        mfaFlow.offerHandoff(MFA_ROUTES.challenge)
+        navigate(MFA_ROUTES.challenge, { replace: true, state: null })
+
+        return
+      }
 
       if (!accepted || controller.signal.aborted) {
         return

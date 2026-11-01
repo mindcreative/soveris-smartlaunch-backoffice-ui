@@ -1,3 +1,10 @@
+import { mfaFlow } from '../account/mfaFlow'
+import type { MfaLoginDisposition } from '../account/models/mfa'
+import { configurePrivilegedRevalidation, currentPrivilegedGeneration, hasMfaAssurance, isPrivilegedExperience, retirePrivilegedAuthority, withoutPrivilegedAuthority } from '../auth/mfaAuthority'
+import { retireReportScopes } from '../queries/billingReportKeys'
+import { retireAnomalyScopes } from '../queries/billingAnomalyKeys'
+import { retireLocalSubscriptionAttempts } from '../queries/localSubscriptionAttemptScope'
+import { AuthorityChangedError } from '../auth/authorityEpoch'
 import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
 import type { AuthResponse, AuthUser, UserRole } from '../types/auth'
@@ -65,7 +72,7 @@ interface AuthState {
 export interface AuthActions {
   setTokens: (access: string, refresh: string) => void
   setUser: (user: AuthUser) => void
-  login: (email: string, password: string, signal?: AbortSignal) => Promise<boolean>
+  login: (email: string, password: string, signal?: AbortSignal) => Promise<MfaLoginDisposition>
   acceptActivationSession: (session: AuthResponse, expectedEpoch: number, signal?: AbortSignal) => Promise<boolean>
   logout: () => Promise<void>
   doRefreshToken: () => Promise<void>
@@ -73,6 +80,7 @@ export interface AuthActions {
   clearSession: () => Promise<void>
   suspendAuthority: () => Promise<void>
   revalidateAuthority: () => Promise<void>
+  retirePrivileged: () => void
   handleSuccessfulRefresh: () => Promise<void>
   synchronizeSessionFromStorage: () => Promise<void>
   hasRole: (role: UserRole) => boolean
@@ -83,13 +91,38 @@ type AuthStore = AuthState & AuthActions
 const anonymous = { user: null, accessToken: null, refreshTokenValue: null, isAuthenticated: false, isLoading: false, isInitialized: true, authorityUnavailable: false }
 let initializing: Promise<void> | null = null
 let refreshingProjection: Promise<void> | null = null
-let revalidatingProjection: Promise<void> | null = null
-function sameAuthority(left: AuthUser | null, right: AuthUser): boolean {
-  return Boolean(left && left.id===right.id && left.clientId===right.clientId && left.clientRoleId===right.clientRoleId &&
-    left.sessionId===right.sessionId && left.securityRevision===right.securityRevision && left.role===right.role &&
-    JSON.stringify(left.permissions??[])===JSON.stringify(right.permissions??[]) &&
-    JSON.stringify(left.platformPermissions??[])===JSON.stringify(right.platformPermissions??[]))
+let revalidatingProjection: { isCurrent: () => boolean; promise: Promise<void> } | null = null
+function sameCustomerAuthority(left: AuthUser | null, right: AuthUser): boolean {
+  return Boolean(left && left.id === right.id && left.clientId === right.clientId && left.clientRoleId === right.clientRoleId
+    && left.sessionId === right.sessionId && left.securityRevision === right.securityRevision && left.role === right.role
+    && JSON.stringify(left.permissions ?? []) === JSON.stringify(right.permissions ?? []))
 }
+
+function sameAuthority(left: AuthUser | null, right: AuthUser): boolean {
+  return Boolean(sameCustomerAuthority(left, right) && JSON.stringify(left?.platformPermissions ?? []) === JSON.stringify(right.platformPermissions ?? [])
+    && left?.mfaState === right.mfaState && left?.stepUpRequired === right.stepUpRequired
+    && left?.assuranceGeneration === right.assuranceGeneration && left?.assuranceExpiresAt === right.assuranceExpiresAt
+    && left?.freshAssuranceExpiresAt === right.freshAssuranceExpiresAt)
+}
+
+function retirePlatformState(): void {
+  retirePrivilegedAuthority()
+  const activePlatform = isPrivilegedExperience()
+  const predicate = (query: { queryKey: readonly unknown[] }) => query.queryKey.some(key => key === 'platform'
+    || typeof key === 'string' && key.startsWith('["platform",'))
+    || activePlatform && query.queryKey[0] === 'backoffice'
+  const cancelling = queryClient.cancelQueries({ predicate })
+  queryClient.removeQueries({ predicate })
+  void cancelling.catch(() => undefined)
+
+  if (activePlatform) {
+    retireReportScopes()
+    retireAnomalyScopes()
+    retireLocalSubscriptionAttempts()
+    queryClient.getMutationCache().clear()
+  }
+}
+
 export const useAuthStore = create<AuthStore>()(devtools(persist((set, get) => {
   function accept(user: unknown, access: string, refresh: string): void {
     const parsed = parseCurrentAuthority(user)
@@ -138,6 +171,17 @@ export const useAuthStore = create<AuthStore>()(devtools(persist((set, get) => {
           set({ isLoading: false })
 
           return false
+        }
+
+        if ('status' in result) {
+          if (result.status !== 'mfa_required') {
+            throw { status: 503, code: 'account_flow_unavailable' }
+          }
+
+          mfaFlow.setLogin({ challenge: result.challenge, csrfToken: result.csrfToken })
+          set({ isLoading: false })
+
+          return 'mfa_required'
         }
 
         accept(result.user, result.accessToken, result.refreshToken)
@@ -252,24 +296,89 @@ export const useAuthStore = create<AuthStore>()(devtools(persist((set, get) => {
         set({user:null,isAuthenticated:false,isLoading:false,authorityUnavailable:!denied})
       }
     },
+    retirePrivileged: () => {
+      retirePlatformState()
+      const user = get().user
+
+      if (user) {
+        set({ user: withoutPrivilegedAuthority(user) })
+      }
+    },
     revalidateAuthority: async () => {
-      if(revalidatingProjection) return revalidatingProjection
-      revalidatingProjection=(async () => {
-        const state=get()
-        if(!state.isAuthenticated || !state.user || !state.accessToken || !state.refreshTokenValue) return
-        const epoch=currentAuthorityEpoch()
+      if (revalidatingProjection?.isCurrent()) {
+        return revalidatingProjection.promise
+      }
+
+      const state = get()
+
+      if (!state.isAuthenticated || !state.user || !state.accessToken || !state.refreshTokenValue) {
+        return
+      }
+
+      const epoch = currentAuthorityEpoch()
+      const generation = currentPrivilegedGeneration()
+      const accessToken = state.accessToken
+      const refreshToken = state.refreshTokenValue
+      const initialTokens = storedTokenSnapshot()
+      const isCurrent = () => currentAuthorityEpoch() === epoch && currentPrivilegedGeneration() === generation
+        && get().accessToken === accessToken && get().refreshTokenValue === refreshToken
+        && sameStoredTokens(initialTokens, storedTokenSnapshot())
+      const promise = (async () => {
         try {
-          const parsed=parseCurrentAuthority(await authApi.currentAuthority())
-          if(currentAuthorityEpoch()!==epoch || sameAuthority(get().user,parsed)) return
-          accept(parsed,state.accessToken,state.refreshTokenValue)
-        } catch(error) {
-          if(currentAuthorityEpoch()!==epoch) return
-          if(error && typeof error==='object' && 'status' in error && error.status===503) await get().suspendAuthority()
-          else if(error && typeof error==='object' && 'status' in error && (error.status===401 || error.status===403)) await clear()
-          else throw error
+          const projection = await authApi.currentAuthority()
+
+          if (!isCurrent()) {
+            return
+          }
+
+          const parsed = parseCurrentAuthority(projection)
+
+          if (sameAuthority(get().user, parsed)) {
+            return
+          }
+
+          const prior = get().user
+          const mfaOnlyChange = sameCustomerAuthority(prior, parsed) && prior?.mfaState === parsed.mfaState
+            && (prior?.stepUpRequired !== parsed.stepUpRequired || prior?.assuranceGeneration !== parsed.assuranceGeneration
+              || prior?.assuranceExpiresAt !== parsed.assuranceExpiresAt || prior?.freshAssuranceExpiresAt !== parsed.freshAssuranceExpiresAt)
+
+          if (mfaOnlyChange) {
+            const previous = get().user
+
+            if (previous?.assuranceGeneration && previous.assuranceGeneration === parsed.assuranceGeneration
+              && (previous.assuranceExpiresAt !== parsed.assuranceExpiresAt || previous.freshAssuranceExpiresAt !== parsed.freshAssuranceExpiresAt)) {
+              throw { status: 503, code: 'authorization_unavailable' }
+            }
+
+            retirePlatformState()
+            set({ user: { ...parsed, accessToken, refreshToken } })
+          } else {
+            accept(parsed, accessToken, refreshToken)
+          }
+        } catch (error) {
+          if (!isCurrent()) {
+            return
+          }
+
+          if (error && typeof error === 'object' && 'status' in error && error.status === 503) {
+            await get().suspendAuthority()
+          } else if (error && typeof error === 'object' && 'status' in error && (error.status === 401 || error.status === 403)) {
+            await clear()
+          } else {
+            throw error
+          }
         }
       })()
-      try {await revalidatingProjection} finally {revalidatingProjection=null}
+      const pending = { isCurrent, promise }
+      revalidatingProjection = pending
+
+      try {
+        await promise
+      } finally {
+        if (revalidatingProjection === pending) {
+          revalidatingProjection = null
+        }
+      }
     },
     handleSuccessfulRefresh: async () => {
       if (refreshingProjection) return refreshingProjection
@@ -328,3 +437,18 @@ export const useAuthStore = create<AuthStore>()(devtools(persist((set, get) => {
   migrate: () => ({ accessToken: null,refreshTokenValue: null }),
   partialize: state => ({ accessToken: state.accessToken, refreshTokenValue: state.refreshTokenValue }),
 }), { name: 'BackofficeAuthStore' }))
+
+configurePrivilegedRevalidation(async () => {
+  const state = useAuthStore.getState()
+
+  if (state.user && !hasMfaAssurance(state.user)) {
+    state.retirePrivileged()
+  }
+
+  await useAuthStore.getState().revalidateAuthority()
+  const current = useAuthStore.getState()
+
+  if (!current.isAuthenticated || !hasMfaAssurance(current.user) || !current.user?.platformPermissions?.length) {
+    throw new AuthorityChangedError()
+  }
+}, () => useAuthStore.getState().retirePrivileged())

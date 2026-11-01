@@ -1,3 +1,6 @@
+import { MFA } from '../account/constants/mfa'
+import { parseMfaRequired } from '../account/mfaParsing'
+import type { PasswordLoginResult } from '../account/models/mfa'
 import { apiClient } from './apiClient'
 import { localInstantDateTime, parseLocalInstant, type LocalInstantValue } from '../timezone/LocalInstant'
 import { localResponseBinding } from '../timezone/responseGuard'
@@ -47,8 +50,13 @@ export {
 
 // ==================== AUTH ENDPOINTS ====================
 
-export async function login(credentials: LoginCredentials, signal?: AbortSignal): Promise<AuthResponse & { user: AuthUser }> {
-  const response = await apiClient.post('/auth/login', credentials, { signal })
+export async function login(credentials: LoginCredentials, signal?: AbortSignal): Promise<PasswordLoginResult> {
+  const started = Date.now()
+  const response = await apiClient.post('/auth/login', credentials, { signal, baseURL: MFA.sameOriginBase, retryOnUnauthorized: false })
+
+  if (response.data && typeof response.data === 'object' && 'status' in response.data && response.data.status === 'mfa_required') {
+    return parseMfaRequired(response.data, started)
+  }
 
   return response.data as AuthResponse & { user: AuthUser }
 }

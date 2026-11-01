@@ -1,3 +1,6 @@
+import { parseMfaChallenge, parseMfaRequired } from './mfaParsing'
+import type { MfaBoundChallenge, MfaPrimaryPurpose } from './models/mfa'
+import { MFA } from './constants/mfa'
 import type { SignupChallengeAdmission } from './models/turnstile'
 import { ACCOUNT_ADMISSION } from './constants/turnstile'
 import { normalizeAccountError } from './accountLifecycleError'
@@ -91,6 +94,29 @@ async function submit(path: string, body: unknown, signal?: AbortSignal, accessT
     ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) })
 }
 
+function parseStart(result: Record<string, unknown>): GoogleStart {
+  if (typeof result.authorizationUrl !== 'string' || result.authorizationUrl.length > 8192 || typeof result.expiresIn !== 'number' ||
+    !Number.isSafeInteger(result.expiresIn) || result.expiresIn <= 0 || result.expiresIn > GOOGLE_ACCOUNT.maximumSeconds) {
+    return invalidResponse()
+  }
+
+  let url: URL
+
+  try {
+    url = new URL(result.authorizationUrl)
+  } catch {
+    return invalidResponse()
+  }
+
+  if (url.origin !== GOOGLE_ACCOUNT.authorizationOrigin || url.pathname !== GOOGLE_ACCOUNT.authorizationPath ||
+    url.username || url.password || url.hash || url.searchParams.get('response_type') !== 'code' ||
+    url.searchParams.get('response_mode') !== 'form_post' || url.searchParams.get('code_challenge_method') !== 'S256') {
+    return invalidResponse()
+  }
+
+  return { authorizationUrl: result.authorizationUrl, expiresIn: result.expiresIn }
+}
+
 export const googleAccountApi = {
   async start(intent: GoogleIntent, proof?: string, signal?: AbortSignal, admission?: SignupChallengeAdmission): Promise<GoogleStart> {
     const signup = intent === 'signup' ? admission : undefined
@@ -98,29 +124,14 @@ export const googleAccountApi = {
       ...(signup ? { admissionContext: signup.contextId, turnstileToken: signup.token } : {}) }, signal, undefined,
       signup ? { [ACCOUNT_ADMISSION.csrfHeader]: signup.csrf } : {})
 
-    if (typeof result.authorizationUrl !== 'string' || result.authorizationUrl.length > 8192 || typeof result.expiresIn !== 'number' ||
-      !Number.isSafeInteger(result.expiresIn) || result.expiresIn <= 0 || result.expiresIn > GOOGLE_ACCOUNT.maximumSeconds) {
-      return invalidResponse()
-    }
-
-    let url: URL
-
-    try {
-      url = new URL(result.authorizationUrl)
-    } catch {
-      return invalidResponse()
-    }
-
-    if (url.origin !== GOOGLE_ACCOUNT.authorizationOrigin || url.pathname !== GOOGLE_ACCOUNT.authorizationPath ||
-      url.username || url.password || url.hash || url.searchParams.get('response_type') !== 'code' ||
-      url.searchParams.get('response_mode') !== 'form_post' || url.searchParams.get('code_challenge_method') !== 'S256') {
-      return invalidResponse()
-    }
-
-    return { authorizationUrl: result.authorizationUrl, expiresIn: result.expiresIn }
+    return parseStart(result)
   },
   async complete(signal?: AbortSignal): Promise<GoogleCompletion> {
     const result = await submit('/complete', {}, signal)
+
+    if (result.status === 'mfa_required') {
+      return parseMfaRequired(result)
+    }
 
     if ((result.status === 'authenticated' || (result.status === 'activated' && result.nextAction === 'create_first_product')) && result.session) {
       return result as unknown as GoogleCompletion
@@ -144,6 +155,20 @@ export const googleAccountApi = {
   },
   async cancel(pendingToken?: string, signal?: AbortSignal): Promise<void> {
     const result = await submit('/cancel', pendingToken ? { pendingToken } : {}, signal)
+
+    if (result.status !== 'cancelled') {
+      invalidResponse()
+    }
+  },
+  async reauthenticationStart(purpose: MfaPrimaryPurpose, accessToken: string, signal?: AbortSignal): Promise<GoogleStart> {
+    return parseStart(await submit('/reauth-start', { purpose }, signal, accessToken))
+  },
+  async reauthenticationComplete(accessToken: string, signal?: AbortSignal, csrf?: string): Promise<MfaBoundChallenge> {
+    return parseMfaChallenge(await submit('/reauth-complete', {}, signal, accessToken, csrf ? { [MFA.csrfHeader]: csrf } : {}),
+      ['enrollment', 'replacement', 'factor_change'])
+  },
+  async reauthenticationCancel(accessToken: string, signal?: AbortSignal): Promise<void> {
+    const result = await submit('/reauth-cancel', {}, signal, accessToken)
 
     if (result.status !== 'cancelled') {
       invalidResponse()

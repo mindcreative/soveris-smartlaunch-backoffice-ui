@@ -50,6 +50,8 @@ it('switches menus through activation without pointerdown and keeps focus in the
   await user.click(screen.getByRole('button', { name: 'Appearance' }))
   fireEvent.click(screen.getByRole('button', { name: /User menu/ }))
   expect(screen.getByRole('menu', { name: 'User menu' })).toBeVisible()
+  expect(screen.getByRole('menuitem', { name: 'Account security' })).toHaveFocus()
+  await user.keyboard('{ArrowDown}')
   expect(screen.getByRole('menuitem', { name: 'Logout' })).toHaveFocus()
   fireEvent.click(screen.getByRole('button', { name: 'Appearance' }))
   expect(screen.getByRole('menu', { name: 'Appearance' })).toBeVisible()

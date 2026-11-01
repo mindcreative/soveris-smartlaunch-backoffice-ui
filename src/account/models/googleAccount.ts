@@ -1,8 +1,10 @@
+import type { MfaRequired } from './mfa'
 import type { AuthResponse } from '../../types/auth'
 import type { PendingAccountResponse } from './accountLifecycle'
 
 export type GoogleIntent = 'signup' | 'login' | 'link' | 'resume_verification'
 export type GoogleCompletion =
+  | MfaRequired
   | { status: 'authenticated'; session: AuthResponse }
   | { status: 'activated'; session: AuthResponse; nextAction: 'create_first_product' }
   | (PendingAccountResponse & { authMethod: 'google' })

@@ -1,3 +1,6 @@
+import { MFA_AUTHENTICATED_PATHS, MFA_PENDING_PATHS } from '../account/constants/mfa'
+import { normalizeMfaError } from '../account/mfaError'
+import { currentPrivilegedGeneration, invalidateCurrentPrivilegedAuthority, isPrivilegedExperience, revalidatePrivilegedAuthority } from '../auth/mfaAuthority'
 import { AuthorityChangedError, authorityTokenIsCurrent, currentAuthorityEpoch } from '../auth/authorityEpoch'
 import { normalizeRemovalProblem } from './productRemovalProblem'
 import { normalizeDomainProblem } from './domainProblem'
@@ -151,17 +154,30 @@ export class ApiClient {
   private setupInterceptors(): void {
     // Request interceptor — attach access token
     this.client.interceptors.request.use(
-      (config: InternalAxiosRequestConfig) => {
-        const scoped=config as InternalAxiosRequestConfig & { authorityEpoch?: number }; scoped.authorityEpoch=currentAuthorityEpoch()
+      async (config: InternalAxiosRequestConfig) => {
+        const scoped=config as InternalAxiosRequestConfig & { authorityEpoch?: number; privilegedGeneration?: number }; scoped.authorityEpoch=currentAuthorityEpoch()
         const token = this.getAccessToken()
         const authorityLookup=config.url?.endsWith('/auth/current')
         const lifecycle = Object.values(ACCOUNT_ENDPOINTS).some(path => config.url === path)
-        const publicAuth=lifecycle || ['/auth/login','/auth/refresh','/auth/revoke'].some(path=>config.url?.endsWith(path))
+        const pendingMfa = MFA_PENDING_PATHS.some(path => config.url === path)
+        const mfa = pendingMfa || MFA_AUTHENTICATED_PATHS.some(path => config.url === path)
+        const publicAuth=lifecycle || pendingMfa || ['/auth/login','/auth/refresh','/auth/revoke'].some(path=>config.url?.endsWith(path))
         if(!authorityLookup && !publicAuth && !authorityTokenIsCurrent(token)) {
           window.dispatchEvent(new CustomEvent('auth:storage-changed'))
           throw new AuthorityChangedError()
         }
-        if (lifecycle) {
+        if (!authorityLookup && !publicAuth && !mfa && isPrivilegedExperience()) {
+          const generation = currentPrivilegedGeneration()
+          await revalidatePrivilegedAuthority()
+
+          if (generation !== currentPrivilegedGeneration() || scoped.authorityEpoch !== currentAuthorityEpoch() || token !== this.getAccessToken()) {
+            throw new AuthorityChangedError()
+          }
+
+          scoped.privilegedGeneration = generation
+        }
+
+        if (lifecycle || pendingMfa) {
           config.headers.delete('Authorization')
         } else if (token) {
           config.headers.set('Authorization', `Bearer ${token}`)
@@ -176,6 +192,12 @@ export class ApiClient {
       (response: AxiosResponse) => {
         // Storage changes are visible before their queued browser event. Reject
         // a late response even in that window, including binary/download data.
+        const privileged = (response.config as InternalAxiosRequestConfig & { privilegedGeneration?: number }).privilegedGeneration
+
+        if (privileged !== undefined && privileged !== currentPrivilegedGeneration()) {
+          throw new AuthorityChangedError()
+        }
+
         const sent=response.config.headers.get('Authorization')
         if(sent && sent!==`Bearer ${this.getAccessToken()}`) {
           window.dispatchEvent(new CustomEvent('auth:storage-changed'))
@@ -189,7 +211,12 @@ export class ApiClient {
         const originalRequest = error.config as InternalAxiosRequestConfig & {
           _retry?: boolean
           authorityEpoch?: number
+          privilegedGeneration?: number
           onAuthReplay?: () => void
+        }
+
+        if (originalRequest?.privilegedGeneration !== undefined && originalRequest.privilegedGeneration !== currentPrivilegedGeneration()) {
+          return Promise.reject(new AuthorityChangedError())
         }
 
         if(originalRequest?.authorityEpoch!==undefined && originalRequest.authorityEpoch!==currentAuthorityEpoch())
@@ -201,7 +228,9 @@ export class ApiClient {
         }
         const status=error.response?.status
         const lifecycle = Object.values(ACCOUNT_ENDPOINTS).some(path => originalRequest?.url === path)
-        const authPublic=lifecycle || ['/auth/login','/auth/refresh','/auth/revoke'].some(path=>originalRequest?.url?.endsWith(path))
+        const pendingMfa = MFA_PENDING_PATHS.some(path => originalRequest?.url === path)
+        const mfa = pendingMfa || MFA_AUTHENTICATED_PATHS.some(path => originalRequest?.url === path)
+        const authPublic=lifecycle || pendingMfa || ['/auth/login','/auth/refresh','/auth/revoke'].some(path=>originalRequest?.url?.endsWith(path))
         let problemBody=error.response?.data
         if(problemBody instanceof Blob && problemBody.size<=65536) {
           try {problemBody=await problemBody.text()} catch { /* Keep the bounded generic failure. */ }
@@ -212,7 +241,12 @@ export class ApiClient {
         const problemCode=problem && typeof problem==='object' ? String((problem as {code?:unknown;error?:unknown}).code??(problem as {error?:unknown}).error??'') : ''
         const currentAuthority=originalRequest?.url?.endsWith('/auth/current')
         const unavailable=status===503 && (/authorization.*unavailable|authorization.*dependency/.test(problemCode) || currentAuthority)
-        if(!authPublic && unavailable) window.dispatchEvent(new CustomEvent('auth:suspended'))
+        if (mfa && status === 503) {
+          invalidateCurrentPrivilegedAuthority()
+          window.dispatchEvent(new CustomEvent('mfa:unavailable'))
+        }
+
+        if(!authPublic && !mfa && unavailable) window.dispatchEvent(new CustomEvent('auth:suspended'))
         if(!authPublic && status===403) {
           if(currentAuthority) window.dispatchEvent(new CustomEvent('auth:suspended'))
           else await notifyForbiddenAuthorityCheck()
@@ -247,7 +281,7 @@ export class ApiClient {
   }
 
   private shouldRetryRequest(config: InternalAxiosRequestConfig & { _retry?: boolean; retryOnUnauthorized?: boolean }): boolean {
-    if (config.retryOnUnauthorized === false || config.method?.toUpperCase()!=='GET') return false
+    if (config.retryOnUnauthorized === false || config.method?.toUpperCase()!=='GET' || [...MFA_AUTHENTICATED_PATHS, ...MFA_PENDING_PATHS].some(path => path === config.url)) return false
     // Don't retry login, refresh, or health endpoints
     const nonRetryPaths = ['/auth/login', '/auth/refresh', '/auth/current', '/health']
     return !nonRetryPaths.some((path) => config.url?.includes(path))
@@ -258,6 +292,12 @@ export class ApiClient {
       const transport = error as { config?: { url?: string }; response?: AxiosResponse<unknown> }
       const path = transport.config?.url ?? transport.response?.config?.url
       const lifecycle = Object.values(ACCOUNT_ENDPOINTS).some(endpoint => endpoint === path)
+      const mfa = [...MFA_AUTHENTICATED_PATHS, ...MFA_PENDING_PATHS].some(endpoint => endpoint === path)
+
+      if (mfa) {
+        return normalizeMfaError(decodeErrorBody(transport.response?.data), transport.response?.status,
+          transport.response?.headers?.['retry-after'])
+      }
 
       if (lifecycle) {
         return normalizeAccountError(decodeErrorBody(transport.response?.data), transport.response?.status,
