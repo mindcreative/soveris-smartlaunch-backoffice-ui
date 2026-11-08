@@ -1,7 +1,7 @@
 ---
 title: "Back-Office UX Specification \u2014 Products & Domains Expansion"
 status: draft
-updated: "2026-09-10"
+updated: "2026-11-07"
 created: "2026-09-07"
 version: "1.0.0"
 ---
@@ -592,3 +592,20 @@ Client-bound domains permit internal and Basic/Brand/Brand Premium customers; pr
 ## September 10 planning integration and evidence
 
 See [approved resolution](../../soveris-business/_bmad-output/planning-artifacts/architectures/architecture-products-domains-oq-001-004-resolution.md), [contracts/input register](../../soveris-business/_bmad-output/planning-artifacts/specs/spec-backoffice-ui-implementation/products-domains-contracts.md), and [normative UX-AIB-BASE](../../soveris-business/_bmad-output/planning-artifacts/back-office-review/ux-ai-billing-phase-1-addendum.md). Products/Domains and tier surfaces inherit NFR-11/12/13 and the full verification gate, including keyboard, focus, screen reader, reflow/zoom, text spacing, forced colours, reduced motion and private-state transitions. The September 9 Story 2.8 exception does not defer new-story checks. Development uses only local Docker, explicit development bindings and deterministic DNS/edge doubles; real-edge launch evidence is future Epic 8 work. OQ-005 text is preserved and excluded from this amendment.
+
+## Story 16.8 — temporary support access, scoped interaction delta
+
+The [support interaction contract](../../soveris-business/_bmad-output/planning-artifacts/specs/spec-backoffice-ui-implementation/support-access-ux-contract.md) is this spine's normative support companion: actor entry/routes, state/action tables, available-option dropdowns, recovery/focus, W1–W5 wireframes and UX01–UX29 acceptance cases. Story 16.8 D1–D8 owns support authorization, consent, MFA, audit, lifetimes and delivery gates; this scoped delta supersedes conflicting generic draft/caching/role/redirect examples for support only. The Business public-product UX explicitly excludes staff support and supplies no replacement visual system.
+
+| Component / surface | Behavior authority in the companion | Visual authority |
+| --- | --- | --- |
+| Customer / Products dropdown and selected chips | Component patterns; bounded no-search paging, selection/removal, ambiguity and label recovery | DESIGN support component map; existing semantic controls |
+| Request / owner consent summary | Actor entry, lifecycle table, W1/W2; explicit exact review and state-specific commands | Existing cards, fields, headings and action groups |
+| Grant-bound MFA / activation | Lifecycle/recovery tables, focus primitives, W3; verification and activation are separate | Existing TOTP input, status region, buttons |
+| Attribution / private result / Exit | Actor entry, W4/W5, retirement and result-completion focus | Existing warning banner, readable result and persistent Exit |
+| Owner duration / stale state | 15-second visible metadata cadence, server-time countdown and safe revoke | Existing time/status/card patterns |
+| Durable interruption / validation feedback | Evidence-based recovery table; unknown 403 is not a diagnosis; linked field errors | Existing status/error regions, never toast-only |
+
+All reached dropdowns offer available values on opening with no search/filter input; finite MFA Security action and shell menus retain their existing no-search behavior. Password, TOTP, reason/case and numeric duration retain their input types. All controls inherit the Accessibility Floor; native AT, keyboard, touch/mobile, zoom and both palettes need fresh implementation-bound checks. No prior automated search PASS attests this delta.
+
+The contract is specified for implementation. Story remains in-progress; T7/T16, V7/AV9 and V8 remain incomplete/open with no deferral. This document amendment is not a claim that the described changes are running or accepted.

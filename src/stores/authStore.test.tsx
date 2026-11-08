@@ -8,7 +8,7 @@ import { billingAccountKeys } from '../queries/billingQueries'
 import { productKeys } from '../queries/productQueries'
 import { queryClient } from '../queryClient'
 import { useAuthStore } from './authStore'
-import { currentAuthorityEpoch, privateObjectUrl } from '../auth/authorityEpoch'
+import { currentAuthorityEpoch, retireAuthority, privateObjectUrl } from '../auth/authorityEpoch'
 
 const CLIENT_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
 
@@ -26,7 +26,65 @@ function resetStore() {
 }
 
 describe('auth lifecycle', () => {
+  it.each([new TypeError('offline'), { status: 503 }, { status: 403 }])('AV2 settles unavailable and retains login credentials during uncertainty: %j', async failure => {
+    useAuthStore.getState().setTokens('saved-access', 'saved-refresh')
+    vi.spyOn(authApi, 'currentAuthority').mockRejectedValue(failure)
+    await useAuthStore.getState().initialize()
+    expect(useAuthStore.getState()).toMatchObject({ isLoading: false, isInitialized: true, authorityUnavailable: true, isAuthenticated: false })
+    expect(localStorage.getItem('backoffice_access_token')).toBe('saved-access')
+  })
+
+  it('AV2 settles its interrupted restoration without accepting the cancelled authority', async () => {
+    useAuthStore.getState().setTokens('saved-access', 'saved-refresh')
+    let finish!: (value: ReturnType<typeof currentAuthorityFixture>) => void
+    const current = vi.spyOn(authApi, 'currentAuthority').mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const restoring = useAuthStore.getState().initialize()
+    await waitFor(() => expect(current).toHaveBeenCalledTimes(1))
+    retireAuthority()
+    finish(currentAuthorityFixture())
+    await restoring
+    expect(useAuthStore.getState()).toMatchObject({ isLoading: false, isInitialized: true, authorityUnavailable: true, user: null })
+    expect(localStorage.getItem('backoffice_access_token')).toBe('saved-access')
+  })
+
+  it('AV2 a late failed restoration cannot erase a newer authenticated account', async () => {
+    useAuthStore.getState().setTokens('saved-access', 'saved-refresh')
+    let fail!: (error: unknown) => void
+    const current = vi.spyOn(authApi, 'currentAuthority').mockImplementation(() => new Promise((_, reject) => { fail = reject }))
+    const restoring = useAuthStore.getState().initialize()
+    await waitFor(() => expect(current).toHaveBeenCalledTimes(1))
+    useAuthStore.getState().setTokens('new-access', 'new-refresh')
+    useAuthStore.getState().setUser(currentAuthorityFixture())
+    fail({ status: 401 })
+    await restoring
+    expect(useAuthStore.getState()).toMatchObject({ isLoading: false, isAuthenticated: true, accessToken: 'new-access' })
+    expect(localStorage.getItem('backoffice_access_token')).toBe('new-access')
+  })
+
+  it('AV2 confirmed invalid original login requires authentication', async () => {
+    useAuthStore.getState().setTokens('saved-access', 'saved-refresh')
+    vi.spyOn(authApi, 'currentAuthority').mockRejectedValue({ status: 401 })
+    await useAuthStore.getState().initialize()
+    expect(useAuthStore.getState()).toMatchObject({ isLoading: false, isInitialized: true, authorityUnavailable: false, accessToken: null })
+  })
+
   beforeEach(() => { resetStore(); vi.spyOn(authApi,'revoke').mockResolvedValue() })
+
+  it('refreshes the saved timezone for support deadlines without changing original authority or its epoch', async () => {
+    const original = currentAuthorityFixture({ timeZoneId: 'UTC', platformPermissions: ['platform:support:operate'] })
+    useAuthStore.getState().setTokens('fixture-token', 'fixture-refresh')
+    useAuthStore.getState().setUser(original)
+    const epoch = currentAuthorityEpoch()
+    vi.spyOn(authApi, 'currentAuthority').mockResolvedValue({ ...original, timeZoneId: 'Europe/Belgrade' })
+
+    await useAuthStore.getState().revalidateAuthority()
+
+    expect(useAuthStore.getState().user?.timeZoneId).toBe('Europe/Belgrade')
+    expect(useAuthStore.getState().user?.clientId).toBe(original.clientId)
+    expect(useAuthStore.getState().user?.sessionId).toBe(original.sessionId)
+    expect(useAuthStore.getState().user?.securityRevision).toBe(original.securityRevision)
+    expect(currentAuthorityEpoch()).toBe(epoch)
+  })
 
   it('retires queries, optimistic mutations and blob URLs synchronously on another tab logout', async () => {
     useAuthStore.getState().setTokens('old-access','old-refresh')
@@ -218,7 +276,7 @@ describe('auth lifecycle', () => {
       isLoading: false,
       isInitialized: true,
     })
-    vi.spyOn(authApi, 'refreshToken').mockRejectedValue(new Error('Refresh rejected'))
+    vi.spyOn(authApi, 'refreshToken').mockRejectedValue({ status: 401 })
 
     await useAuthStore.getState().doRefreshToken()
 

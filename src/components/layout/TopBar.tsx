@@ -1,4 +1,6 @@
 import { useNavigate } from 'react-router-dom'
+import { supportText } from '../../support/labels'
+import { SUPPORT } from '../../support/constants'
 import { MFA_ROUTES } from '../../account/constants/mfa'
 import { useEffect, useState, type RefObject } from 'react'
 import { useLocation } from 'react-router-dom'
@@ -19,7 +21,9 @@ export function TopBar({ onOpenMobileNavigation, menuButtonRef }: TopBarProps) {
   const { user, logout } = useAuth(), appearance = useAppearance(), location = useLocation()
   const [open, setOpen] = useState<'appearance' | 'user' | null>(null)
   useEffect(() => { setOpen(null) }, [location.key, user?.id, user?.clientId, user?.role])
-  const name = user?.displayName?.trim() || user?.email || 'User'
+  const supportView = /^(?:\/support(?:\/|$)|\/platform\/support|\/settings\/support-access)/.test(location.pathname)
+  const rawName = user?.displayName?.trim() || user?.email || 'User'
+  const name = supportView ? supportText(rawName) : rawName
   const initials = name.split(/\s+/).slice(0, 2).map(part => Array.from(part)[0]).join('').toUpperCase()
   const AppearanceIcon = choices.find(choice => choice.value === appearance.preference)!.Icon
   return <header className="relative lg:sticky top-0 z-40 border-b border-line bg-surface">
@@ -43,7 +47,9 @@ export function TopBar({ onOpenMobileNavigation, menuButtonRef }: TopBarProps) {
           <span className="hidden max-w-44 truncate text-sm font-medium sm:block">{name}</span><ChevronDown aria-hidden="true" size={16} className="hidden sm:block" />
         </>}>
           <div role="presentation" className="break-words border-b border-line px-3 py-3 text-sm">
-            <p className="font-semibold">{name}</p><p className="mt-1 text-muted">{user?.email}</p><p className="mt-1 text-muted">{user?.role}</p>
+            <p className="font-semibold">{name}</p><p className="mt-1 text-muted">{supportView ? supportText(user?.email) : user?.email}</p><p className="mt-1 text-muted">Workspace role: {user?.role}</p>
+            <p className="mt-1 text-muted">Workspace: {supportText(user?.workspaceName)}</p>
+            {user?.platformPermissions?.includes(SUPPORT.permission) && <p className="mt-1 text-muted">Platform role: SupportOperator</p>}
           </div>
           <button type="button" role="menuitem" tabIndex={-1} className="header-menu-item" onClick={() => { setOpen(null); navigate(MFA_ROUTES.security) }}>Account security</button>
           <button type="button" role="menuitem" tabIndex={-1} className="header-menu-item" onClick={() => { setOpen(null); void logout() }}><LogOut aria-hidden="true" size={18} />Logout</button>

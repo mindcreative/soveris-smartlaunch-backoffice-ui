@@ -75,7 +75,7 @@ export function setPrivilegedExperience(value: boolean): void {
 }
 
 export function isPrivilegedExperience(): boolean {
-  return platformExperience || /^\/platform(?:\/|$)/.test(window.location.pathname)
+  return platformExperience || /^\/(?:platform|support)(?:\/|$)/.test(window.location.pathname)
 }
 
 export function registerPrivilegedObjectUrl(url: string): void {

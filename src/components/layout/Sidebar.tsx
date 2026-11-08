@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { canonicalizeGuid } from '../../lib/guid'
 import { permittedLanding, platformAvailable, platformViews, workspaceDestinations } from '../../auth/experience'
 import { useExperience } from '../../auth/ExperienceContext'
+import { SUPPORT } from '../../support/constants'
 
 const baseNavigation = [
   { name: 'Dashboard', href: '/dashboard', icon: 'home' },
@@ -32,10 +33,11 @@ export function Sidebar({ mobile = false, onClose, onNavigate }: SidebarProps) {
   const { hasPermission, user } = useAuth()
   const defaultClientId = canonicalizeGuid(user?.clientId)
   const audience = useExperience()
-  const navigation = audience === 'platform'
+  const navigation = audience === 'support' ? [{ name: 'Support requests', href: '/platform/support', icon: 'shield' }] : audience === 'platform'
     ? [
       ...(platformAvailable(user) ? [{ name: 'Platform operations', href: '/platform', icon: 'shield' }] : []),
       ...(hasPermission(platformViews.health) ? [{ name: 'System Health', href: '/platform/health', icon: 'home' }] : []),
+      ...(hasPermission(SUPPORT.permission) ? [{ name: 'Support requests', href: '/platform/support', icon: 'shield' }] : []),
       { name: 'My workspace', href: permittedLanding({ ...user!, platformPermissions: [] }), icon: 'home' },
     ]
     : [
@@ -45,6 +47,7 @@ export function Sidebar({ mobile = false, onClose, onNavigate }: SidebarProps) {
       }),
       ...(defaultClientId && hasPermission('billing:view') ? [{name:'Billing', href:`/billing/clients/${defaultClientId}/account`, icon:'billing'}] : []),
       ...(platformAvailable(user) ? [{name:'Platform operations', href:'/platform', icon:'shield'}] : []),
+      ...(user?.role === 'ClientOwner' ? [{ name: 'Support access approvals', href: '/settings/support-access', icon: 'shield' }] : []),
     ]
   const filteredNav = navigation
 

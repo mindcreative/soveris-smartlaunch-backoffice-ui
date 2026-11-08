@@ -6,10 +6,12 @@ export interface AuthUser extends Partial<MfaProjection> {
   id: string
   email: string
   displayName: string
+  workspaceName?: string | null
   role: UserRole
   clientRoleId?: string
   securityRevision?: string
   sessionId?: string
+  timeZoneId?: string | null
   permissions?: readonly string[]
   platformPermissions?: readonly string[]
   clientId: string

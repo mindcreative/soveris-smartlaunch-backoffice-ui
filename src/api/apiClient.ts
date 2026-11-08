@@ -268,8 +268,15 @@ export class ApiClient {
             originalRequest.headers.set('Authorization', `Bearer ${newToken}`)
             return this.client.request(originalRequest)
           } catch (refreshError) {
-            // Refresh failed — clear auth and redirect
-            if(currentAuthorityEpoch()===refreshEpoch) this.clearAuthState()
+            if (currentAuthorityEpoch() === refreshEpoch) {
+              const failure = this.normalizeError(refreshError)
+
+              if (failure.status === 401) {
+                this.clearAuthState()
+              } else {
+                window.dispatchEvent(new CustomEvent('auth:suspended'))
+              }
+            }
             return Promise.reject(this.normalizeError(refreshError))
           }
         }
@@ -469,9 +476,15 @@ export class ApiClient {
         throw { code: 'NO_REFRESH_TOKEN', message: 'No refresh token available' } satisfies ApiError
       }
 
+      const originalAccess = this.getAccessToken()
+      const originalEpoch = currentAuthorityEpoch()
       const response = await this.client.post('/auth/refresh', {
         refreshToken,
       })
+
+      if (originalEpoch !== currentAuthorityEpoch() || originalAccess !== this.getAccessToken() || refreshToken !== this.getRefreshToken()) {
+        throw new AuthorityChangedError()
+      }
 
       const { accessToken, refreshToken: newRefreshToken } = response.data
 

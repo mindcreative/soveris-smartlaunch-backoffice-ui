@@ -1,5 +1,9 @@
 import type { AuthUser } from '../types/auth'
 import { canonicalizeGuid } from '../lib/guid'
+import { SUPPORT, SUPPORT_UUID_V7 } from '../support/constants'
+import type { ExperienceRoute } from './models/experience'
+
+export type { Audience, ExperienceRoute } from './models/experience'
 
 export function operationalTarget(value:string | undefined):string|null {
   const id=canonicalizeGuid(value)
@@ -11,8 +15,7 @@ function evaluationTarget(value: string | undefined): string | null {
   return id && id !== '00000000-0000-7000-8000-000000000000' && UUID_V7.test(id) ? id : null
 }
 
-export type Audience = 'workspace' | 'platform'
-type Authority = Pick<AuthUser, 'clientId' | 'permissions' | 'platformPermissions'> | null
+type Authority = (Pick<AuthUser, 'clientId' | 'permissions' | 'platformPermissions'> & Partial<Pick<AuthUser, 'role'>>) | null
 export const workspaceDestinations = [
   ['dashboard', 'Dashboard', 'clients:view'], ['products', 'Products', 'products:view'],
   ['submissions', 'Submissions', 'submissions:view'], ['analytics', 'Analytics', 'analytics:view'],
@@ -25,20 +28,37 @@ export const platformViews = {
   reconciliation: 'platform:billing:reconcile', health: 'platform:health:view',
 } as const
 export function platformAvailable(user: Authority): boolean {
-  return Object.values(platformViews).some(p => user?.platformPermissions?.includes(p))
+  return Object.values(platformViews).some(p => user?.platformPermissions?.includes(p)) || !!user?.platformPermissions?.includes(SUPPORT.permission)
 }
 export function permittedLanding(user: Authority): string {
   return '/' + (workspaceDestinations.find(([, , p]) => user?.permissions?.includes(p))?.[0] ??
     (platformAvailable(user) ? 'platform' : 'workspace-access'))
 }
-export interface ExperienceRoute { audience: Audience; target: string | null; allowed: boolean; redirect?: string }
 export function experienceRoute(pathname: string, user: Authority): ExperienceRoute {
   const parts = pathname.split('/').filter(Boolean)
   const platform = parts[0] === 'platform'
+
+  if (parts[0] === 'support') {
+    const grant = canonicalizeGuid(parts[1])
+
+    return { audience: 'support', target: null, grant: grant ?? undefined,
+      allowed: parts.length === 2 && !!grant && SUPPORT_UUID_V7.test(grant) && !!user?.platformPermissions?.includes(SUPPORT.permission) }
+  }
+
   const result: ExperienceRoute = { audience: platform ? 'platform' : 'workspace', target: platform ? null : canonicalizeGuid(user?.clientId), allowed: false }
   if (!user) return result
+
+  if (parts[0] === 'settings' && parts[1] === 'support-access' && parts.length === 2) {
+    return { ...result, allowed: user.role === 'ClientOwner' }
+  }
+
   if (platform) {
     if (parts.length === 1) return { ...result, allowed: platformAvailable(user) }
+
+    if (parts.length === 2 && parts[1] === 'support') {
+      return { ...result, allowed: !!user.platformPermissions?.includes(SUPPORT.permission) }
+    }
+
     if (parts.length === 2 && parts[1] === 'health') return { ...result, allowed: !!user.platformPermissions?.includes(platformViews.health) }
     const target = operationalTarget(parts[2])
     if (parts[1] !== 'clients' || !target) return result

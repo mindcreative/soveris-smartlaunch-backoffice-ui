@@ -1,9 +1,10 @@
 import { hasMfaAssurance, parseMfaProjection } from './mfaAuthority'
 import type { AuthUser } from '../types/auth'
+import { SUPPORT } from '../support/constants'
 
 const guid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const clientPermissions = new Set(['ai:create','ai:view','analytics:view','audit:view','billing:export','billing:view','clients:update','clients:view','content:update','content:view','domains:create','domains:delete','domains:update','domains:verify','domains:view','products:create','products:delete','products:update','products:view','submissions:delete','submissions:export','submissions:view','themes:update','themes:view','users:audit','users:create','users:delete','users:resetPassword','users:update','users:view'])
-const platformPermissions = new Set(['platform:clients:view','platform:clients:status','platform:packages:manage','platform:billing:view','platform:billing:export','platform:billing:provision','platform:billing:adjust','platform:billing:reconcile','platform:audit:view','platform:health:view'])
+const platformPermissions = new Set(['platform:clients:view','platform:clients:status','platform:packages:manage','platform:billing:view','platform:billing:export','platform:billing:provision','platform:billing:adjust','platform:billing:reconcile','platform:audit:view','platform:health:view',SUPPORT.permission])
 function permissions(value: unknown, known: Set<string>): string[] {
   if (!Array.isArray(value) || value.some(p => typeof p !== 'string' || !known.has(p)) || new Set(value).size !== value.length) throw new Error('Current session permissions are unavailable')
   return [...value]
@@ -22,7 +23,9 @@ export function parseCurrentAuthority(value: unknown): AuthUser {
 
   return { ...mfa, id: v.id as string, clientId: v.clientId as string, clientRoleId: v.clientRoleId as string,
     sessionId: v.sessionId, securityRevision: v.securityRevision, role: v.role as AuthUser['role'],
-    email: v.email, displayName: v.displayName, permissions: permissions(v.permissions, clientPermissions),
+    email: v.email, displayName: v.displayName,
+    workspaceName: typeof v.workspaceName === 'string' && Array.from(v.workspaceName).length <= 500 && v.workspaceName.trim() ? v.workspaceName : null, timeZoneId: typeof v.timeZoneId === 'string' ? v.timeZoneId : null,
+    permissions: permissions(v.permissions, clientPermissions),
     platformPermissions: hasMfaAssurance(mfa) ? platform : [],
     accessToken: '', refreshToken: '', expiresIn: 0 }
 }

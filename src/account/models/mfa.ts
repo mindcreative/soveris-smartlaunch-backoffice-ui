@@ -3,7 +3,7 @@ import type { AuthResponse, AuthUser } from '../../types/auth'
 export type MfaState = 'none' | 'enrolled' | 'recovery-required'
 export type MfaPrimaryPurpose = 'enrollment' | 'replacement' | 'factor_change'
 export type MfaStepUpPurpose = 'step_up' | 'google_link' | 'factor_change'
-export type MfaPurpose = 'login' | MfaPrimaryPurpose | MfaStepUpPurpose
+export type MfaPurpose = 'login' | 'support_activation' | MfaPrimaryPurpose | MfaStepUpPurpose
 
 export interface MfaProjection {
   mfaState: MfaState

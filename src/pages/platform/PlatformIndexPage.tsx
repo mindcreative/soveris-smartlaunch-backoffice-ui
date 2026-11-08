@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { operationalTarget, platformViews } from '../../auth/experience'
+import { SUPPORT } from '../../support/constants'
 
 export function PlatformIndexPage() {
   const { hasPermission } = useAuth()
@@ -12,6 +13,7 @@ export function PlatformIndexPage() {
     <h1 className="text-2xl font-bold">Platform operations</h1>
     <p>Operations apply to this installation. Your workspace membership stays unchanged.</p>
     {hasPermission(platformViews.health) && <Link className="inline-flex min-h-11 items-center text-primary underline" to="/platform/health">System Health</Link>}
+    {hasPermission(SUPPORT.permission) && <Link className="inline-flex min-h-11 items-center text-primary underline" to="/platform/support">Temporary support access</Link>}
     {targeted.length > 0 && <>
       <form onSubmit={event => {event.preventDefault(); const id=operationalTarget(entry); setError(!id); setTarget(id)}} className="space-y-3">
         <label className="block" htmlFor="operational-client">Target Client ID</label>

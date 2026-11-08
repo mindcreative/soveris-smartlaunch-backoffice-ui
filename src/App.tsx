@@ -1,4 +1,7 @@
 import { MfaBoundary } from './account/MfaBoundary'
+import { SupportBoundary } from './support/SupportBoundary'
+import { SupportInboxPage } from './support/SupportInboxPage'
+import { SupportAudiencePage } from './support/SupportAudiencePage'
 import MfaSecurity from './pages/account/MfaSecurityPage'
 import MfaEnroll from './pages/account/MfaEnrollPage'
 import MfaChallenge from './pages/account/MfaChallengePage'
@@ -74,7 +77,7 @@ function Application() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <AccountFlowLifetime />
-          <MfaBoundary><AccountDocumentPolicy><Routes>
+          <MfaBoundary><SupportBoundary><AccountDocumentPolicy><Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
             <Route element={<AccountBoundary />}>
@@ -96,6 +99,10 @@ function Application() {
             {/* Protected routes under AdminShell */}
             <Route element={<AdminShell />}>
               <Route path="/platform" element={<PlatformIndexPage />} />
+              <Route path="/platform/support" element={<SupportInboxPage mode="operator" />} />
+              <Route path="/settings/support-access" element={<SupportInboxPage mode="owner" />} />
+              <Route path="/support/:grantId" element={<SupportAudiencePage />} />
+              <Route path="/support/*" element={<ExperienceDeniedPage />} />
               <Route path="/platform/*" element={<ExperienceDeniedPage />} />
               <Route path="/platform/clients/:clientId" element={<PlatformClientPage />} />
               <Route path="/platform/health" element={<PlatformHealthPage />} />
@@ -141,7 +148,7 @@ function Application() {
 
             {/* Catch-all */}
             <Route path="*" element={<Landing />} />
-          </Routes></AccountDocumentPolicy></MfaBoundary>
+          </Routes></AccountDocumentPolicy></SupportBoundary></MfaBoundary>
 
           <ToastContainer
             icon={NotificationIcon}

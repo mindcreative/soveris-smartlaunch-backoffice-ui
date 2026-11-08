@@ -275,25 +275,45 @@ export const useAuthStore = create<AuthStore>()(devtools(persist((set, get) => {
       await clearPrivateState()
     },
     synchronizeSessionFromStorage: async () => {
-      let access: string | null = null, refresh: string | null = null
-      try { access=localStorage.getItem('backoffice_access_token');refresh=localStorage.getItem('backoffice_refresh_token') } catch { /* Retire unverifiable storage. */ }
-      if(access===get().accessToken && refresh===get().refreshTokenValue) return
-      // Retire synchronously, before the first await. Do not write shared tokens:
-      // an intermediate logout/rotation event must not erase another tab's login.
+      const saved = storedTokenSnapshot()
+      const access = saved.available ? saved.accessToken : null
+      const refresh = saved.available ? saved.refreshToken : null
+
+      if (access === get().accessToken && refresh === get().refreshTokenValue) {
+        return
+      }
+
       bindAuthorityToken(null)
-      set({ ...anonymous,accessToken:access,refreshTokenValue:refresh,isLoading:Boolean(access && refresh) })
-      const retiring=clearPrivateState(), epoch=currentAuthorityEpoch()
-      await retiring
-      if(!access || !refresh || currentAuthorityEpoch()!==epoch) return
+      set({ ...anonymous, accessToken: access, refreshTokenValue: refresh, isLoading: Boolean(access && refresh) })
+      const retiring = clearPrivateState()
+      const epoch = currentAuthorityEpoch()
+      const ownsCredentials = () => get().accessToken === access && get().refreshTokenValue === refresh
+        && sameStoredTokens(saved, storedTokenSnapshot())
+
       try {
-        const projection=await authApi.currentAuthority()
-        if(currentAuthorityEpoch()!==epoch || localStorage.getItem('backoffice_access_token')!==access ||
-          localStorage.getItem('backoffice_refresh_token')!==refresh) return
-        accept(projection,access,refresh)
+        await retiring
+
+        if (!access || !refresh || currentAuthorityEpoch() !== epoch || !ownsCredentials()) {
+          return
+        }
+
+        const projection = await authApi.currentAuthority()
+
+        if (currentAuthorityEpoch() === epoch && ownsCredentials()) {
+          accept(projection, access, refresh)
+        }
       } catch (error) {
-        if(currentAuthorityEpoch()!==epoch) return
-        const denied=error && typeof error==='object' && 'status' in error && (error.status===401 || error.status===403)
-        set({user:null,isAuthenticated:false,isLoading:false,authorityUnavailable:!denied})
+        if (currentAuthorityEpoch() === epoch && ownsCredentials()) {
+          if (error && typeof error === 'object' && 'status' in error && error.status === 401) {
+            await clear()
+          } else {
+            await get().suspendAuthority()
+          }
+        }
+      } finally {
+        if (ownsCredentials() && get().isLoading && !get().isAuthenticated) {
+          await get().suspendAuthority()
+        }
       }
     },
     retirePrivileged: () => {
@@ -333,7 +353,13 @@ export const useAuthStore = create<AuthStore>()(devtools(persist((set, get) => {
 
           const parsed = parseCurrentAuthority(projection)
 
-          if (sameAuthority(get().user, parsed)) {
+          const previous = get().user
+
+          if (sameAuthority(previous, parsed)) {
+            if (previous && (previous.timeZoneId !== parsed.timeZoneId || previous.workspaceName !== parsed.workspaceName || previous.displayName !== parsed.displayName || previous.email !== parsed.email)) {
+              set({ user: { ...previous, timeZoneId: parsed.timeZoneId, workspaceName: parsed.workspaceName, displayName: parsed.displayName, email: parsed.email } })
+            }
+
             return
           }
 
@@ -360,9 +386,9 @@ export const useAuthStore = create<AuthStore>()(devtools(persist((set, get) => {
             return
           }
 
-          if (error && typeof error === 'object' && 'status' in error && error.status === 503) {
+          if (!(error && typeof error === 'object' && 'status' in error && error.status === 401)) {
             await get().suspendAuthority()
-          } else if (error && typeof error === 'object' && 'status' in error && (error.status === 401 || error.status === 403)) {
+          } else if (error && typeof error === 'object' && 'status' in error && error.status === 401) {
             await clear()
           } else {
             throw error
@@ -381,19 +407,47 @@ export const useAuthStore = create<AuthStore>()(devtools(persist((set, get) => {
       }
     },
     handleSuccessfulRefresh: async () => {
-      if (refreshingProjection) return refreshingProjection
-      refreshingProjection=(async () => {
-        const retiring=get().suspendAuthority(),epoch=currentAuthorityEpoch()
+      if (refreshingProjection) {
+        return refreshingProjection
+      }
+
+      refreshingProjection = (async () => {
+        const saved = storedTokenSnapshot()
+        const retiring = get().suspendAuthority()
+        const epoch = currentAuthorityEpoch()
         await retiring
-        if(currentAuthorityEpoch()!==epoch) return
-        let access: string | null=null, refresh: string | null=null
-        try { access=localStorage.getItem('backoffice_access_token');refresh=localStorage.getItem('backoffice_refresh_token') } catch { /* handled below */ }
-        if(!access || !refresh) { await clear();return }
-        const projection=await authApi.currentAuthority()
-        if(currentAuthorityEpoch()!==epoch) return
-        accept(projection,access,refresh)
+
+        if (currentAuthorityEpoch() !== epoch || !sameStoredTokens(saved, storedTokenSnapshot())) {
+          return
+        }
+
+        if (!saved.available || !saved.accessToken || !saved.refreshToken) {
+          await clear()
+          return
+        }
+
+        try {
+          const projection = await authApi.currentAuthority()
+
+          if (currentAuthorityEpoch() === epoch && sameStoredTokens(saved, storedTokenSnapshot())) {
+            accept(projection, saved.accessToken, saved.refreshToken)
+          }
+        } catch (error) {
+          if (currentAuthorityEpoch() === epoch && sameStoredTokens(saved, storedTokenSnapshot())) {
+            if (error && typeof error === 'object' && 'status' in error && error.status === 401) {
+              await clear()
+            } else {
+              await get().suspendAuthority()
+            }
+          }
+        }
       })()
-      try { await refreshingProjection } finally { refreshingProjection=null }
+
+      try {
+        await refreshingProjection
+      } finally {
+        refreshingProjection = null
+      }
     },
     doRefreshToken: async () => {
       const refresh=get().refreshTokenValue
@@ -405,30 +459,75 @@ export const useAuthStore = create<AuthStore>()(devtools(persist((set, get) => {
         const result=await authApi.refreshToken({ refreshToken: refresh })
         if(currentAuthorityEpoch()!==epoch) return
         accept(result.user,result.accessToken,result.refreshToken)
-      } catch { if(currentAuthorityEpoch()===epoch) await clear() }
+      } catch (error) {
+        if (currentAuthorityEpoch() === epoch) {
+          if (error && typeof error === 'object' && 'status' in error && error.status === 401) {
+            await clear()
+          } else {
+            await get().suspendAuthority()
+          }
+        }
+      }
     },
     initialize: async () => {
-      if(get().isInitialized) return
-      if(initializing) return initializing
-      initializing=(async () => {
-        let access: string | null=null,refresh: string | null=null
-        try { access=localStorage.getItem('backoffice_access_token');refresh=localStorage.getItem('backoffice_refresh_token') } catch { /* handled below */ }
-        if(!access || !refresh) { await clear();return }
+      if (get().isInitialized) {
+        return
+      }
+
+      if (initializing) {
+        return initializing
+      }
+
+      initializing = (async () => {
+        const saved = storedTokenSnapshot()
+
+        if (!saved.available || !saved.accessToken || !saved.refreshToken) {
+          await clear()
+          return
+        }
+
+        const { accessToken, refreshToken } = saved
         bindAuthorityToken(null)
-        set({ user: null,accessToken:access,refreshTokenValue:refresh,isAuthenticated: false,isLoading: true })
-        const retiring=clearPrivateState(),epoch=currentAuthorityEpoch()
-        await retiring
-        if(currentAuthorityEpoch()!==epoch) return
+        set({ user: null, accessToken, refreshTokenValue: refreshToken, isAuthenticated: false, isLoading: true, authorityUnavailable: false })
+        const retiring = clearPrivateState()
+        const epoch = currentAuthorityEpoch()
+        const ownsCredentials = () => get().accessToken === accessToken && get().refreshTokenValue === refreshToken
+          && sameStoredTokens(saved, storedTokenSnapshot())
+
         try {
-          const projection=await authApi.currentAuthority()
-          if(currentAuthorityEpoch()===epoch) accept(projection,access,refresh)
+          await retiring
+
+          if (currentAuthorityEpoch() !== epoch || !ownsCredentials()) {
+            return
+          }
+
+          const projection = await authApi.currentAuthority()
+
+          if (currentAuthorityEpoch() === epoch && ownsCredentials()) {
+            accept(projection, accessToken, refreshToken)
+          }
         } catch (error) {
-          if(currentAuthorityEpoch()!==epoch) return
-          if(error && typeof error==='object' && 'status' in error && error.status===503) await get().suspendAuthority()
-          else await clear()
+          if (currentAuthorityEpoch() === epoch && ownsCredentials()) {
+            if (error && typeof error === 'object' && 'status' in error && error.status === 401) {
+              await clear()
+            } else {
+              await get().suspendAuthority()
+            }
+          }
+        } finally {
+          // Cancellation removes positive authority, not the original credentials.
+          // A newer accepted login owns its own state and must never be overwritten.
+          if (ownsCredentials() && get().isLoading && !get().isAuthenticated) {
+            await get().suspendAuthority()
+          }
         }
       })()
-      try { await initializing } finally { initializing=null }
+
+      try {
+        await initializing
+      } finally {
+        initializing = null
+      }
     },
   }
 }, {

@@ -38,4 +38,5 @@ export const MFA_AUTHENTICATED_PATHS = [
 ] as const
 
 export const MFA_UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+export const MFA_TOTP_CODE = /^[0-9]{6}$/
 export const MFA_UTC_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,7})?(?:Z|\+00:00)$/

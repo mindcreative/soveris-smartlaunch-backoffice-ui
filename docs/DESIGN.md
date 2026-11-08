@@ -1,7 +1,7 @@
 ---
 title: "Back-Office Visual Design Tokens"
 status: draft
-updated: "2026-09-10"
+updated: "2026-11-07"
 created: "2026-09-07"
 version: "1.0.0"
 designSystem: "Tailwind CSS"
@@ -272,6 +272,21 @@ font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 - Margin top: `mt-2`
 
 ---
+
+### Story 16.8 support surfaces — existing semantic appearance
+
+For this scoped increment, inherit the already implemented Light/Dark/forced-colour palette in [src/appearance/tokens.css](../src/appearance/tokens.css) and its existing utility consumers. Semantic roles are `surface`, `foreground`, `muted`, `control`, `selected`, `focus`, `primary-solid`, `on-accent`, `warning`, `warning-soft` and `warning-line`; values and theme variants stay in that existing source. The earlier literal indigo/white examples above must not replace these roles in support. This is an inheritance clarification, not new tokens or a palette change.
+
+| Component | Existing visual anatomy; behavior belongs to EXPERIENCE's support companion |
+| --- | --- |
+| Customer / Products dropdown | Existing labelled control and surface popup; visible selected/focus states, bounded option region and separate paging/status row. No search field. |
+| Selected products | Wrapped named chips, count and full-size Remove targets; unavailable-label text remains readable. |
+| Request / consent card | Existing heading/description/field/action spacing, structured exact-scope summary, persistent validation. |
+| MFA / activation | Existing labelled TOTP input, status/error region and distinct verification/activation actions. |
+| Attribution banner / Exit | Existing warning surface/border/text roles; identity/scope/deadline wrap; Exit stays visible without obscuring focus. |
+| Lifecycle / recovery / read result | Text-labelled state, time and last-check metadata; durable notice, actionable controls and bounded readable result. No colour-only meaning. |
+
+See [the scoped companion and W1–W5](../../soveris-business/_bmad-output/planning-artifacts/specs/spec-backoffice-ui-implementation/support-access-ux-contract.md) for composition and interaction. These wireframes are subordinate to this visual spine and the story's behavioral/security contract. Preserve the current shell and typography. Measure actual text, selected/disabled, warning and focus pairs in both palettes, 320px/zoom and forced colours; this note does not establish contrast or manual PASS.
 
 ## Do's and Don'ts
 

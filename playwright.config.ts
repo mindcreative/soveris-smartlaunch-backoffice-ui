@@ -6,7 +6,9 @@ export default defineConfig({
   testDir: './e2e',
   // Appearance and performance acceptance require built assets. Performance
   // runs in playwright.reports.config.ts and the full appearance matrix.
-  testIgnore: ['**/*-live.spec.ts', '**/appearance.spec.ts', '**/appearance-session.spec.ts', '**/billing-reports-performance.spec.ts'],
+  // Navigation stages require the canonical Infrastructure fixture and run
+  // through playwright.account-live.config.ts, alongside the other live lanes.
+  testIgnore: ['**/*-live.spec.ts', '**/product-navigation.spec.ts', '**/appearance.spec.ts', '**/appearance-session.spec.ts', '**/billing-reports-performance.spec.ts'],
   fullyParallel: true,
   retries: process.env.CI ? 2 : 0,
   reporter: 'list',

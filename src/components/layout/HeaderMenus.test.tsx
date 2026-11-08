@@ -7,10 +7,11 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import { TopBar } from './TopBar'
 import { AppearanceProvider } from '../../appearance/AppearanceProvider'
 const logout = vi.fn()
-vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: { displayName: 'Operator', email: 'operator@example.test', role: 'ClientAdmin', permissions: clientFixturePermissions }, logout }) }))
-beforeEach(() => { localStorage.clear() })
-function setup() {
-  render(<MemoryRouter initialEntries={['/domains']}><AppearanceProvider userId="test-user"><TopBar onOpenMobileNavigation={() => {}} menuButtonRef={createRef()} /></AppearanceProvider><button>Outside</button></MemoryRouter>)
+const currentUser = { displayName: 'Operator', email: 'operator@example.test', role: 'ClientAdmin', permissions: clientFixturePermissions, platformPermissions: [] as string[], workspaceName: 'Original workspace' }
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: currentUser, logout }) }))
+beforeEach(() => { localStorage.clear(); currentUser.platformPermissions = []; currentUser.displayName = 'Operator' })
+function setup(path = '/domains') {
+  render(<MemoryRouter initialEntries={[path]}><AppearanceProvider userId="test-user"><TopBar onOpenMobileNavigation={() => {}} menuButtonRef={createRef()} /></AppearanceProvider><button>Outside</button></MemoryRouter>)
   return userEvent.setup()
 }
 it('opens Appearance by keyboard, arrows/Home/End select and Escape restores focus', async () => {
@@ -29,7 +30,7 @@ it('shows one identity menu and mutually excludes menus; outside click keeps tar
   await user.click(screen.getByRole('button', { name: /User menu/ }))
   expect(screen.queryByRole('menu', { name: 'Appearance' })).toBeNull()
   expect(screen.getByRole('menu', { name: 'User menu' })).toHaveTextContent('operator@example.test')
-  expect(screen.getByText('ClientAdmin')).toBeVisible()
+  expect(screen.getByText('Workspace role: ClientAdmin')).toBeVisible()
   await user.click(screen.getByRole('button', { name: 'Outside' }))
   expect(screen.getByRole('button', { name: 'Outside' })).toHaveFocus(); expect(screen.queryByRole('menu')).toBeNull()
   await user.click(screen.getByRole('button', { name: /User menu/ }))
@@ -65,4 +66,16 @@ it('dismisses a focused tooltip with Escape while retaining trigger focus', asyn
   expect(document.querySelector('.header-tooltip')).toBeNull()
   expect(screen.queryByRole('menu')).toBeNull()
   expect(trigger).toHaveFocus()
+})
+
+it('AV6 distinguishes support authority from the unchanged role in the original named workspace', async () => {
+  currentUser.platformPermissions = ['platform:support:operate']
+  currentUser.displayName = 'Rowan 019d0e15-c3f0-7a55-8bc2-9cf0a1b2c3d4'
+  const user = setup('/platform/support')
+  await user.click(screen.getByRole('button', { name: /User menu/ }))
+  expect(screen.getByText('Platform role: SupportOperator')).toBeVisible()
+  expect(screen.getByText('Workspace role: ClientAdmin')).toBeVisible()
+  expect(screen.getByText('Workspace: Original workspace')).toBeVisible()
+  expect(document.body.textContent).not.toContain('019d0e15-c3f0-7a55-8bc2-9cf0a1b2c3d4')
+  expect(currentUser.role).toBe('ClientAdmin')
 })
