@@ -15,5 +15,18 @@ it('labels scoped readiness, idle lifecycle, freshness and unverified writes wit
   expect(screen.getByText('Idle — starts on demand')).not.toHaveClass('bg-success-soft')
   expect(screen.getByText('Observation: observed · 2 seconds old')).toBeVisible()
   expect(screen.getAllByText('Write capability unverified').length).toBeGreaterThan(0)
-  expect(within(screen.getByText('AI Worker', { selector: 'dt' }).parentElement!).getByText('unknown')).toBeVisible()
+  expect(within(screen.getByText('AI Worker', { selector: 'dt' }).parentElement!).getByText('Unverified')).toBeVisible()
+})
+
+it('distinguishes a failed dependency from missing evidence and explains idle execution', () => {
+  const summary = parseHealthSummary(fixture)
+  Object.assign(summary.components.find(row => row.alias === 'redis_auth')!, {
+    status: 'unhealthy', state: 'observed', reasonCode: 'dependency_unavailable', ageSeconds: 0, validForSeconds: 30,
+  })
+  render(<PlatformHealthComponents summary={summary} />)
+  const auth = within(screen.getByText('Redis authentication', { selector: 'dt' }).parentElement!)
+  expect(auth.getByText('Unavailable')).toBeVisible()
+  expect(auth.getByText(/required dependency check failed/)).toBeVisible()
+  expect(screen.getAllByText('Not ready').length).toBeGreaterThan(0)
+  expect(screen.getAllByText(/No current observation from the owning service/).length).toBeGreaterThan(0)
 })

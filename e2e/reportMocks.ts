@@ -35,7 +35,7 @@ export async function installSession(page:Page,role: 'ClientAdmin' | 'Editor' | 
  await installCurrentSession(page,{id:ACTOR,clientId:CLIENT,role,permissions:role==='Viewer'?viewerFixturePermissions:role==='Editor'?editorFixturePermissions:clientFixturePermissions,platformPermissions:role==='Viewer'?[]:['platform:billing:view','platform:billing:reconcile']})
 }
 function periods(from:string,to:string,grain:string){const result:{bucketStart:string;periodStart:string;periodEnd:string}[]=[];const date=new Date(from);date.setUTCHours(0,0,0,0);if(grain==='week')date.setUTCDate(date.getUTCDate()-(date.getUTCDay()+6)%7);if(grain==='month')date.setUTCDate(1);while(date.getTime()<Date.parse(to)){const start=date.toISOString();if(grain==='month')date.setUTCMonth(date.getUTCMonth()+1);else date.setUTCDate(date.getUTCDate()+(grain==='week'?7:1));result.push({bucketStart:start,periodStart:new Date(Math.max(Date.parse(start),Date.parse(from))).toISOString(),periodEnd:new Date(Math.min(date.getTime(),Date.parse(to))).toISOString()})}return result}
-export function mockReports(){
+export function mockReports(capturedAt:()=>string=()=>new Date().toISOString()){
  let version=1,sequence=0;const snapshots=new Map<string,{kind:string;client:string;filters:Record<string,any>;asOf:string;version:number;position:number}>();const requests:URL[]=[]
  let expenseCount=0,largeCredit=false,hostile=false,empty=false
  const expenseCache=new Map<string,{groups:any[];totals:any[]}>()
@@ -74,7 +74,7 @@ export function mockReports(){
   if(cursor){const snapshot=snapshots.get(cursor);if(!snapshot)throw new Error('Unknown test cursor');return make(snapshot.kind,snapshot.client,snapshot.filters,snapshot.asOf,snapshot.version,snapshot.position)}
   const q=url.searchParams;const filters:Record<string,any>={from:q.get('from')!,to:q.get('to')!,groupBy:q.get('groupBy')!,pageSize:Number(q.get('pageSize')??20)}
   if(kind==='expense')Object.assign(filters,{dimensions:(q.get('dimensions')??'currency,provider,model,status,source').split(','),currency:q.get('currency'),provider:q.get('provider'),model:q.get('model'),status:q.get('status'),source:q.get('source')})
-  return make(kind,client,filters,new Date().toISOString(),version,0)
+  return make(kind,client,filters,capturedAt(),version,0)
  }
  return {requests,response,setVersion:(v:number)=>version=v,maximum:(count:number)=>expenseCount=count,large:()=>largeCredit=true,hostile:()=>hostile=true,empty:()=>empty=true,install:async(page:Page,override?:(route:Route,url:URL,body:string)=>Promise<boolean>)=>{await page.route('**/api/billing/reports/*',async route=>{const url=new URL(route.request().url());requests.push(url);const body=response(url);if(override&&await override(route,url,body))return;await route.fulfill({status:200,contentType:'application/json',body,headers:{'cache-control':'no-store'}})})}}
 }

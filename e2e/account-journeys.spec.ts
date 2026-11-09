@@ -99,16 +99,31 @@ test('each public account screen follows System, reflows and passes axe without 
 })
 
 test('signup validates focus, preserves pasted inputs through theme changes and sends a single anonymous request', async ({ page }, info) => {
+  // Deterministic admission transport/child fixture; no real Turnstile claim.
+  const admission = { contextId: 'A'.repeat(43), nonce: 'Q'.repeat(43), csrf: 'g'.repeat(43),
+    challengeOrigin: 'http://localhost:5190', siteKey: 'fixture-site-key', expiresIn: 300 }
+  await page.route('**/api/backoffice/auth/admission/context', route => route.fulfill({ json: admission }))
+  await page.route('http://localhost:5190/', route => route.fulfill({ contentType: 'text/html', body: `<!doctype html><script>
+    addEventListener('message', event => {
+      if (event.source === parent && event.data.type === 'account-challenge:init') {
+        parent.postMessage({type:'account-challenge:success',nonce:event.data.nonce,token:'fixture-challenge-token'}, event.origin)
+      }
+    })
+  </script>` }))
   let registrations = 0
   await page.route('**/api/backoffice/auth/register', async route => {
     registrations++
     expect(route.request().headers().authorization === undefined).toBe(true)
     const request = route.request().postDataJSON()
-    expect(Object.keys(request).sort()).toEqual(['email', 'password', 'returnIntent'])
+    expect(Object.keys(request).sort()).toEqual(['admissionContext', 'email', 'password', 'returnIntent', 'turnstileToken'])
 
+    expect(request.admissionContext).toBe(admission.contextId)
+    expect(request.turnstileToken).toBe('fixture-challenge-token')
+    expect(route.request().headers()['x-account-admission-csrf']).toBe(admission.csrf)
     await route.fulfill({ status: 202, json: { status: 'check_email', pendingToken: proof, expiresIn: 86400 } })
   })
   await page.goto('/signup')
+  await expect(page.getByText('Security check complete.')).toBeVisible()
   await page.getByRole('button', { name: 'Create account', exact: true }).click()
   await expect(page.getByLabel('Email address')).toBeFocused()
   await page.getByLabel('Email address').fill('fixture@example.test')

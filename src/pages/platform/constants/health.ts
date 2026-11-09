@@ -1,0 +1,1 @@
+export const HEALTH_REFRESH_INTERVAL_MS = 10_000

@@ -169,6 +169,8 @@ test('header menus switch through pointerless activation without losing focus', 
   const user = page.getByRole('button', { name: /User menu:/ })
   await appearance.click(); await user.evaluate(el => el.click())
   await expect(page.getByRole('menu', { name: 'User menu' })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: 'Account security' })).toBeFocused()
+  await page.keyboard.press('ArrowDown')
   await expect(page.getByRole('menuitem', { name: 'Logout' })).toBeFocused()
   await appearance.evaluate(el => el.click())
   await expect(page.getByRole('menu', { name: 'Appearance' })).toBeVisible()

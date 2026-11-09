@@ -1,3 +1,4 @@
+import { statusLabels, explanations } from './constants/healthLabels'
 import { Badge } from '@/components/shared/Badge'
 import type { ComponentAlias, HealthSummary } from '@/api/healthApi'
 
@@ -14,15 +15,15 @@ const names: Record<ComponentAlias, string> = {
 const scopes = { api_control_plane: 'API control plane', ai_worker: 'AI Worker', ai_content_execution: 'AI content execution',
   ai_image_execution: 'AI image execution', product_asset_write: 'Product asset writes', private_ai_result_write: 'Private AI result writes', ledger_export_write: 'Ledger export writes' }
 
-// Presentation only: intentionally absent from customer routes/navigation. The
-// real platform grant/session integration must authorize and supply the DTO.
+// The platform route supplies an authorized DTO; customer routes never mount this view.
 export function PlatformHealthComponents({ summary }: { summary: HealthSummary }) {
   return <section className="space-y-4" aria-labelledby="platform-health-title">
     <h2 id="platform-health-title" className="text-lg font-semibold">System Health</h2>
+    <p className="text-sm text-muted">Readiness requires fresh capability checks. Unverified means evidence is missing; idle AI models start on demand.</p>
     <div className="space-y-2" aria-label="Overall readiness">
       {summary.readiness.map(scope => <div key={scope.scope} className="rounded-lg border border-line p-4">
         <h3 className="font-medium">Overall readiness — {scopes[scope.scope]}</h3>
-        <p>{scope.status.replace(/_/g, ' ')}</p>
+        <p>{scope.status === 'unhealthy' ? 'Not ready' : statusLabels[scope.status]}</p>
         {scope.blockers.length > 0 && <p className="text-sm text-muted">Blockers: {scope.blockers.map(alias => names[alias]).join(', ')}</p>}
       </div>)}
     </div>
@@ -34,9 +35,9 @@ export function PlatformHealthComponents({ summary }: { summary: HealthSummary }
         return <div key={row.alias} className="p-4 space-y-1 break-words">
           <dt className="font-medium">{names[row.alias]}</dt>
           <dd className="space-y-1 text-sm">
-            <Badge variant={variant}>{lifecycle ?? row.status.replace(/_/g, ' ')}</Badge>
+            <Badge variant={variant}>{lifecycle ?? statusLabels[row.status]}</Badge>
             <p>Observation: {row.state.replace(/_/g, ' ')} · {row.ageSeconds === null ? 'No observation' : `${Math.floor(row.ageSeconds)} seconds old`}</p>
-            <p>{row.reasonCode === 'write_unverified' ? 'Write capability unverified' : row.reasonCode.replace(/_/g, ' ')}</p>
+            <p>{explanations[row.reasonCode]}</p>
             {row.storageWrite !== 'not_applicable' && <p>{row.storageWrite === 'unverified' ? 'Write capability unverified' :
               row.storageWrite === 'read_only' ? 'Read-only mount' : row.storageWrite === 'failed' ? 'Confirmed write failure' : 'Write capability verified'}</p>}
             {row.executionReady !== null && <p>{row.executionReady ? 'Capability ready to execute' : 'Capability not ready to execute'}</p>}

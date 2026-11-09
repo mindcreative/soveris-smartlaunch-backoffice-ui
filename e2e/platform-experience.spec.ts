@@ -1,11 +1,92 @@
 import { test, expect } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { installCurrentSession } from './currentSession'
-import { currentAuthorityFixture } from '../src/test/authorityFixtures'
+import { currentAuthorityFixture, verifiedMfaFixture } from '../src/test/authorityFixtures'
 import { readFileSync } from 'node:fs'
 const fixture=JSON.parse(readFileSync(new URL('../src/api/fixtures/health-v2.json',import.meta.url),'utf8'))
 const client='01990000-0000-7000-8000-000000000002'
 const foreign='01990000-0000-7000-8000-000000000099'
+
+test('automatic health refresh preserves the scrolled inventory and stops after an outage', async ({ page }) => {
+  test.setTimeout(60_000)
+  await installCurrentSession(page, { permissions: [], platformPermissions: ['platform:health:view'] })
+  let calls = 0
+  let release!: () => void
+  const held = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/api/backoffice/health', async route => {
+    calls++
+
+    if (calls === 2) {
+      await held
+    }
+
+    await route.fulfill(calls < 3 ? { json: fixture } : { status: 503, json: { error: 'authorization_unavailable' } })
+  })
+  await page.goto('/platform/health')
+  await expect(page.getByText('Backoffice API process', { exact: true })).toBeVisible()
+  await page.getByText('Redis authentication', { exact: true }).scrollIntoViewIfNeeded()
+  const scrollBefore = await page.evaluate(() => scrollY)
+  expect(scrollBefore).toBeGreaterThan(0)
+
+  await expect.poll(() => calls, { timeout: 15_000 }).toBe(2)
+  await expect(page.getByText('Redis authentication', { exact: true })).toBeVisible()
+  expect(await page.evaluate(() => scrollY)).toBe(scrollBefore)
+  release()
+
+  await expect(page.getByRole('heading', { name: 'Current access unavailable' })).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByText('Redis authentication', { exact: true })).toHaveCount(0)
+  await page.waitForTimeout(12_000)
+  expect(calls).toBe(3)
+})
+
+test('health inventory cannot survive customer operator customer transitions or a held refresh',async({page})=>{
+  const user=await installCurrentSession(page,{permissions:['clients:view'],platformPermissions:[]})
+  let calls=0,release!:()=>void,entered!:()=>void
+  const started=new Promise<void>(resolve=>{entered=resolve})
+  const held=new Promise<void>(resolve=>{release=resolve})
+  await page.route('**/api/backoffice/health',async route=>{
+    calls++
+    if(calls===2){entered();await held}
+    await route.fulfill({json:fixture})
+  })
+  await page.route('**/api/backoffice/clients/*/dashboard',route=>route.fulfill({json:{clientId:client,products:0,totalSubmissions:0,verifiedSubmissions:0}}))
+  await page.goto('/platform/health')
+  await expect(page.getByRole('heading',{name:'Access denied'})).toBeVisible()
+  expect(calls).toBe(0)
+  Object.assign(user,verifiedMfaFixture,{platformPermissions:['platform:health:view'],securityRevision:'2',sessionId:'01990000-0000-7000-8000-000000000005'})
+  await page.evaluate(()=>dispatchEvent(new Event('focus')))
+  await expect(page.getByText('Backoffice API process',{exact:true})).toBeVisible()
+  await page.getByRole('button',{name:'Refresh health',exact:true}).click()
+  await started
+  await expect(page.getByRole('status',{name:'Refreshing health observations…'})).toBeVisible()
+  await page.getByRole('link',{name:'My workspace',exact:true}).click()
+  Object.assign(user,{platformPermissions:[],mfaState:'none',stepUpRequired:true,assuranceGeneration:null,assuranceExpiresAt:null,freshAssuranceExpiresAt:null,securityRevision:'3',sessionId:'01990000-0000-7000-8000-000000000006'})
+  await page.evaluate(()=>dispatchEvent(new Event('focus')))
+  await expect(page.getByRole('link',{name:'Platform operations',exact:true})).toHaveCount(0)
+  release()
+  await expect(page.getByText('Backoffice API process',{exact:true})).toHaveCount(0)
+  await page.goBack()
+  await expect(page.getByRole('heading',{name:'Access denied'})).toBeVisible()
+  await expect(page.getByText('Backoffice API process',{exact:true})).toHaveCount(0)
+  expect(calls).toBe(2)
+})
+
+test('offline and malformed health refreshes hide prior inventory and recover explicitly',async({page})=>{
+  await installCurrentSession(page,{permissions:[],platformPermissions:['platform:health:view']})
+  let mode:'valid'|'offline'|'malformed'='valid'
+  await page.route('**/api/backoffice/health',route=>mode==='offline'?route.abort():route.fulfill({json:mode==='valid'?fixture:{...fixture,secret:'rejected'}}))
+  await page.goto('/platform/health')
+  await expect(page.getByText('Backoffice API process',{exact:true})).toBeVisible()
+  for(const next of ['offline','malformed'] as const){
+    mode=next
+    await page.getByRole('button',{name:'Refresh health',exact:true}).click()
+    await expect(page.getByRole('heading',{name:'Health unavailable',exact:true})).toBeVisible()
+    await expect(page.getByText('Backoffice API process',{exact:true})).toHaveCount(0)
+    mode='valid'
+    await page.getByRole('button',{name:'Refresh health',exact:true}).click()
+    await expect(page.getByText('Backoffice API process',{exact:true})).toBeVisible()
+  }
+})
 
 test('health-only operator uses separate shell; expiry, outage and fresh recovery are honest',async({page})=>{
   await installCurrentSession(page,{permissions:[],platformPermissions:['platform:health:view']})

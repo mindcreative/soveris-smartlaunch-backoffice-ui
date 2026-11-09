@@ -1,4 +1,4 @@
-import {expect,test,type Route} from '@playwright/test'
+import {expect,test,type Page,type Route} from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import {mockReports,installSession,reportsPath,CLIENT,CLIENT_B} from './reportMocks'
 import {writeFile} from 'node:fs/promises'
@@ -131,13 +131,23 @@ test('review fixes preserve keyboard recovery and accepted normalized draft iden
  failure=500;await credit.getByRole('button',{name:'Load more',exact:true}).focus();await page.keyboard.press('Enter');await expect(credit.getByRole('status',{name:'Credit report recovery'})).toBeFocused();await page.keyboard.press('Tab');await expect(credit.getByRole('button',{name:'Try again'})).toBeFocused();await page.keyboard.press('Enter');await expect(credit.getByRole('button',{name:'Refresh credit report'})).toBeFocused()
 })
 
+// Age the report independently so its expiry does not also expire session-bound MFA.
+async function pauseReportClock(page:Page) {
+ const now=new Date()
+ // Install before the pause target on the empty page, then keep setup time out
+ // of the one-second pre-expiry window. MFA keeps its separate fixture expiry.
+ await page.clock.install({time:new Date(now.getTime()-60000)})
+ await page.clock.pauseAt(now)
+ return new Date(now.getTime()-14*60000).toISOString()
+}
+
 for(const pending of [false,true])test(`fixed expiry preserves focus on a named stale status (pending=${pending})`,async({page})=>{
- await page.clock.install({time:new Date()});const mock=mockReports();let hold=false,release:(()=>void)|undefined;await mock.install(page,async(_route,url)=>{if(hold&&url.searchParams.has('cursor'))await new Promise<void>(resolve=>{release=resolve});return false});await page.goto(reportsPath());await page.getByLabel('Credit periods per page').fill('1');await page.getByRole('button',{name:'Apply filters'}).click();const credit=page.getByRole('region',{name:'Abstract-credit activity',exact:true});await expect(credit.getByRole('button',{name:'Load more',exact:true})).toBeVisible();await page.clock.fastForward(14*60000+59000);await credit.getByRole('button',{name:'Load more',exact:true}).focus()
+ const capturedAt=await pauseReportClock(page);const mock=mockReports(()=>capturedAt);let hold=false,release:(()=>void)|undefined;await mock.install(page,async(_route,url)=>{if(hold&&url.searchParams.has('cursor'))await new Promise<void>(resolve=>{release=resolve});return false});await page.goto(reportsPath());await page.getByLabel('Credit periods per page').fill('1');await page.getByRole('button',{name:'Apply filters'}).click();const credit=page.getByRole('region',{name:'Abstract-credit activity',exact:true});await expect(credit.getByRole('button',{name:'Load more',exact:true})).toBeVisible();await page.clock.fastForward(59000);await credit.getByRole('button',{name:'Load more',exact:true}).focus()
  if(pending){hold=true;await page.keyboard.press('Enter');await expect.poll(()=>Boolean(release)).toBe(true)}
  await page.clock.fastForward(2000);await expect(credit.getByRole('status',{name:'Credit report continuation unavailable'})).toBeFocused();if(pending){release!();await expect(credit).toHaveAttribute('aria-busy','false');await expect(credit.locator('p[id]').filter({hasText:/2 periods loaded/})).toBeVisible();await expect(credit.getByRole('status',{name:'Credit report continuation unavailable'})).toBeFocused()}
  await expect(credit.getByRole('button',{name:'Load more',exact:true})).toHaveCount(0)
 })
 
 test('successful non-final keyboard continuation retains focus through later idle expiry',async({page})=>{
- await page.clock.install({time:new Date()});const mock=mockReports();await mock.install(page);await page.goto(reportsPath());await page.getByLabel('Credit periods per page').fill('1');await page.getByRole('button',{name:'Apply filters'}).click();const credit=page.getByRole('region',{name:'Abstract-credit activity',exact:true});await credit.getByRole('button',{name:'Load more',exact:true}).focus();await page.keyboard.press('Enter');await expect(credit.locator('p[id]').filter({hasText:/2 periods loaded/})).toBeVisible();await expect(credit.getByRole('button',{name:'Load more',exact:true})).toBeFocused();await page.clock.fastForward(16*60000);await expect(credit.getByRole('status',{name:'Credit report continuation unavailable'})).toBeFocused()
+ const capturedAt=await pauseReportClock(page);const mock=mockReports(()=>capturedAt);await mock.install(page);await page.goto(reportsPath());await page.getByLabel('Credit periods per page').fill('1');await page.getByRole('button',{name:'Apply filters'}).click();const credit=page.getByRole('region',{name:'Abstract-credit activity',exact:true});await credit.getByRole('button',{name:'Load more',exact:true}).focus();await page.keyboard.press('Enter');await expect(credit.locator('p[id]').filter({hasText:/2 periods loaded/})).toBeVisible();await expect(credit.getByRole('button',{name:'Load more',exact:true})).toBeFocused();await page.clock.fastForward(61000);await expect(credit.getByRole('status',{name:'Credit report continuation unavailable'})).toBeFocused()
 })
