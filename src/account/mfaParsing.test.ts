@@ -51,6 +51,21 @@ describe('bounded MFA transport', () => {
       assuranceGeneration: id, assuranceExpiresAt: new Date(Date.now() - 1).toISOString(), freshAssuranceExpiresAt: new Date(Date.now() - 600_001).toISOString() } } })).toThrow()
   })
 
+  it('accepts a verified login with the assigned configuration-view permission', () => {
+    const platformPermissions = ['platform:health:view', 'platform:configuration:view']
+    const user = currentAuthorityFixture({ platformPermissions })
+    const session = { user, accessToken: 'fixture-token', refreshToken: 'fixture-refresh', expiresIn: 60 }
+
+    expect(parseMfaSession({ status: 'authenticated', session }).user?.platformPermissions).toEqual(platformPermissions)
+  })
+
+  it('still rejects unknown platform permissions in a verified login', () => {
+    const user = currentAuthorityFixture({ platformPermissions: ['platform:configuration:write'] })
+    const session = { user, accessToken: 'fixture-token', refreshToken: 'fixture-refresh', expiresIn: 60 }
+
+    expect(() => parseMfaSession({ status: 'authenticated', session })).toThrow()
+  })
+
   it('returns fixed safe errors without server diagnostics, private body or unknown retry claims', () => {
     const safe = normalizeMfaError({ code: 'private-canary', message: 'private-canary', secret: 'private-canary' }, 503, '999999999')
     expect(JSON.stringify(safe)).not.toContain('private-canary')
