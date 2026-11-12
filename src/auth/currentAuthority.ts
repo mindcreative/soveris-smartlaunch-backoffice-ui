@@ -4,7 +4,7 @@ import { SUPPORT } from '../support/constants'
 
 const guid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const clientPermissions = new Set(['ai:create','ai:view','analytics:view','audit:view','billing:export','billing:view','clients:update','clients:view','content:update','content:view','domains:create','domains:delete','domains:update','domains:verify','domains:view','products:create','products:delete','products:update','products:view','submissions:delete','submissions:export','submissions:view','themes:update','themes:view','users:audit','users:create','users:delete','users:resetPassword','users:update','users:view'])
-const platformPermissions = new Set(['platform:clients:view','platform:clients:status','platform:packages:manage','platform:billing:view','platform:billing:export','platform:billing:provision','platform:billing:adjust','platform:billing:reconcile','platform:audit:view','platform:health:view','platform:configuration:view',SUPPORT.permission])
+const platformPermissions = new Set(['platform:clients:view','platform:clients:status','platform:packages:manage','platform:billing:view','platform:billing:export','platform:billing:provision','platform:billing:adjust','platform:billing:reconcile','platform:audit:view','platform:health:view','platform:configuration:view','platform:retention:preview','platform:retention:execute','platform:retention:holds:manage',SUPPORT.permission])
 function permissions(value: unknown, known: Set<string>): string[] {
   if (!Array.isArray(value) || value.some(p => typeof p !== 'string' || !known.has(p)) || new Set(value).size !== value.length) throw new Error('Current session permissions are unavailable')
   return [...value]

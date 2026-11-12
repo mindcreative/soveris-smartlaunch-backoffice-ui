@@ -59,6 +59,15 @@ describe('bounded MFA transport', () => {
     expect(parseMfaSession({ status: 'authenticated', session }).user?.platformPermissions).toEqual(platformPermissions)
   })
 
+  it.each(['platform:retention:preview', 'platform:retention:execute', 'platform:retention:holds:manage'])(
+    'accepts the exact assigned retention permission through verified MFA: %s', permission => {
+      const user = currentAuthorityFixture({ platformPermissions: [permission] })
+      const session = { user, accessToken: 'fixture-token', refreshToken: 'fixture-refresh', expiresIn: 60 }
+
+      expect(parseMfaSession({ status: 'authenticated', session }).user?.platformPermissions).toEqual([permission])
+    },
+  )
+
   it('still rejects unknown platform permissions in a verified login', () => {
     const user = currentAuthorityFixture({ platformPermissions: ['platform:configuration:write'] })
     const session = { user, accessToken: 'fixture-token', refreshToken: 'fixture-refresh', expiresIn: 60 }
